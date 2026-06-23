@@ -1,0 +1,63 @@
+{
+  "project": {
+    "name": "trimail",
+    "path": "/Users/vidarbrevik/projects/trimail",
+    "mode": "established_codebase",
+    "created": "2026-06-23",
+    "operator": "vidarbrevik"
+  },
+  "constraints": {
+    "all_llm_local": true,
+    "no_cloud_in_runtime": true,
+    "no_paid_services": true,
+    "single_user": true,
+    "no_clientside_storage_for_creds": true
+  },
+  "workflow": {
+    "research_first": false,
+    "require_plan_approval": true,
+    "auto_commit_after_phase": false,
+    "atomic_commits": true,
+    "skip_research_when_existing_report": true,
+    "use_thinker_for_framing_decisions": true,
+    "use_code_reviewer_for_docs_and_code": true,
+    "sync_state_at_end_of_session": true
+  },
+  "research": {
+    "skip_when_present": [
+      "docs/RESEARCH-REPORT.md"
+    ],
+    "open_questions_resolved_via_doc_review": true,
+    "open_question_ids": ["Q1", "Q2", "Q3", "Q4", "Q5"]
+  },
+  "roadmap": {
+    "phase_naming": "phase-NN-kebab-name",
+    "phases_dir": ".planning/phases",
+    "preserve_adr_numbers": true,
+    "adr_anchors": [
+      "ADR-001-postgres-pgvector",
+      "ADR-002-taranis-prior-art",
+      "ADR-003-osint-reframe",
+      "ADR-004-llm-local-qwen36"
+    ]
+  },
+  "ai": {
+    "scoring_model": "local qwen36 via oMLX :8000/v1 (Ollama :11434/v1 fallback)",
+    "sab_model": "local qwen36 (same) — ADR-004",
+    "embeddings_model_under_test": "bge-m3 or mE5-large (multilingual)",
+    "scoring_prompt_source": "ccir.md verbatim"
+  },
+  "git": {
+    "branch_strategy": "main + short-lived feature branches per phase",
+    "auto_push": false,
+    "data_dir_is_gitignored": true,
+    "never_commit_env_files": true
+  },
+  "links": {
+    "docs": [".planning/PROJECT.md", ".planning/REQUIREMENTS.md", ".planning/ROADMAP.md", ".planning/STATE.md"],
+    "repo_docs": ["docs/ARCHITECTURE.md", "docs/RESEARCH-REPORT.md", "README.md", "ccir.md"],
+    "codebase_map": [".planning/codebase/index.md", ".planning/codebase/architecture.md", ".planning/codebase/structure.md", ".planning/codebase/concerns.md"]
+  }
+}
+</content>
+</invoke>

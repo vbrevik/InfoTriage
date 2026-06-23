@@ -1,0 +1,46 @@
+# trimail — local, free info-triage hub. All on the Mac, no cloud.
+# FreshRSS = aggregator/store · rss-bridge = sites→RSS · feeds = serves the
+# Gmail→Atom file produced by bridge/gmail_to_atom.py to FreshRSS.
+services:
+  freshrss:
+    image: freshrss/freshrss:latest
+    container_name: trimail-freshrss
+    restart: unless-stopped
+    ports:
+      - "8088:80"            # http://localhost:8088  (web UI + setup)
+    environment:
+      TZ: Europe/Oslo
+      # Gentle global cadence so we never hammer a source. FreshRSS fetches feeds
+      # one at a time; at 30-min cycles even GDELT (limit 1 req / 5 s) is safe.
+      # Give rate-limited/heavy feeds (GDELT) a long per-feed TTL in the UI too.
+      CRON_MIN: "23,53"      # twice an hour (not on the :00 stampede)
+    volumes:
+      - ./data/freshrss:/var/www/FreshRSS/data
+    networks: [trimail]
+
+  rssbridge:
+    image: rssbridge/rss-bridge:latest
+    container_name: trimail-rssbridge
+    restart: unless-stopped
+    ports:
+      - "3000:80"            # http://localhost:3000  (turn any site into RSS)
+    volumes:
+      - ./data/rssbridge:/config
+    networks: [trimail]
+
+  # Static server so FreshRSS can subscribe to the locally-generated email feed
+  # at http://feeds/  (on the compose network). Host writes into ./data/feeds.
+  feeds:
+    image: halverneus/static-file-server:latest
+    container_name: trimail-feeds
+    restart: unless-stopped
+    environment:
+      FOLDER: /web
+      PORT: "80"
+    volumes:
+      - ./data/feeds:/web:ro
+    networks: [trimail]
+
+networks:
+  trimail:
+    name: trimail

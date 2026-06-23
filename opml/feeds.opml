@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- trimail feeds — verified 2026-06-23.
+     ✅ live (HTTP 200 + XML).  ⚠️ feed exists but 403s to bots (Cloudflare):
+     FreshRSS may fail — if so, recreate it via rss-bridge (http://localhost:3000).
+     Sources with NO native RSS are listed as comments at the end → use rss-bridge.
+     Import: FreshRSS ▸ Subscription management ▸ Import ▸ upload this file. -->
+<opml version="2.0">
+  <head>
+    <title>trimail — kilder</title>
+  </head>
+  <body>
+    <outline text="Norske aviser" title="Norske aviser">
+      <outline type="rss" text="NRK Toppsaker"      title="NRK Toppsaker"      xmlUrl="https://www.nrk.no/toppsaker.rss" htmlUrl="https://www.nrk.no/"/>
+      <outline type="rss" text="NRK Siste nytt"      title="NRK Siste nytt"      xmlUrl="https://www.nrk.no/nyheter/siste.rss" htmlUrl="https://www.nrk.no/nyheter/"/>
+      <outline type="rss" text="NRK Norge"           title="NRK Norge"           xmlUrl="https://www.nrk.no/norge/toppsaker.rss" htmlUrl="https://www.nrk.no/norge/"/>
+      <outline type="rss" text="NRK Urix (utenriks)" title="NRK Urix (utenriks)" xmlUrl="https://www.nrk.no/urix/toppsaker.rss" htmlUrl="https://www.nrk.no/urix/"/>
+      <outline type="rss" text="VG"                  title="VG"                  xmlUrl="https://www.vg.no/rss/feed/" htmlUrl="https://www.vg.no/"/>
+      <outline type="rss" text="Aftenposten"         title="Aftenposten"         xmlUrl="https://www.aftenposten.no/rss" htmlUrl="https://www.aftenposten.no/"/>
+      <outline type="rss" text="E24 (økonomi)"       title="E24 (økonomi)"       xmlUrl="https://e24.no/rss" htmlUrl="https://e24.no/"/>
+      <outline type="rss" text="Dagbladet"           title="Dagbladet"           xmlUrl="https://www.dagbladet.no/rss/nyheter" htmlUrl="https://www.dagbladet.no/"/>
+      <outline type="rss" text="Bergens Tidende"     title="Bergens Tidende"     xmlUrl="https://www.bt.no/rss" htmlUrl="https://www.bt.no/"/>
+      <outline type="rss" text="Adresseavisen"       title="Adresseavisen"       xmlUrl="https://www.adressa.no/rss" htmlUrl="https://www.adressa.no/"/>
+      <outline type="rss" text="TV 2 Nyheter"        title="TV 2 Nyheter"        xmlUrl="https://www.tv2.no/rss/nyheter" htmlUrl="https://www.tv2.no/"/>
+    </outline>
+    <outline text="Offentlig Norge" title="Offentlig Norge">
+      <outline type="rss" text="Regjeringen"             title="Regjeringen"             xmlUrl="https://www.regjeringen.no/no/rss/Rss/2581966/" htmlUrl="https://www.regjeringen.no/"/>
+      <outline type="rss" text="Stortinget – Referater"  title="Stortinget – Referater"  xmlUrl="https://www.stortinget.no/no/Stottemeny/RSS/Referater-fra-Stortinget/" htmlUrl="https://www.stortinget.no/"/>
+      <outline type="rss" text="Stortinget – Aktuelt/saker" title="Stortinget – Aktuelt/saker" xmlUrl="https://www.stortinget.no/no/Stottemeny/RSS/Aktuelt-saker/" htmlUrl="https://www.stortinget.no/"/>
+      <outline type="rss" text="Lovdata – Nytt"          title="Lovdata – Nytt"          xmlUrl="https://lovdata.no/feed?data=newArticles&amp;type=RSS" htmlUrl="https://lovdata.no/"/>
+      <outline type="rss" text="Lovdata – Lover/forskrifter" title="Lovdata – Lover/forskrifter" xmlUrl="https://lovdata.no/feed?data=LT&amp;type=RSS" htmlUrl="https://lovdata.no/"/>
+      <outline type="rss" text="FHI"                     title="FHI"                     xmlUrl="https://www.fhi.no/rss/nyheter/" htmlUrl="https://www.fhi.no/"/>
+      <outline type="rss" text="SSB"                     title="SSB"                     xmlUrl="https://www.ssb.no/rss/nyheter" htmlUrl="https://www.ssb.no/"/>
+    </outline>
+    <outline text="Norsk forsvar &amp; sikkerhet" title="Norsk forsvar &amp; sikkerhet">
+      <outline type="rss" text="aldrimer.no"   title="aldrimer.no"   xmlUrl="https://www.aldrimer.no/feed" htmlUrl="https://www.aldrimer.no/"/>
+      <outline type="rss" text="Stratagem (NO)" title="Stratagem (NO)" xmlUrl="https://www.stratagem.no/feed/" htmlUrl="https://www.stratagem.no/"/>
+    </outline>
+    <outline text="Forsvar &amp; geopolitikk (intl)" title="Forsvar &amp; geopolitikk (intl)">
+      <outline type="rss" text="War on the Rocks" title="War on the Rocks" xmlUrl="https://warontherocks.com/feed/" htmlUrl="https://warontherocks.com/"/>
+      <outline type="rss" text="Defense One"      title="Defense One"      xmlUrl="https://www.defenseone.com/rss/all/" htmlUrl="https://www.defenseone.com/"/>
+      <outline type="rss" text="The Diplomat"     title="The Diplomat"     xmlUrl="https://thediplomat.com/feed/" htmlUrl="https://thediplomat.com/"/>
+      <outline type="rss" text="Foreign Policy"   title="Foreign Policy"   xmlUrl="https://foreignpolicy.com/feed/" htmlUrl="https://foreignpolicy.com/"/>
+      <outline type="rss" text="Foreign Affairs"  title="Foreign Affairs"  xmlUrl="https://www.foreignaffairs.com/rss.xml" htmlUrl="https://www.foreignaffairs.com/"/>
+      <outline type="rss" text="Politico EU"      title="Politico EU"      xmlUrl="https://www.politico.eu/feed/" htmlUrl="https://www.politico.eu/"/>
+      <outline type="rss" text="Politico (US)"    title="Politico (US)"    xmlUrl="https://rss.politico.com/politics-news.xml" htmlUrl="https://www.politico.com/"/>
+      <outline type="rss" text="ISW ⚠️"            title="ISW ⚠️"            xmlUrl="https://www.understandingwar.org/rss.xml" htmlUrl="https://www.understandingwar.org/"/>
+      <outline type="rss" text="Lawfare ⚠️"        title="Lawfare ⚠️"        xmlUrl="https://www.lawfaremedia.org/feed" htmlUrl="https://www.lawfaremedia.org/"/>
+      <outline type="rss" text="Breaking Defense ⚠️" title="Breaking Defense ⚠️" xmlUrl="https://breakingdefense.com/feed/" htmlUrl="https://breakingdefense.com/"/>
+      <outline type="rss" text="The National Interest ⚠️" title="The National Interest ⚠️" xmlUrl="https://nationalinterest.org/feed" htmlUrl="https://nationalinterest.org/"/>
+      <outline type="rss" text="Ukrainska Pravda ⚠️" title="Ukrainska Pravda ⚠️" xmlUrl="https://www.pravda.com.ua/eng/" htmlUrl="https://www.pravda.com.ua/eng/"/>
+      <outline type="rss" text="RUSI"               title="RUSI"               xmlUrl="https://rusi.org/rss" htmlUrl="https://rusi.org/"/>
+      <outline type="rss" text="Euromaidan Press"   title="Euromaidan Press"   xmlUrl="https://euromaidanpress.com/feed/" htmlUrl="https://euromaidanpress.com/"/>
+    </outline>
+    <outline text="OSINT &amp; investigations (intl)" title="OSINT &amp; investigations (intl)">
+      <!-- Investigative / open-source journalism. Anchored by PIR-6 in ccir.md;
+           politically-oriented outlets (The Intercept, openDemocracy) are
+           flagged here but you can disable them in FreshRSS if the bias
+           outweighs the value. -->
+      <outline type="rss" text="Bellingcat"            title="Bellingcat"            xmlUrl="https://www.bellingcat.com/feed/" htmlUrl="https://www.bellingcat.com/"/>
+      <outline type="rss" text="OCCRP"                 title="OCCRP"                 xmlUrl="https://www.occrp.org/en/rss/" htmlUrl="https://www.occrp.org/"/>
+      <outline type="rss" text="The New Humanitarian"  title="The New Humanitarian"  xmlUrl="http://www.thenewhumanitarian.org/rss/all.xml" htmlUrl="https://www.thenewhumanitarian.org/"/>
+      <outline type="rss" text="ProPublica"            title="ProPublica"            xmlUrl="https://www.propublica.org/feed/" htmlUrl="https://www.propublica.org/"/>
+      <outline type="rss" text="The Intercept"         title="The Intercept"         xmlUrl="https://theintercept.com/feed/" htmlUrl="https://theintercept.com/"/>
+      <outline type="rss" text="openDemocracy"         title="openDemocracy"         xmlUrl="https://www.opendemocracy.net/feed/" htmlUrl="https://www.opendemocracy.net/"/>
+    </outline>
+    <outline text="Verdensnyheter" title="Verdensnyheter">
+      <outline type="rss" text="BBC News"        title="BBC News"        xmlUrl="https://feeds.bbci.co.uk/news/rss.xml" htmlUrl="https://www.bbc.com/news"/>
+      <outline type="rss" text="BBC World"       title="BBC World"       xmlUrl="https://feeds.bbci.co.uk/news/world/rss.xml" htmlUrl="https://www.bbc.com/news/world"/>
+      <outline type="rss" text="CNN (Edition)"   title="CNN (Edition)"   xmlUrl="http://rss.cnn.com/rss/edition.rss" htmlUrl="https://edition.cnn.com/"/>
+      <outline type="rss" text="CNN World"       title="CNN World"       xmlUrl="http://rss.cnn.com/rss/edition_world.rss" htmlUrl="https://edition.cnn.com/world"/>
+      <outline type="rss" text="Al Jazeera"      title="Al Jazeera"      xmlUrl="https://www.aljazeera.com/xml/rss/all.xml" htmlUrl="https://www.aljazeera.com/"/>
+      <outline type="rss" text="The Guardian – World" title="The Guardian – World" xmlUrl="https://www.theguardian.com/world/rss" htmlUrl="https://www.theguardian.com/world"/>
+      <outline type="rss" text="Deutsche Welle"  title="Deutsche Welle"  xmlUrl="https://rss.dw.com/rdf/rss-en-all" htmlUrl="https://www.dw.com/"/>
+      <outline type="rss" text="TASS"            title="TASS"            xmlUrl="https://tass.com/rss/v2.xml" htmlUrl="https://tass.com/"/>
+    </outline>
+    <outline text="Datakilder" title="Datakilder">
+      <!-- GDELT global news API as RSS. Works, but RATE-LIMITED to 1 req / 5 s —
+           keep FreshRSS refresh slow (>=15 min). Edit query=... to your topic. -->
+      <outline type="rss" text="GDELT · Ukraine" title="GDELT · Ukraine" xmlUrl="https://api.gdeltproject.org/api/v2/doc/doc?query=Ukraine&amp;mode=ArtList&amp;format=rss&amp;maxrecords=75" htmlUrl="https://www.gdeltproject.org/"/>
+    </outline>
+    <outline text="Medium" title="Medium">
+      <outline type="rss" text="Medium · AI"               title="Medium · AI"               xmlUrl="https://medium.com/feed/tag/artificial-intelligence" htmlUrl="https://medium.com/tag/artificial-intelligence"/>
+      <outline type="rss" text="Medium · LLM"              title="Medium · LLM"              xmlUrl="https://medium.com/feed/tag/llm" htmlUrl="https://medium.com/tag/llm"/>
+      <outline type="rss" text="Medium · National Security" title="Medium · National Security" xmlUrl="https://medium.com/feed/tag/national-security" htmlUrl="https://medium.com/tag/national-security"/>
+      <outline type="rss" text="Medium · Geopolitics"      title="Medium · Geopolitics"      xmlUrl="https://medium.com/feed/tag/geopolitics" htmlUrl="https://medium.com/tag/geopolitics"/>
+    </outline>
+
+    <outline text="Midtøsten &amp; US-Iran (SIR-1)" title="Midtøsten &amp; US-Iran (SIR-1)">
+      <outline type="rss" text="Crisis Group"            title="Crisis Group"            xmlUrl="https://www.crisisgroup.org/rss.xml" htmlUrl="https://www.crisisgroup.org/"/>
+      <outline type="rss" text="Al-Monitor"             title="Al-Monitor"             xmlUrl="https://www.al-monitor.com/rss" htmlUrl="https://www.al-monitor.com/"/>
+      <outline type="rss" text="FDD · Long War Journal"  title="FDD · Long War Journal"  xmlUrl="https://www.longwarjournal.org/feed" htmlUrl="https://www.longwarjournal.org/"/>
+      <outline type="rss" text="US State Dept"           title="US State Dept"           xmlUrl="https://www.state.gov/rss-feed/department-press-bureau/department-of-state/feed" htmlUrl="https://www.state.gov/"/>
+    </outline>
+    <outline text="Sport — VM 2026 (SIR-2)" title="Sport — VM 2026 (SIR-2)">
+      <outline type="rss" text="BBC Sport Football"   title="BBC Sport Football"   xmlUrl="https://feeds.bbci.co.uk/sport/football/rss.xml" htmlUrl="https://www.bbc.com/sport/football"/>
+      <outline type="rss" text="ESPN FC"              title="ESPN FC"              xmlUrl="https://www.espn.com/espn/rss/soccer/news" htmlUrl="https://www.espn.com/soccer/"/>
+      <outline type="rss" text="Reuters Sports"       title="Reuters Sports"       xmlUrl="https://www.reutersagency.com/feed/?best-topics=sports&amp;post_type=best" htmlUrl="https://www.reutersagency.com/"/>
+      <outline type="rss" text="Google News · WC2026" title="Google News · WC2026" xmlUrl="https://news.google.com/rss/search?q=FIFA+World+Cup+2026&amp;hl=en" htmlUrl="https://news.google.com/search?q=FIFA+World+Cup+2026"/>
+    </outline>
+    <!-- ===== NO native RSS (404) — build with rss-bridge (CSS-selector scrape) =====
+    
+      Forsvarets forum   https://www.forsvaretsforum.no/
+         FFI                https://www.ffi.no/
+         NUPI               https://www.nupi.no/
+         UTSYN              https://www.utsyn.no/
+         High North News    https://www.highnorthnews.com/
+         X / Twitter        — no free RSS; see README "X / Twitter" section
+    -->
+  </body>
+</opml>
