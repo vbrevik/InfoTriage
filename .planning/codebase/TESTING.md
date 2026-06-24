@@ -1,112 +1,276 @@
-# TESTING — InfoTriage
+# Testing Patterns
 
-Source of truth: absence of a formal test suite + observed smoke patterns.
-Generated: 2026-06-23.
+**Analysis Date:** 2026-06-24
 
-## TL;DR
+## Test Framework
 
-**No formal test suite.** No `test/`, no `pytest`, no `unittest`, no `conftest.py`. The codebase ships with smoke evals at every code change but no regression test harness. The runtime itself is the integration test (Fever loop on live FreshRSS + live qwen36).
+**Runner:**
+- `unittest` (Python standard library, built-in)
+- No test framework configuration file (no `pytest.ini`, `setup.cfg`, or similar)
 
-This is consistent with a spike-stage project: cost-of-test-harness exceeds cost-of-smoke-run while the codebase is small and the bugs that matter are end-to-end ones (Cloudflare-blocked feed; credential issue; LLM inviability; staleness).
-
-## What validation exists today
-
-### Smoke at file level
-
-| Layer | Smoke check | Where |
-|---|---|---|
-| Python syntax | `python3 -m py_compile <file>` | every code change |
-| OPML well-formedness | `xml.etree.ElementTree.fromstring()` parses the file cleanly | after every OPML edit |
-| Markdown structure | grep `^## ` for section hierarchy | after every ccir.md edit |
-| ccir.md × CCIR_ORDER sync | spot-check that tuple count matches expected | after every ccir.md or CCIR_ORDER edit |
-
-### Smoke at module level
-
-| Module | Smoke pattern |
-|---|---|
-| `score/digest.py` | Build a hand-crafted list of `verdicts` → call `write_bluf(verdicts, period, top_n=K)` → assert the output markdown contains exactly the expected number of `## …` headers and `[N]` references. |
-| `score/triage_score.py` | `python3 triage_score.py --sample` against the in-file  `SAMPLE` list; eyeball the markdown digest icons. |
-| `score/fever_triage.py` | `python3 fever_triage.py --dry-run --max 20` exercises the full Fever pull without mutating state. |
-
-### Smoke at integration level
-
-Verified live per README's "Status" table:
-
-| Piece | Verified by |
-|---|---|
-| FreshRSS + rss-bridge + feeds up | `docker compose ps` |
-| qwen36 scorer roundtrip | `python3 score/triage_score.py --sample` returns sensible buckets |
-| Fever API auth + mark-read roundtrip | `python3 score/fever_triage.py` from the cron |
-| Bridge writes to `data/feeds/*.xml` | handshake after the bridge runs |
-| FreshRSS subscribes a bridge feed | manual UI / curl on `:8088` |
-| `http://feeds/gmail.xml` from inside the `InfoTriage` compose network | container-side curl |
-
-### Smoke at directory level / external services
-
-| Probe | Pattern |
-|---|---|
-| LLM reachability | `curl -m 3 http://127.0.0.1:8000/v1/models` expecting HTTP 200/401 (auth header). |
-| FreshRSS web | `curl -m 3 http://localhost:8088/` expecting 302 (FreshRSS's expected redirect). |
-| IMAP probe (Gmail) | low-level `imaplib.IMAP4_SSL('imap.gmail.com'); imap.login(user, pw)` with `.env` loaded. Length-and-shape-only diagnostics for the password (never the password itself). |
-| OPML feed health | `curl` each URL, assert `content-type=xml` and HTTP 200; flag ⚠️ empirically. |
-
-## What is missing
-
-These are gaps; ranked by blast-radius × cost to close.
-
-### High priority
-
-- **No regression tests for `score_item`.** The bucket derivation (`skip`/`read`/`maybe`) is the most-branched logic in the codebase. A ccir.md edit + scorer prompt change could silently invert the routing. Cheap to add: `tests/test_triage_score.py` with 8–10 fixtures covering: `ccir=none` ⇒ `skip`; `ccir=PIR-1, cnr=I` ⇒ `read`; `ccir=PIR-1, cnr=II, score=8` ⇒ `read`; etc.
-- **No fix for `write_bluf` redaction regression.** Verified once (password-leak guard). No automated regression check that the markdown output never contains `GMAIL_APP_PASSWORD` or other env-var names. Cheap: a fixture where `llm()` raises `Exception("GMAIL_APP_PASSWORD=abcd1234")`, then assert the output BLUF markdown doesn't contain `"abcd1234"` or `"GMAIL_APP_PASSWORD"`. This is the highest-value test for security.
-- **No tests for OPML parser roundtrip.** Editing opml by hand with str_replace is fragile (multi-byte em-dash anchors have failed multiple times). A roundtrip test "edit → write → re-parse → feed count == expected" would catch the same bug class instantly.
-
-### Medium priority
-
-- **No `pytest` config.** Setup = `pyproject.toml` or `pytest.ini` at project root. Cost: trivial.
-- **No `CI`.** A GitHub-Actions workflow that runs `py_compile` + the bridge IMAP-probes + a sample scoring run would catch 80% of regressions overnight.
-- **No fixtures for the bridges.** Each bridge requires live creds to test end-to-end. A `tests/fixtures/{mailboxes,channels}/*.json.example` would let new contributors dry-run bridges without their own creds.
-- **No tests for `cluster()` in `score/digest.py`.** Greedy keyword-overlap clustering is replaceable (Phase 2: cosine on embeddings) but currently has no testbench for the existing greedy behavior.
-
-### Low priority (defer)
-
-- **Property-based tests** (Hypothesis) on the LLM prompt parser.
-- **Mutation testing** for the scorer.
-- **Coverage targets.** Spike-stage: not yet.
-
-## What we've explicitly not done
-
-- **No mocks for the LLM.** Score-time tests against a real local qwen36 (the stack's normal boot path) — that's how the user verifies "the brain works" in practice. A mock would test the parser, not the truck.
-- **No load testing.** Digest generation runs in seconds at the current article volume (max 400 per window).
-- **No per-bridge integration test against FreshRSS.** Verified manually per README.
-
-## How to run the existing smoke
-
+**Run Commands:**
 ```bash
-# Syntax
-python3 -m py_compile score/digest.py score/triage_score.py score/fever_triage.py \
-                    bridge/gmail_to_atom.py bridge/imap_to_atom.py bridge/yt_to_atom.py
-
-# OPML well-formedness + feed-count
-python3 -c "from xml.etree import ElementTree as ET; r=ET.parse('opml/feeds.opml'); \
-            print(sum(1 for o in r.iter('outline') if o.get('type')=='rss'))"
-
-# Scorer self-test
-python3 score/triage_score.py --sample
-
-# Fever dry-run (read unread, score, mark nothing)
-python3 score/fever_triage.py --dry-run --max 20
-
-# Liveness
-docker compose ps
-curl -m 3 -o /dev/null -w 'HTTP %{http_code}\n' http://localhost:8088/
-curl -m 3 -o /dev/null -w 'HTTP %{http_code}\n' http://localhost:3000/
-curl -m 3 -o /dev/null -w 'HTTP %{http_code}\n' http://127.0.0.1:8000/v1/models
+python3 tests/test_opml_check.py                # Run single test file
+python3 tests/test_*.py                         # Run all test files (shell glob)
+python3 -m unittest discover tests/ -p "test_*.py"  # Discover and run all tests
 ```
 
-## TL;DR for the reviewer
+**Assertion Library:**
+- Standard `unittest.TestCase` assertions: `assertEqual()`, `assertIn()`, `assertNotIn()`, `assertRaises()`
 
-If you only have time to add three tests:
+## Test File Organization
 
-1. `score_item` enum-table test (ccir + cnr + score → bucket).
-2. `write_bluf` credential-leak guard test.
-3. OPML roundtrip test (write → re-parse → `len(feeds) == expected`).
+**Location:**
+- All tests in `tests/` directory at project root
+- Tests are sibling to source code modules (`bridge/`, `opml/`, `score/`)
+
+**Naming:**
+- Test files: `test_*.py` format (e.g., `test_opml_check.py`, `test_bridge_escape.py`)
+- Test classes: `Test<FeatureName>` (e.g., `TestClassify`, `TestLoadOpml`, `TestEscape`)
+- Test methods: `test_<scenario>` (e.g., `test_200_rss_xml_is_live`, `test_ampersand_escaped`)
+
+**Directory Structure:**
+```
+tests/
+├── test_opml_check.py       # opml/_check.py classifier + OPML loader
+├── test_bridge_escape.py    # bridge/_util.py::escape() contract
+├── test_ccir_sync.py        # CCIR markdown synchronization
+├── test_opml_roundtrip.py   # OPML parsing round-trip
+├── test_score_parse.py      # Triage scorer JSON extraction
+└── test_write_bluf.py       # BLUF credential-leak guard
+```
+
+## Test Structure
+
+**Suite Organization:**
+```python
+class TestClassify(unittest.TestCase):
+    """``classify(probe_result)`` → (emoji, reason). Pure logic, no network."""
+
+    def test_200_rss_xml_is_live(self):
+        """200 OK with <?xml + <rss = ✅."""
+        self.assertEqual(
+            _check.classify((200, "application/rss+xml",
+                             b'<?xml version="1.0"?><rss version="2.0">')),
+            ("✅", "HTTP 200, RSS/Atom XML"))
+
+    def test_200_html_body_keeps_warning(self):
+        """200 OK but body is HTML (Pravda / The National Interest) = ⚠️."""
+        self.assertEqual(
+            _check.classify((200, "text/html",
+                             b"<!DOCTYPE html><html><head><title>Pravda</title>")),
+            ("⚠️", "HTTP 200, HTML body"))
+```
+
+**Patterns:**
+- One docstring per test method explaining the scenario and expected outcome
+- Assertion on result immediately after action
+- Each test is self-contained (no test order dependencies)
+- Multiple related tests in one test class
+
+**Setup and Teardown:**
+```python
+class TestEmitWorkingOPML(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        # Build synthetic test data
+        def outline(title, url):
+            return ET.Element("outline", {...})
+        self.results = [...]
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_emit_working_opml_keeps_only_live_and_transient(self):
+        out_path = os.path.join(self.tmpdir, "working.opml")
+        _check.emit_working_opml(self.results, out_path, "2026-06-24")
+        tree = ET.parse(out_path)
+        # assertions...
+```
+
+## Mocking
+
+**Framework:** Manual mocking without a dedicated mocking library
+
+**Patterns:**
+```python
+def test_credential_not_in_markdown(self):
+    """Exception carrying GMAIL_APP_PASSWORD=… must NOT appear in bluf.md."""
+    secret = "GMAIL_APP_PASSWORD=abcd1234efgh5678"
+    original = triage_score.llm
+
+    def failing_llm(msgs, max_tokens=400):
+        raise RuntimeError(f"auth failed: {secret}")
+
+    triage_score.llm = failing_llm
+    try:
+        _, text = write_bluf(self._make_verdicts("PIR-1"), "test period")
+    finally:
+        triage_score.llm = original
+
+    self.assertNotIn("abcd1234", text)
+```
+
+**What to Mock:**
+- External function calls that have side effects
+- LLM API calls (replace with lambda returning test data)
+- I/O operations that are expensive or have state
+
+**What NOT to Mock:**
+- Pure functions (no side effects)
+- XML parsing (safe and fast)
+- Data structure operations
+
+## Fixtures and Factories
+
+**Test Data Creation:**
+```python
+def _make_verdicts(self, ccir="PIR-1"):
+    """Minimal verdict list hitting one CCIR."""
+    return [{"title": "t", "source": "s", "summary": "sum",
+             "ccir": ccir, "cnr": "II", "score": 8, "bucket": "read",
+             "why": "test", "url": "http://x", "id": 1, "t": 0}]
+
+def _make_verdicts_n(self, ccir, n, score_start=9):
+    """N items in CCIR `ccir` with descending scores."""
+    return [
+        {"title": f"item_{i}", "source": f"s_{i}",
+         "summary": "x " * 50,
+         "ccir": ccir, "cnr": "II", "score": score_start - i,
+         "bucket": "read", "why": "test",
+         "url": f"http://x/{i}", "id": i, "t": 0}
+        for i in range(n)
+    ]
+```
+
+**Location:**
+- Helper methods in the test class, prefixed with `_`
+- Not extracted to separate files (kept inline for clarity)
+
+## Coverage
+
+**Requirements:** None enforced (no coverage tool configured)
+
+**View Coverage:**
+- No built-in command; would require adding pytest-cov or coverage.py
+
+## Test Types
+
+**Unit Tests:**
+- Pure function testing with controlled inputs
+- Examples: `TestClassify`, `TestEscape`, `TestScoreParse`
+- No network access required; all probes mocked
+- Scope: Single function or class behavior
+
+**Integration Tests:**
+- Multi-component testing (e.g., OPML loading + filtering)
+- Examples: `TestLoadOpml`, `TestEmitWorkingOPML`
+- File I/O tested using `tempfile.mkdtemp()`
+- Scope: Entire workflow with real files
+
+**E2E Tests:**
+- Not used in this codebase
+- Tests run locally without external services
+
+## Common Patterns
+
+**Assertion for Exception Type:**
+```python
+def test_non_str_input_fails_loud(self):
+    """Defense-in-depth: silent ``str()`` coercion was over-broad."""
+    for bad in (123, 4.5, ["a"], {"k": "v"}, b"bytes"):
+        with self.assertRaises(TypeError,
+                               msg=f"expected TypeError for input {bad!r}"):
+            escape(bad)
+```
+
+**Multiple Assertions per Test:**
+```python
+def test_emit_working_opml_keeps_only_live_and_transient(self):
+    """✅ + 🟡 survive; ⚠️ + ❌ are dropped."""
+    out_path = os.path.join(self.tmpdir, "working.opml")
+    _check.emit_working_opml(self.results, out_path, "2026-06-24")
+    tree = ET.parse(out_path)
+    cats = tree.getroot().find("body").findall("outline")
+    texts_in_file = []
+    for c in cats:
+        cat_text = c.get("text")
+        for sub in c.findall("outline"):
+            texts_in_file.append((cat_text, sub.get("text")))
+    self.assertIn(("CatA", "A1-live"), texts_in_file)
+    self.assertIn(("CatA", "A2-transient"), texts_in_file)
+    self.assertNotIn(("CatA", "A3-broken"), texts_in_file)
+```
+
+**Defense-in-Depth Testing:**
+```python
+def test_double_escape_stays_well_formed(self):
+    """Defense-in-depth: html.escape is not idempotent by design.
+    Even if a bridge accidentally double-escapes, the output still
+    contains no raw XML metachars — FreshRSS keeps parsing."""
+    for raw in ["<a>", "a&b", '"x"', "mix & < > '\"", "AT&T"]:
+        once = escape(raw)
+        twice = escape(once)
+        for c in ("<", ">"):
+            self.assertNotIn(c, twice,
+                             f"raw {c!r} leaked through double-escape of {raw!r}")
+```
+
+**Behavior-Driven Test Names:**
+Test names describe the scenario and expected outcome, not just the operation:
+- `test_200_rss_xml_is_live` — describes scenario AND result
+- `test_html_body_keeps_warning` — describes state AND outcome
+- `test_credential_not_in_markdown` — describes contract being tested
+- `test_none_returns_empty_string` — describes input AND output
+
+## Test Imports Pattern
+
+```python
+#!/usr/bin/env python3
+"""tests/test_opml_check.py — opml/_check.py classifier + OPML loader.
+
+[Docstring with test purpose and usage]
+"""
+import os
+import shutil
+import sys
+import tempfile
+import unittest
+import xml.etree.ElementTree as ET
+
+# Set up path to import from sibling package
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "opml"))
+import _check  # noqa: E402
+
+# Define module-level constants
+OPML = os.path.join(os.path.dirname(__file__), "..", "opml", "feeds.opml")
+
+# Define test classes
+class TestClassify(unittest.TestCase):
+    ...
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
+```
+
+## Running Tests
+
+**Example Test Run Output:**
+```bash
+$ python3 tests/test_opml_check.py
+test_200_rss_xml_is_live (test_opml_check.TestClassify) ... ok
+test_200_html_body_keeps_warning (test_opml_check.TestClassify) ... ok
+test_403_cloudflare_is_warning (test_opml_check.TestClassify) ... ok
+...
+Ran 24 tests in 0.123s
+
+OK
+```
+
+**Verbosity:**
+- Default: minimal output (just `.` or `F` per test)
+- `unittest.main(verbosity=2)`: show test name + result for each test
+
+---
+
+*Testing analysis: 2026-06-24*

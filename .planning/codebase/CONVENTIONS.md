@@ -1,82 +1,189 @@
-# CONVENTIONS — InfoTriage
+# Coding Conventions
 
-Source of truth: code-level patterns + ccir.md headings + opml/feeds.opml.
-Generated: 2026-06-23.
+**Analysis Date:** 2026-06-24
 
-## Naming
+## Naming Patterns
 
-- **CCIR tier prefixes.** PIR-* (external threats), FFIR-* (home/own forces), SIR-* (time-bounded specific). Numbers 1..N per tier.
-- **CNR levels.** CAT I 🚩 (varsle straks), CAT II 📋 (dagsbrief), Routine (utelat).
-- **Bucket labels.** `read` / `maybe` / `skip` — internal to the scorer. Visualised in digests as 🔥 / 🤔 / 🗑️.
-- **Writer modes.** `cluster` / `brief` / `list` / `bluf` — passed via `--mode` to `score/digest.py`. `cluster` is the default; digests ship to `data/digests/`.
-- **Atom output names.** `data/feeds/<name>.xml` (IMAP) or `data/feeds/youtube-<slug>.xml` (YouTube). The single-account Gmail bridge writes **`gmail.xml`** (collision risk documented in `bridge/imap_to_atom.py:54-58`).
-- **Channel slug.** lowercased / non-alnum → `-`, trailing 32 chars. Disambiguate via explicit `name:` in the channel config when collision risk exists.
+**Files:**
+- Lowercase with underscores: `gmail_to_atom.py`, `_check.py`, `triage_score.py`
+- Private modules prefixed with underscore: `_util.py`, `_check.py`
+- Test files: `test_*.py` (e.g., `test_opml_check.py`)
 
-## OPML style (`opml/feeds.opml`)
+**Functions:**
+- Lowercase with underscores: `load_opml()`, `classify()`, `probe_and_classify()`, `escape()`, `emit_working_opml()`
+- Helper functions may be private: `_collect_rss()`, `_make_verdicts()`
+- Main entry point: `main()`
 
-- 4-space indent for top-level `<outline text="…" title="…">`.
-- 6-space indent for child `<outline type="rss" …/>`.
-- Every `<outline type="rss">` carries both `xmlUrl` and `htmlUrl`. `text` and `title` are kept in sync.
-- Em-dash `—` and middle-dot `·` are UTF-8 — OK.
-- `&` in URLs/titles escaped as `&amp;` to keep XML well-formedness.
-- `⚠️` suffix on a title means "feeds 403 to bot UAs". Empirical, not speculative.
-- Bottom-of-file `<!-- ===== NO native RSS (404) — build with rss-bridge (CSS-selector scrape) ===== -->` lists the sites that have no native RSS — pipeline reminder, not data.
+**Variables:**
+- Lowercase with underscores: `tmpdir`, `body_clean`, `out_path`, `score_start`
+- Module-level state: lowercase (e.g., `ccir = load_ccir()`)
 
-## Python code style
+**Constants:**
+- UPPERCASE_WITH_UNDERSCORES: `DEFAULT_UA`, `DEFAULT_TIMEOUT`, `PROBE_BODY_BYTES`, `OPML_HERE`, `CCIR_PATH`, `OUT`
 
-- `#!/usr/bin/env python3` shebang on every script.
-- Module docstring with **usage** in the first block.
-- Stdlib-maximum; resist new deps unless feedgen's job is genuinely outside stdlib's reach.
-- Functions named after their role: `score_item`, `fever`, `strip_html`, `gmail_search`, `write_bluf`, `fetch_window`.
-- Module-level constants `UPPER_SNAKE` (`CCIR_ORDER`, `STOP`, `STORE`, `OUT`, `OSLO`).
-- `load_dotenv(path)` helper duplicated across modules for self-containment — keeps each script runnable standalone.
+## Code Style
 
-## Bilingual policy
+**Formatting:**
+- No explicit linting tool configured (no `.eslintrc`, `.pylintrc`, `pyproject.toml`)
+- PEP 8-style line length (no excessive wrapping observed)
+- Indentation: 4 spaces (Python standard)
+- Blank lines: 2 between module-level definitions, 1 between class methods
 
-- **Code identifiers** — English.
-- **User-facing prose** — Norwegian. Headings are bilingual (`## PIR — Priority Intelligence Requirements`).
-- **Prompts to the LLM** — bilingual segment: instructions in English; example outputs in Norwegian.
-- **OPML "text=" labels** — Norwegian (matches the user-facing UI in FreshRSS, which a Norwegian operator will see).
-- **ccir.md entries** — bilingual heading + Norwegian bulleted description.
+**Shebang & Module Header:**
+- Every `.py` file starts: `#!/usr/bin/env python3`
+- Followed by a comprehensive module docstring using triple quotes
+- Module docstring includes: purpose, usage examples (with command-line options), and environment variables
 
-## Secrets hygiene
+**Example pattern** (`opml/_check.py` lines 1-37):
+```python
+#!/usr/bin/env python3
+"""opml/_check.py — bulk health-check of every feed in opml/feeds.opml.
 
-- **Plaintext in `.env`** (gitignored). Used for LLM API key (oMLX/Ollama; not a real secret in the operator's threat model), Gmail app password, Fever creds.
-- **App password shape:** 16 chars, lowercase letters + digits only, no spaces. Validation done length-and-shape-only — never printed.
-- **`.mailboxes.json`** (gitignored). Plaintext IMAP credentials for non-Gmail accounts. Operator-side, file-based.
-- **`.yt_channels.json`** (gitignored). Channel URLs only — **do not** add a YouTube account.
-- **Never echo credential characters in error text.** Probes redact via regex (`[a-z]{16}` → `[REDACTED]`) and length-only diagnostics (`len=16`, `isalnum+islower=True/False`).
-- **Reuse the same `load_dotenv()` helper across all modules** so secret-handling behavior is consistent.
+[Detailed description of purpose, behavior, output format]
 
-## Output paths
+Usage::
 
-- `data/feeds/<name>.xml` — bridge-produced Atom feeds.
-- `data/digests/<mode>.md` — digest writer output. One md file per mode.
-- `data/verdicts.jsonl` — append-only scorer history (legacy; future: Postgres).
-- Atom output is always hand-written by the bridges (XML strings assembled in `parts = [...]`). `feedgen` is available but not yet used in production.
+  python3 opml/_check.py                                  # report to stdout
+  python3 opml/_check.py --out data/feed-health.md        # also write to file
+  [more options...]
 
-## Failure handling
+Stdlib only — urllib.request, xml.etree.ElementTree, ...
+"""
+```
 
-- **Stderr = diagnostic. Stdout = clean output.** Cron'd scripts should be parseable.
-- **Never echo exception text into user-facing markdown.** urllib error text can carry URLs with auth headers / env-var components. Pattern: `print(..., file=sys.stderr, flush=True)` for full detail; emit a stinging Norwegian placeholder to markdown.
-- **Length-only credential diagnostics.** `print("len=", len(value), "shape_ok=", bool(value.isalnum() and value.islower()))` — never `print(value)`.
-- **`--dry-run` first.** Where a side-effect could change persistent state (e.g., marking items read in FreshRSS), default to read-only.
+## Import Organization
 
-## CCIR routing responsibility
+**Order:**
+1. Standard library imports (`os`, `sys`, `unittest`, `urllib.request`, `xml.etree.ElementTree`, etc.)
+2. Third-party imports (`feedgen`)
+3. Local/project imports (relative imports from sibling modules)
 
-- `ccir.md` is the **document of record**. Read-only to the runtime; the runtime consults it via the scorer's prompt context.
-- `score/digest.py:CCIR_ORDER` is the **render-engine** contract — section order in `brief.md` / `cluster.md` / `bluf.md`. **Manually synced** with ccir.md.
-- The scorer's prompt ties them together — see CONCERNS.md for the specific drift points.
+**Style:**
+- Multiple stdlib imports on one line separated by commas: `import os, sys, unittest`
+- One import per line preferred for clarity in complex imports
+- Relative imports within package: `from _util import escape`, `import _check`
+- Path manipulation for imports: `sys.path.insert(0, os.path.join(...))`
 
-## Versioning
+**Example** (`tests/test_opml_check.py` lines 17-26):
+```python
+import os
+import shutil
+import sys
+import tempfile
+import unittest
+import xml.etree.ElementTree as ET
 
-- Single-version-in-a-day spike. No semver. The project's "version" is its date-stamped status (header comment in `opml/feeds.opml` reads `verified 2026-06-23`).
-- That's the only datestamp in the codebase — no `__version__` constants anywhere.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "opml"))
+import _check  # noqa: E402
+```
 
-## Style for digests
+## Error Handling
 
-- One markdown file per writer mode.
-- Top heading carries the writer name + the period (cutoff → now Oslo).
-- Each `## SECTION` heading is `CCIR_ID · Norwegian title`.
-- Items use `- **[{score}] {title}**  · {source} · {ccir}` line shape, then a `- {why} — [les]({url})` continuation.
-- Emojis are *intentional* — they're part of CNR/CNR-elevated visibility, not decoration.
+**Pattern: Try-Except with Fallback:**
+- Specific exception types caught
+- Fallback to safe default or empty value
+- Never silent failures without indication
+
+**Example** (`opml/_check.py` lines 73-88):
+```python
+try:
+    req = urllib.request.Request(url, headers={...})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.status, r.headers.get("Content-Type", ""), r.read(...)
+except urllib.error.HTTPError as e:
+    try:
+        body = e.read(PROBE_BODY_BYTES) if hasattr(e, "read") else b""
+    except Exception:
+        body = b""
+    return e.code, (e.headers.get("Content-Type", "") if e.headers else ""), body
+except Exception as e:
+    return "err", f"{type(e).__name__}: {e}", b""
+```
+
+**Pattern: None-Safety:**
+- Functions handle `None` inputs gracefully
+- Example: `escape()` in `bridge/_util.py` (lines 33-38) returns `""` for `None` input rather than raising
+
+**Pattern: Type Validation:**
+- Explicit type checking before processing
+- Raise `TypeError` for incorrect input types
+- Example: `escape()` raises `TypeError` for non-string inputs (except `None`)
+
+## Logging
+
+**Framework:** None. Uses standard output:
+- `print()` statements for normal output
+- Return values for structured data
+- Exception messages embedded in tuples returned by functions
+
+**Pattern: Return Structured Data:**
+- Functions return tuples with status info: `(status, reason_string)`, `(emoji, explanation)`
+- Example: `classify()` returns `("✅", "HTTP 200, RSS/Atom XML")`
+
+**Pattern: Environment-Based Configuration:**
+- No logging config; configuration via environment variables
+- Example: `os.environ.get("LLM_BASE_URL", "http://127.0.0.1:8000/v1")`
+
+## Comments
+
+**When to Comment:**
+- Explain WHY, not WHAT (the code shows WHAT)
+- Clarify non-obvious design decisions
+- Document edge cases and defensive patterns
+- Explain why certain libraries are used (not stdlib vs. third-party)
+
+**Example** (`opml/_check.py` lines 48-57):
+```python
+# FreshRSS-default UA-ish: a Chrome UA that FreshRSS can be configured to
+# mimic. Adjusts past any common Cloudflare/JS-challenge layers that 403 pure
+# bot UAs (curl, wget, Go-http-client). Override per-site via --ua as needed.
+#
+# Must be pure ASCII: urllib sends the User-Agent header as a latin-1-encoded
+# byte string; any non-latin-1 codepoint (e.g. em-dash U+2014) raises
+# UnicodeEncodeError on EVERY probe. Keep this string ASCII only.
+```
+
+**Docstrings:**
+- Every function has a docstring
+- Docstrings explain purpose, parameters (implicitly), return value, and behavior
+- Example: `escape()` docstring explains None-safety and type validation
+
+**Block Comments:**
+- Use `#` for explanations of complex logic
+- Example: Classification logic in `classify()` (lines 101-141) includes comments explaining each branch
+
+## Function Design
+
+**Size:** Functions typically 5-50 lines; longer functions well-commented
+
+**Parameters:**
+- Positional parameters for essential inputs
+- Keyword parameters with defaults for optional config
+- Example: `probe(url, ua=DEFAULT_UA, timeout=DEFAULT_TIMEOUT)`
+
+**Return Values:**
+- Return tuples for multiple related values: `(status, content_type, body)`
+- Return structured dicts for complex data: `{"ccir": "PIR-1", "score": 7, ...}`
+- Use `None` for missing data only when explicit about it
+
+## Module Design
+
+**Exports:**
+- No explicit `__all__` declaration
+- Public functions: not prefixed
+- Private helpers: prefixed with underscore: `_collect_rss()`, `_make_verdicts()`
+
+**Single-File Modules:**
+- Self-contained logic with main entry point
+- Helper functions defined before main entry point
+- Example: `bridge/gmail_to_atom.py` has helpers (`load_dotenv`, `dec`, `gmail_search`, `body_text`) before `main()`
+
+**Package Structure:**
+- `opml/_check.py`: OPML validation and health checking
+- `bridge/*.py`: Email/RSS to Atom bridge converters
+- `score/*.py`: Item triage and scoring
+- `tests/test_*.py`: Test suite
+
+---
+
+*Convention analysis: 2026-06-24*

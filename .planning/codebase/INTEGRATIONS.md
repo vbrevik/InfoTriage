@@ -1,98 +1,202 @@
-# INTEGRATIONS — InfoTriage
+# External Integrations
 
-Source of truth: code-level env reads + bridge entry points.
-Generated: 2026-06-23.
+**Analysis Date:** 2026-06-24
 
-## LLM (local)
+## APIs & External Services
 
-**Endpoint.** OpenAI-compatible `chat/completions` on the local qwen3.6 server.
-- Primary: `http://127.0.0.1:8000/v1` (oMLX on Mac).
-- Fallback: `http://127.0.0.1:11434/v1` (Ollama).
-- Both reply `/v1/models` for inventory and `/v1/chat/completions` for inference.
+**Email (IMAP):**
+- Gmail IMAP (`imap.gmail.com:993`) - Read-only newsletter/message ingestion
+  - SDK/Client: Python `imaplib` (stdlib)
+  - Auth: Google app password (not full Gmail API)
+  - Used by: `bridge/gmail_to_atom.py`, `bridge/imap_to_atom.py`
+  - Query language: Gmail X-GM-RAW (native Gmail search syntax)
+  - Output: Atom feed written to `data/feeds/gmail.xml` or `data/feeds/gmail-multi.xml`
 
-**Auth.** Bearer token from env.
-- `LLM_BASE_URL` (default `http://127.0.0.1:8000/v1`).
-- `LLM_API_KEY` (default `omlx`).
-- `LLM_MODEL` (default `qwen36-ud-4bit`).
+- Multi-Account IMAP (`imap_to_atom.py`)
+  - Providers: Gmail, Outlook, Fastmail, ProtonMail, custom-domain IMAP
+  - Auth: Plaintext IMAP credentials in `.mailboxes.json` (gitignored)
+  - Config: `MAILBOXES` env var (JSON array) or `.mailboxes.json` file
+  - Output: `data/feeds/gmail-multi.xml` (one runner, per-account dispatch)
 
-**Code anchor.** `score/triage_score.py:50` — `llm(messages, max_tokens=400)`. Used by `score_item` for triage and by `write_bluf` (in `score/digest.py`) for per-CCIR synthesis.
+**LLM / AI Scoring:**
+- OpenAI-compatible API endpoint (local)
+  - Default: oMLX on `http://127.0.0.1:8000/v1`
+  - Alternative: Ollama on `http://127.0.0.1:11434/v1`
+  - Auth: Bearer token in header (`Authorization: Bearer {LLM_API_KEY}`)
+  - Endpoint: `/chat/completions` (POST)
+  - Model: Configurable (default: `qwen36-ud-4bit` on oMLX)
+  - Payload: JSON with `model`, `messages`, `temperature`, `max_tokens`
+  - Used by: `score/triage_score.py`, `score/fever_triage.py`, `score/digest.py`, `score/sab_html.py`
+  - Purpose: Scoring items against CCIR (interest profile) and generating digests
+  - Implementation: `score/triage_score.py::llm()` - wraps urllib for compatibility
 
-**Failure handling.** All call sites wrap with try/except; never echo exception text into user-facing markdown (urllib errors can carry URLs with env vars — like `GMAIL_APP_PASSWORD` if it ever leaks into a URL). Stderr gets full detail; markdown gets a stingy Norwegian placeholder. Examples:
-- `triage_score.py` — JSON parse exception → fallback verdict `{ccir:none, cnr:none, score:0}`.
-- `digest.py:write_bluf` — any exception → `_(Kunne ikke generere BLUF — sjekk logg for detaljer)_`.
+**YouTube (Video Transcription):**
+- YouTube video metadata and audio
+  - SDK/Client: `youtube-transcript-api` (optional, implicit in yt_to_atom.py architecture)
+  - Transcription: `mlx_whisper` (Apple Silicon) or OpenAI `whisper` (fallback)
+  - Config: `YT_CHANNELS` env var (JSON array) or `.yt_channels.json` file
+  - Output: Atom feed `data/feeds/youtube-<slug>.xml`
+  - Used by: `bridge/yt_to_atom.py`
+  - Mode: Optional transcription (can emit stub summaries without transcription for testing)
 
-## Gmail (single-account bridge)
+## Data Storage
 
-**Service.** Google Mail IMAP `imap.gmail.com:993` (SSL).
-**Auth.** Google **app password** (16 chars, lowercase-alnum only). Stored as `GMAIL_APP_PASSWORD` in `.env`. App-password requires 2-Step Verification to be ON on the account.
-**Query.** `GMAIL_QUERY` env var (default `newer_than:7d`). Sent as Gmail's proprietary `X-GM-RAW` IMAP extension key.
-**Code anchor.** `bridge/gmail_to_atom.py:1–91`. Single account, INBOX only.
-**Output.** `data/feeds/gmail.xml` (ATOM 1.0). Served at `http://feeds/gmail.xml` to FreshRSS via the `feeds` compose container.
-**Posture.** Read-only — `imap.select("INBOX", readonly=True)`. No STORE / EXPUNGE calls anywhere.
+**Databases:**
+- FreshRSS (in-container)
+  - Type: SQLite (embedded in `freshrss/freshrss:latest` Docker image)
+  - Path (container): `/var/www/FreshRSS/data`
+  - Path (host): `./data/freshrss/` (Docker volume mount)
+  - Connection: Automatic via FreshRSS ORM
+  - Stores: User accounts, feed subscriptions, articles, read/unread state
 
-**Collision warning.** If `name="gmail"` is also given to `imap_to_atom.py`, both scripts will write the same file. Use `name="gmail-multi"` for IMAP Gmail or run only one bridge per Gmail account.
+- rss-bridge
+  - Type: File-based cache (in-container)
+  - Path (container): `/config`
+  - Path (host): `./data/rssbridge/` (Docker volume mount)
+  - Stores: Bridge configurations, cache of generated feeds
 
-## Multi-IMAP bridge
+**File Storage (Local):**
+- `./data/feeds/` - Generated feed files served by static server
+  - `gmail.xml` - Gmail-to-Atom output (from `bridge/gmail_to_atom.py`)
+  - `gmail-multi.xml` - Multi-IMAP output (from `bridge/imap_to_atom.py`)
+  - `youtube-<slug>.xml` - YouTube transcript feeds (from `bridge/yt_to_atom.py`)
+  - Server: `halverneus/static-file-server` on port 80 (internal Docker network)
 
-**Service.** Any IMAP mailbox, including Gmail (with `X-GM-RAW`), Outlook, Fastmail, ProtonMail, custom-domain.
-**Auth.** Per-account password — app password where applicable.
-**Config.** `MAILBOXES` JSON array as a shell env, **OR** `.mailboxes.json` sibling file (gitignored, plaintext). The `.env` loader skips `MAILBOXES=` because the JSON starts with `[` and is not a `KEY=VALUE` line.
-**Per-entry shape.**
-```json
-{"name":"...","host":"...","user":"...","password":"...","query":"...","provider":"gmail|imap"}
+- `./data/triage.log` - Cron log output from `score/fever_triage.py`
+
+- `./data/digests/` - Generated digest files (if created by `score/digest.py`)
+
+**Caching:**
+- FreshRSS internal feed cache (TTL configurable per-feed in UI)
+- rss-bridge local cache in `./data/rssbridge/`
+- No external caching service
+
+## Authentication & Identity
+
+**Email (IMAP):**
+- Google app password (not full Gmail API key) — can be revoked independently
+  - Env var: `GMAIL_APP_PASSWORD`
+  - Scope: Read-only IMAP access to specific account
+
+- Per-account IMAP credentials in `.mailboxes.json`
+  - Format: JSON array with `host`, `port`, `user`, `password` per entry
+  - Example: `[{"host": "imap.gmail.com", "user": "...@gmail.com", "password": "...", ...}]`
+
+**FreshRSS (Fever API):**
+- Fever API username and password (stored in FreshRSS database)
+  - Env vars: `FRESHRSS_FEVER_USER`, `FRESHRSS_FEVER_API_PASSWORD`
+  - Auth method: MD5 hash of `username:password` sent as `api_key` in POST body
+  - Used by: `score/fever_triage.py` to mark items read/unread
+  - Web UI credentials: Admin / InfoTriageLocal23 (default, for local throw-away instance)
+
+**LLM API:**
+- Bearer token authentication (header-based)
+  - Env var: `LLM_API_KEY` (default: `omlx` for oMLX, `ollama` for Ollama)
+  - No external identity provider — API key is local/trusted
+
+## Monitoring & Observability
+
+**Error Tracking:**
+- None (local, no external service)
+
+**Logs:**
+- Stdout/stderr to console and cron logs
+- Triage log: `./data/triage.log` (from cron-scheduled `fever_triage.py`)
+- Docker logs: `docker compose logs <service>`
+
+**Alerting:**
+- None (local system, no external monitoring)
+
+## CI/CD & Deployment
+
+**Hosting:**
+- Local macOS machine (no cloud deployment)
+- All services containerized via Docker Compose
+
+**CI Pipeline:**
+- None (local development only)
+- Manual testing: `python3 script.py --sample` or piping JSON to stdin
+- Test suite: `tests/` directory with pytest/unittest (runner not explicitly configured)
+
+## Environment Configuration
+
+**Required env vars (from `.env.example`):**
+- `LLM_BASE_URL` — LLM API endpoint
+- `LLM_API_KEY` — Bearer token for LLM
+- `LLM_MODEL` — Model name to use
+- `GMAIL_APP_PASSWORD` — Google app password (if using gmail_to_atom.py)
+- `FRESHRSS_FEVER_URL` — FreshRSS Fever API endpoint (e.g., `http://localhost:8088/api/fever.php`)
+- `FRESHRSS_FEVER_USER` — Fever API username
+- `FRESHRSS_FEVER_API_PASSWORD` — Fever API password
+
+**Optional env vars:**
+- `GMAIL_QUERY` — Gmail search filter (default: `newsletters, 7d`)
+- `MAILBOXES` — JSON array of IMAP accounts (or use `.mailboxes.json`)
+- `YT_CHANNELS` — JSON array of YouTube channels (or use `.yt_channels.json`)
+
+**Secrets location:**
+- `.env` file (top-level, gitignored)
+- `.mailboxes.json` (gitignored, plaintext IMAP creds)
+- `.yt_channels.json` (gitignored, YouTube channel metadata)
+
+## Webhooks & Callbacks
+
+**Incoming:**
+- None (no webhooks subscribed)
+
+**Outgoing:**
+- Fever API calls from `score/fever_triage.py` to mark items read/unread in FreshRSS
+  - Endpoint: FreshRSS Fever API (`FRESHRSS_FEVER_URL?api&...`)
+  - Payload: Form-encoded with `api_key`, `unread_item_ids`, `read_item_ids`
+  - Used by: `fever()` function in `score/fever_triage.py`
+
+## Content Sources (Feed Inputs)
+
+**Subscribed Feeds:**
+- 44+ RSS/Atom feeds in `opml/feeds.opml` (Norwegian + world + defense/geopolitics)
+  - News outlets: NRK, VG, DN, Klassekampen, etc.
+  - Government: Regjeringen.no, Stortinget, etc.
+  - Defense/Security: ISW (Institute for the Study of War), Lawfare, Breaking Defense, etc.
+  - International: Major news (BBC, Reuters, etc.), defense analysts
+  - Data sources: GDELT (geopolitical events, 1 req / 5 sec rate limit)
+
+- Sites without native RSS:
+  - Forsvarets forum, FFI, NUPI, UTSYN, High North News
+  - Workaround: Built via rss-bridge at `http://localhost:3000` (CSS-selector / XPathBridge)
+
+**Rate Limiting Compliance:**
+- GDELT: 1 request per 5 seconds (FreshRSS fetches at :23/:53 twice per hour, plus per-feed 6-hour TTL minimum)
+- CloudFlare-protected feeds: May return 403; handled per-feed in FreshRSS UI or via rss-bridge
+
+## Data Flow Summary
+
 ```
-**Provider dispatch.** `bridge/imap_to_atom.py:71-77` — `gmail.com` / `googlemail.com` → `X-GM-RAW`; everything else → standard `IMAP SEARCH` (RFC 3501).
-**Output.** One Atom file per mailbox: `data/feeds/<name>.xml`.
-**Posture.** Read-only. Single-port IMAP4_SSL + `readonly=True`. If all accounts fail → exit 1; if some fail → exit 0 with stderr summary.
+External Sources
+├─ Gmail (IMAP)          ──▶ bridge/gmail_to_atom.py      ──▶ data/feeds/gmail.xml
+├─ IMAP mailboxes        ──▶ bridge/imap_to_atom.py       ──▶ data/feeds/gmail-multi.xml
+├─ YouTube channels      ──▶ bridge/yt_to_atom.py         ──▶ data/feeds/youtube-*.xml
+└─ RSS/Atom feeds        ──▶ (native)
+        │
+        ▼
+  Static File Server (feeds:/ on infotriage network)
+        │
+        ▼
+  FreshRSS (freshrss:8088) ──▶ stores articles in SQLite
+        │
+        ▼
+  score/fever_triage.py   ──▶ queries unread items (Fever API)
+        │
+        ├─▶ scores items via LLM (OpenAI-compatible endpoint)
+        │
+        ├─▶ marks skipped items read (Fever API)
+        │
+        └─▶ generates digest / outputs keepers
 
-## YouTube → Atom with transcripts
+  score/digest.py         ──▶ generates CCIR-bucketed digests (cluster / brief / list modes)
+  score/triage_score.py   ──▶ one-off scoring (stdin/JSON)
+  score/sab_html.py       ──▶ HTML digest output
+```
 
-**Service.** YouTube public-channel pages via `yt-dlp`. **No YouTube credentials.** Treated as anonymous public feed pull.
-**Per-channel pipeline.**
-1. `yt-dlp --flat-playlist --print "%(id)s|||%(title)s"` (no download) → list of (video_id, title).
-2. Per video: `yt-dlp -x --audio-format m4a` → `tmp/<id>.m4a`.
-3. Transcribe with first available runner: `mlx_whisper` (Apple Silicon primary) → `whisper` (fallback).
-4. Emit Atom entry `(id, title, transcript[:1000])`.
+---
 
-**Transcription off.** Set `"transcribe": false` per channel — wires the pipeline with stub summary so MLX/whisper need not be installed for an end-to-end smoke.
-**Config.** `YT_CHANNELS` JSON env or `.yt_channels.json` (gitignored). Loader same shape as `MAILBOXES`.
-**Slug.** `data/feeds/youtube-<slug>.xml` where slug = lowercase / non-alnum → `-`, last 32 chars. Two names that slug-collide need explicit `name:` field.
-**Dependencies (operator-side).** `yt-dlp`; `mlx_whisper` *or* `whisper`. **Do not add a YouTube account.**
-
-## FreshRSS
-
-**Service.** `freshrss/freshrss:latest`. Single-user self-hosted reader + aggregator.
-**Endpoint (container).** `http://localhost:8088`.
-**Fever API.** Used by the scorer to pull unread + mark items read.
-- `FRESHRSS_FEVER_URL` (e.g. `http://localhost:8088/api/fever.php`).
-- `FRESHRSS_FEVER_USER`.
-- `FRESHRSS_FEVER_API_PASSWORD`. The client computes `md5(user:password)` as the api_key.
-**Code anchors.**
-- `score/fever_triage.py:13` — `fever_key()`.
-- `score/fever_triage.py:18` — `fever(api_key, query, **params)`.
-- `score/digest.py:38` — `fetch_window(cutoff_epoch, hardcap)` (paginates items by `max_id`).
-**Cron cadence.** `23,53` minutes past the hour (in compose env) — gentler on rate-limited sources. `score/fever_triage.py` runs at `:35` per README's example cron (after the two refresh stamps).
-**Composer rest.** `:35` per InfoTriage cron, after FreshRSS `:23 / :53` refresh windows.
-
-## rss-bridge
-
-**Service.** `rssbridge/rss-bridge:latest`.
-**Endpoint (container).** `http://localhost:3000`.
-**Used for.** Sites without native RSS — Forsvarets forum, FFI, NUPI, UTSYN, High North News (per README). Bridge protocol: CSS-selector or XPathBridge configured in the rss-bridge UI. The OPML file lists these sites as comments at the end (`<!-- ===== NO native RSS (404) — build with rss-bridge (CSS-selector scrape) ===== -->`) since InfoTriage cannot auto-bridge them.
-
-## OPML ingest
-
-**File.** `opml/feeds.opml` — 61 feeds across 10 top-level outlines (as of post-2026-06-23): Norske aviser, Offentlig Norge, Norsk forsvar & sikkerhet, Forsvar & geopolitikk (intl), OSINT & investigations (intl), Verdensnyheter, Datakilder, Medium, **Midtøsten & US-Iran (SIR-1)**, **Sport — VM 2026 (SIR-2)**. Verified URL-bulk-OK 2026-06-23.
-**Flagging convention.** Feeds known to 403 to bot UAs (Cloudflare) carry a `⚠️` suffix on the title — ISW, Lawfare, Breaking Defense, National Interest, Ukrainska Pravda (HTML-only at the canonical URL — placeholder).
-**Import.** FreshRSS ▸ Subscription management ▸ Import ▸ upload.
-
-## GDELT (a single query-feed in OPML)
-
-**Service.** `https://api.gdeltproject.org/api/v2/doc/doc?query=...&mode=ArtList&format=rss`.
-**Rate limit.** 1 req / 5 s — strictly enforced. The compose cron `23,53` brings global cadence to ≤2 hits/hour, well under the limit.
-**Per-feed TTL.** The OPML comment in `opml/feeds.opml` (Datakilder outline) tells the operator to set a long per-feed TTL in FreshRSS.
-
-## World Monitor (planned, Phase 1)
-
-**Service.** `koala73/worldmonitor`, AGPL-3.0, Docker/Tauri self-host.
-**Why we don't ship it yet.** The Open-Q1 gate (RESEARCH-REPORT.md) — does Ollama path cover CCIR scoring + SAB briefing, or only classification? Must spike and verify before adopting. Cost-free architecture but operationally not free.
+*Integration audit: 2026-06-24*
