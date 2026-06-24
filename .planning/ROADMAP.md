@@ -9,7 +9,8 @@
 | Phase | Title | ADR anchors | Status |
 |---|---|---|---|
 | **0** | Spike (FreshRSS + rss-bridge + qwen36 + Fever + Digest) | ADR-004 | ✅ done — runs today |
-| **1** | Stabilize the spike + ingester expansion | ADR-004 | ready now |
+| **1** | Stabilize the spike + ingester expansion | ADR-004 | ✅ mostly done |
+| **1.5** | PMESII enrichment (operational domain tagging) | JIPOE Step 2 | planned |
 | **2** | World Monitor Open-Q1 spike (gate) | ADR-003 | ⏸ deferred — concept validation pending |
 | **3** | Postgres + pgvector foundation | ADR-001 | ⏸ deferred — concept validation pending |
 | **4** | Embeddings + semantic dedup | ADR-001 (P2), RESEARCH §8 | ⏸ deferred — concept validation pending |

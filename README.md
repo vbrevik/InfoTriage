@@ -20,7 +20,7 @@ Nothing leaves the machine. No paid services.
 | qwen36 triage scorer vs your oMLX endpoint | ✅ tested live — correct buckets, ~3s/item |
 | Internal email-feed URL `http://feeds/gmail.xml` | ✅ verified from the network |
 | Gmail→Atom bridge | ⚠️ written, **untested** — needs your Gmail app password |
-| Scorer → FreshRSS auto-mark-read (Fever API) | ✅ wired + tested live — marks junk read, unread count drops |
+| Scorer → FreshRSS auto-mark-read (Fever API) | ✅ wired + tested live (verified 2026-06-23) — marks junk read, unread count drops |
 | FreshRSS provisioned headless (admin user, 44 feeds, 1642 articles) | ✅ done (see creds below) |
 
 ## Run it

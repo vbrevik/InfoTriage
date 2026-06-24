@@ -66,21 +66,37 @@ def stamp(dt):
     return dt.strftime("%Y-%m-%d %H:%M")
 
 def fetch_window(cutoff_epoch, hardcap):
-    """Page Fever items (read+unread) backwards by id until older than cutoff."""
+    """Fetch Fever items within the time window via unread_item_ids.
+
+    Strategy: get unread IDs (sorted newest-first by Fever), batch-fetch by ID
+    using with_ids (batches of 50), filter by cutoff_epoch, stop early when
+    items are older than cutoff.
+    """
     key = fever_key()
     if fever(key, "")["auth"] != 1:
         raise SystemExit("Fever auth failed — check .env creds / API enabled.")
     feeds = {f["id"]: f["title"] for f in fever(key, "feeds").get("feeds", [])}
-    items, max_id = [], None
-    while len(items) < hardcap:
-        resp = fever(key, "items", **({"max_id": max_id} if max_id else {}))
-        batch = resp.get("items", [])
-        if not batch:
-            break
+
+    # Get unread IDs — Fever returns them newest-first (highest id first)
+    ids_raw = fever(key, "unread_item_ids").get("unread_item_ids", "")
+    unread_ids = sorted((i for i in ids_raw.split(",") if i), key=int, reverse=True)
+    if not unread_ids:
+        print("  nothing unread.", file=sys.stderr)
+        return []
+    # Cap to most recent hardcap items
+    candidate_ids = unread_ids[:hardcap]
+    print(f"  {len(candidate_ids)} candidate unread ids (of {len(unread_ids)} total)",
+          file=sys.stderr, flush=True)
+
+    # Batch-fetch by ID (Fever caps at 50 per request)
+    items = []
+    for i in range(0, len(candidate_ids), 50):
+        chunk = ",".join(candidate_ids[i:i+50])
+        batch = fever(key, "items", **{"with_ids": chunk}).get("items", [])
         items += [it for it in batch if it.get("created_on_time", 0) >= cutoff_epoch]
-        if min(it.get("created_on_time", 0) for it in batch) < cutoff_epoch or len(batch) < 50:
+        # If the oldest in this batch is before cutoff, we're past the window
+        if batch and min(it.get("created_on_time", 0) for it in batch) < cutoff_epoch:
             break
-        max_id = min(int(it["id"]) for it in batch)
     # score
     out = []
     for n, it in enumerate(items, 1):

@@ -52,6 +52,7 @@ Grouped by the **intelligence cycle** (ADR-003) so each requirement maps to a st
 |---|---|---|---|
 | A-1 | CCIR pre-filter: cosine article↔CCIR-def embeddings before LLM scoring | `[TARGET]` | docs/ARCHITECTURE.md Phase 3 |
 | A-2 | Event clustering: same story across outlets collapses to one cluster | `[SPIKE]` | keyword-overlap cluster() in score/digest.py — fails across languages |
+| A-5 | PMESII operational domain tagging per item (Political/Military/Economic/Social/Information/Infrastructure) | `[PLANNED]` | Phase 1.5 — enriches each scored item with one primary PMESII domain for cross-cutting SAB synthesis |
 | A-3 | Entity / relationship knowledge graph (STIX2-flavored) | `[TARGET]` | docs/ARCHITECTURE.md ADR-003 — OpenCTI / MISP candidate |
 | A-4 | Reliability-weighted scoring (Admiralty reliability × credibility × confidence) | `[TARGET]` | docs/ARCHITECTURE.md ADR-003 |
 
