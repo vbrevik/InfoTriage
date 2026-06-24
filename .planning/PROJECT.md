@@ -1,6 +1,11 @@
 # PROJECT — InfoTriage
 
-> **Status:** OSINT pipeline in transition. Current implementation is a local spike on FreshRSS + Gmail + rss-bridge. Target is a Postgres-backed, CCIR-driven, COP-fronted intelligence fusion system, all-local, all-free, all-LLM = local qwen3.6.
+> **Status:** OSINT pipeline **re-platforming** (2026-06-24). A working, tested host-Python spike
+> (ingest → score → brief, incl. PMESII/TESSOC) is being containerized onto a **microservice
+> architecture**: Postgres (JSONB+FTS+pgvector) canonical store, RabbitMQ bus, OAuth2/MCP ingestion,
+> Obsidian + SAB outputs, all-local LLM (qwen36 + embedding model + DGX). Solo now, architected to
+> grow into a multi-user team server (M3). Plan: `.planning/ROADMAP.md`; design:
+> `docs/superpowers/specs/2026-06-24-app-split-architecture-design.md`.
 
 ## What InfoTriage is
 
@@ -12,10 +17,13 @@ The north star is **Palantir Gotham-grade fusion at personal scale** — a singl
 
 ## What InfoTriage is *not*
 
-- Not a reader. FreshRSS is the reader; InfoTriage sits behind it.
+- Not a reader-first tool. Reading is via SAB + Obsidian; FreshRSS is now an **optional** RSS/YouTube
+  projection, no longer the store or the spine (Postgres is the store).
 - Not a cloud service. ADR-004 forbids cloud LLMs anywhere in the runtime.
-- Not multi-user. Single operator. No auth, no tenancy.
-- Not complete. FreshRSS+Gmail+rss-bridge is the **current** scope. The PQ+vector + COP + SOCMINT layers are **target**.
+- Not multi-user **yet**. Single operator now (no auth, no tenancy), but **containerized to grow into
+  a multi-user team server for information-sharing** — that's milestone **M3**, deliberately deferred.
+- Not complete. The new architecture (Postgres + RabbitMQ + MCP ingestion + entity resolution + RAG +
+  Wiki-LLM + COP) is **target**, built phase-by-phase over M1/M2.
 
 ## How it works (current spike)
 
@@ -61,17 +69,18 @@ These are not defaults — they are rules. If a future change appears to violate
 5. **The CCIR is the brain.** `ccir.md` is the taxonomy. Editing it changes triage. Editing code to change triage is wrong.
 6. **Polite polling.** GDELT ≤1 req / 5 s. Compose cadence is twice an hour at `:23,:53`. Per-feed TTLs are operator-tunable in the UI. Manual "Refresh all" is discouraged in the README.
 
-## Current verified state (per README, 2026-06-23)
+## Current verified state (audited by execution, 2026-06-24)
 
 | Piece | State |
 |---|---|
-| FreshRSS + rss-bridge + feeds in Docker | ✅ reachable (`:8088`, `:3000`) |
+| Test suite | ✅ **56 tests pass** |
+| Bridges `imap_to_atom` / `yt_to_atom` | ✅ **working** (not "scaffolded") — yt live-fetched a public channel; XML-gen + escaping verified |
+| `gmail_to_atom` (IMAP + app password) | ❌ **dead end** — account 2SV ON, app passwords hard-blocked. To be retired. |
+| Gmail via OAuth2/MCP | ✅ **proven** — live MCP pull produced valid `data/feeds/gmail.xml` (20 entries), no app password. Runtime = self-hosted Gmail MCP server (P4). |
+| score pipeline (triage_score + fever_triage + digest + sab_html) | ✅ working on host Python; **PMESII/TESSOC enrichment done** (not "planned") |
+| FreshRSS + rss-bridge + feeds in Docker | ✅ reachable (`:8088`, `:3000`) — to be re-mapped into 22000 band |
 | qwen36 triage vs oMLX endpoint | ✅ correct buckets, ~3 s/item |
-| Internal `http://feeds/gmail.xml` | ✅ reachable |
-| Scorer → Fever auto-mark-read | ⚠️ Imports clean (PROFILE alias added 2026-06-23; CCIR mirrored). **Runtime smoke against live FreshRSS still pending** — the original "✅ wired + tested live" claim from README is unverified-in-our-session, only the import surface has been re-validated. |
-| FreshRSS provisioned headless (admin/InfoTriageLocal23, 44 feeds, 1642 articles) | ✅ done |
-| Gmail→Atom bridge | ⚠️ written, **untested** — needs GMAIL_APP_PASSWORD |
-| `.env.example` | ❌ referenced by README, missing in tree |
+| `.env.example` | ✅ **exists** (README/PROJECT previously said missing) |
 
 ## North-star benchmark (ADR-003)
 

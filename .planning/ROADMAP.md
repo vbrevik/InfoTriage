@@ -1,160 +1,174 @@
-# ROADMAP — InfoTriage
+# Roadmap: InfoTriage
 
-> Sequenced to **stabilize what's running first**, then **gate the architecture on the empirical World Monitor test**, then **build the durable foundation (Postgres)**, then **layer enrichment, dedup, RAG**. Source-of-truth for the phase target lives in `docs/ARCHITECTURE.md` Phase 0–4; this roadmap is the executable cut of that, with the open questions kept load-bearing.
+## Overview
 
-## Phase index
+**Combined re-architecture (2026-06-24).** Supersedes the prior "ingester-first, defer architecture"
+roadmap. This is a **re-platform, not greenfield**: the spike (ingest → score → brief, incl.
+PMESII/TESSOC) already runs and is tested (56 tests pass) on host Python — the phases below wrap and
+containerize working code onto a **microservice architecture** (Postgres canonical store + RabbitMQ
+bus + OAuth2/MCP ingestion + Obsidian/SAB outputs). Solo on one Mac now, **architected to grow into a
+multi-user team server** (Milestone 3, deferred). Design source-of-truth:
+`docs/superpowers/specs/2026-06-24-app-split-architecture-design.md`.
 
-> **Ingester-first refactor (operator pivot, 2026-06-23).** The operator's imminent need is to **read Gmail + new sources**; the architecture ambitions (WM gate → Postgres → embeddings → RAG → SOCMINT → COP → push) are **icing on the cake**. Phases 2–7 are **deferred until the ingest loop proves operational value**. Active plan: Phase 0 (spike, done) + Phase 1 (stabilize + new ingest bridges). New ingester bridges are scaffolded: `bridge/imap_to_atom.py` (multi-mailbox IMAP), `bridge/yt_to_atom.py` (YouTube + audio transcription), `bridge/RSS_BRIDGE_NOTES.md` (sites-via-rssbridge ops notes). Cross-ref: `.planning/phases/phase-1-stabilize-spike/PLAN.md` (T8/T9/T10 added for the new bridges).
+**Milestones:** **M1 Foundation** (Phases 0–7) re-platforms the spike onto the new architecture; ship
+gate = parity with today. **M2 Fusion** (Phases 8–12) layers the north-star features. **M3** (future)
+= multi-user/team server. **SP-COP** runs as a parallel, non-blocking gated spike.
 
-| Phase | Title | ADR anchors | Status |
-|---|---|---|---|
-| **0** | Spike (FreshRSS + rss-bridge + qwen36 + Fever + Digest) | ADR-004 | ✅ done — runs today |
-| **1** | Stabilize the spike + ingester expansion | ADR-004 | ✅ mostly done |
-| **1.5** | PMESII enrichment (operational domain tagging) | JIPOE Step 2 | planned |
-| **2** | World Monitor Open-Q1 spike (gate) | ADR-003 | ⏸ deferred — concept validation pending |
-| **3** | Postgres + pgvector foundation | ADR-001 | ⏸ deferred — concept validation pending |
-| **4** | Embeddings + semantic dedup | ADR-001 (P2), RESEARCH §8 | ⏸ deferred — concept validation pending |
-| **5** | CCIR pre-filter + RAG SAB | ADR-001 (P3, P4) | ⏸ deferred — concept validation pending |
-| **6** | SOCMINT + Arctic collection plugins | ADR-003 | ⏸ deferred — concept validation pending |
-| **7** | Notification & dissemination | ADR-003 | ⏸ deferred — concept validation pending |
+## Phases
 
----
+**Phase Numbering:** Integer phases (0–12) are planned milestone work. Decimal phases (e.g. 2.1) are
+urgent insertions. The all-local-LLM rule (ADR-004) is never revisited by a phase.
 
-## Phase 1 — Stabilize the spike
+- [ ] **Phase 0: Concept spike** (M1) - throwaway spike gating the unproven bits before any build
+- [ ] **Phase 1: Contracts + monorepo skeleton** (M1) - `libs/contracts` (Item, events, codec, bus interface)
+- [ ] **Phase 2: Storage — Postgres + blobs** (M1) - canonical store behind a store interface
+- [ ] **Phase 3: Bus — RabbitMQ** (M1) - AMQP transport + bus client
+- [ ] **Phase 4: Ingest adapters + Gmail MCP** (M1) - containerize bridges + self-hosted Gmail MCP (OAuth2)
+- [ ] **Phase 5: Triage app** (M1) - event-driven scorer + pgvector dedup
+- [ ] **Phase 6: Brief app** (M1) - SAB renderer + Obsidian vault-writer
+- [ ] **Phase 7: Ops + cutover** (M1) - health, DLQ, replay, retire host path
+- [ ] **Phase 8: Entity resolution** (M2) - Postgres + pgvector → Obsidian projection
+- [ ] **Phase 9: RAG recall** (M2) - CCIR pre-filter + thematic recall over corpus
+- [ ] **Phase 10: Wiki-LLM** (M2) - standing auto-wiki + on-demand synthesis → Obsidian
+- [ ] **Phase 11: SOCMINT + Arctic collection** (M2) - Telegram/AIS adapters via MCP pattern
+- [ ] **Phase 12: CNR alerting / dissemination** (M2) - real-time notification lane
 
-**Why.** The spike already runs end-to-end (Fever + score + SAB + Gmail-bridge path). Before any architecture work, lock it in: prove the Gmail bridge, document the `.env`, and make layer changes safe by adding tests around the scorer parser.
+Parallel, non-blocking: **SP-COP** — COP/map UI gated spike (World Monitor adopt-vs-build; ADR-005).
+Deferred: **Milestone 3** — multi-user / team server (auth, tenancy, sharing).
 
-**Done when.** `bridge/gmail_to_atom.py` produces a valid `data/feeds/gmail.xml` for a real Gmail app password; `.env.example` lands; tests around `score_item()` JSON extraction exist.
+## Phase Details
 
-**Scope (small, surgical):**
-- ✅ **PROFILE alias added 2026-06-23** in `score/triage_score.py`: `PROFILE = CCIR` with provenance comment. README's two PROFILE references keep working; `from triage_score import PROFILE` resolves; runtime smoke against FreshRSS+oMLX is the next required check before the README "✅ wired + tested live" claim can be re-asserted.
-- Add `.env.example` with `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `GMAIL_QUERY`, `FRESHRSS_FEVER_URL`, `FRESHRSS_FEVER_USER`, `FRESHRSS_FEVER_API_PASSWORD`.
-- Run the Gmail bridge end-to-end on a real account; confirm `data/feeds/gmail.xml` is valid and FreshRSS subscribes to `http://feeds/gmail.xml`. Document the X-GM-RAW query syntax and the read-only posture.
-- Pin `feedgen` in `requirements.txt`.
-- Smoke tests for the scorer prompt's JSON extraction (good, bad, code-fence cases).
-- Decide Q4 (FreshRSS migration strategy) by pick: re-provision fresh on Postgres in Phase 3 is the simple path; migrate SQLite data is the lossy path.
+### Phase 0: Concept spike
+**Goal**: A throwaway spike that resolves the unproven architectural unknowns with go/no-go answers
+before any production build. Does NOT re-spike the already-working ingest→score→brief pipeline.
+**Depends on**: Nothing (first phase)
+**Requirements**: ADR-006 (architecture), ADR-007 (RabbitMQ), spec §Final decisions
+**Success Criteria** (what must be TRUE):
+  1. A go/no-go + one-line ADR note exists for: RabbitMQ topology (exchanges/routing for the 4 events).
+  2. Norwegian semantic dedup quality measured (bge-m3 vs mE5-large on NRK/BBC/TASS same-story triples) with a chosen model.
+  3. Postgres entity-resolution feasibility demonstrated on a sample (entities + links).
+  4. Wiki-LLM feasibility shown (standing + on-demand) on qwen36/DGX with a sample output.
+  5. COP need + World Monitor outcome recorded (cross-ref SP-COP).
+**Plans**: TBD
 
-**Out of scope.** Any architectural change.
+### Phase 1: Contracts + monorepo skeleton
+**Goal**: One shared contract package all apps depend on; no app imports another. No behavior change
+to the running pipeline.
+**Depends on**: Phase 0
+**Requirements**: ADR-006, spec §The glue
+**Success Criteria** (what must be TRUE):
+  1. `libs/contracts` defines the canonical `Item` schema (core + summary + body_ref + payload JSON + attachments[]).
+  2. Event schemas exist for `item.ingested`, `verdict.ready`, `sab.published`, `feed.unhealthy`.
+  3. A frontmatter⇆JSONB codec and a transport-swappable bus-client interface exist.
+  4. Repo restructured into `apps/` + `libs/`; existing scripts import from contracts; 56 tests still pass.
+  5. Three stale doc claims fixed (imap/yt not "scaffolded"; PMESII/TESSOC done; `.env.example` exists).
+**Plans**: TBD
 
----
+### Phase 2: Storage — Postgres + blobs
+**Goal**: Postgres is the single canonical store; SQLite is rejected (concurrent writers).
+**Depends on**: Phase 1
+**Requirements**: ADR-001
+**Success Criteria** (what must be TRUE):
+  1. Postgres (`postgres:16` + `pgvector/pgvector:pg16`) runs on :22000 with `InfoTriage` schema: articles, enrichment, ccir, embeddings(vector(1024)), audit, entities, entity_links.
+  2. On-disk content-addressed blob store (`data/blobs/<hash>`) holds MIME/PDF/transcripts/raw HTML.
+  3. A single `store` interface mediates all reads/writes; existing scripts go through it.
+  4. Atom-projection writer for FreshRSS lives behind the same interface.
+**Plans**: TBD
 
-## Phase 2 — World Monitor Open-Q1 spike (gate)
+### Phase 3: Bus — RabbitMQ
+**Goal**: AMQP broker that also models team information-sharing (fan-out, per-consumer queues) for the M3 growth path.
+**Depends on**: Phase 1
+**Requirements**: ADR-007
+**Success Criteria** (what must be TRUE):
+  1. RabbitMQ runs on :22001 (AMQP) / :22002 (management UI).
+  2. The `libs/contracts` bus client implements the interface over AMQP (exchanges + routing keys for the 4 events, acks, durable queues, DLQ).
+  3. A publish/consume round-trip is smoke-tested green.
+**Plans**: TBD
 
-**Why.** `docs/RESEARCH-REPORT.md` identified World Monitor as the map-fronted aggregation + COP core, but the open question is whether its local Ollama path covers **CCIR scoring + SAB briefing** (not just classification/summarization). Until that's answered, do not commit to UI choices. This phase *is* the gate.
+### Phase 4: Ingest adapters + Gmail MCP
+**Goal**: Containerize the working bridges and solve Gmail (app passwords hard-blocked: 2SV on).
+**Depends on**: Phase 2, Phase 3
+**Requirements**: ADR-003, ADR-004 (read-only), ADR-008 (MCP/OAuth2)
+**Success Criteria** (what must be TRUE):
+  1. `ingest-imap`/`ingest-youtube`/`ingest-web` containers normalize sources to `Item`, persist to Postgres+blobs, publish `item.ingested`.
+  2. `ingest-obsidian` reads `Vault/articles-inbox/` clips into the same path.
+  3. `ingest-gmail` is a thin MCP client → self-hosted Gmail MCP server (:22025, own OAuth2 token, headless-safe); legacy IMAP `gmail_to_atom.py` retired.
+  4. Email is triage-only (no FreshRSS projection); RSS/YouTube get an Atom projection → FreshRSS (:22010).
+**Plans**: TBD
 
-**Done when.** World Monitor runs against `http://127.0.0.1:8000/v1` (oMLX) with `LLM_MODEL=qwen36-ud-4bit`, scores a sample of InfoTriage's own items, and writes a brief that mirrors InfoTriage's `brief.md` structure. Pass = adopt WM as the COP layer. Fail = fall back to MapLibre self-built or Taranis (Open-Q2).
+### Phase 5: Triage app
+**Goal**: Decouple scoring from the FreshRSS Fever poll; move proven scoring logic behind events + Postgres.
+**Depends on**: Phase 2, Phase 3, Phase 4
+**Requirements**: ADR-004, ccir.md
+**Success Criteria** (what must be TRUE):
+  1. `triage` (:22030) subscribes `item.ingested`, reads payload from Postgres, scores with qwen36 against ccir.md, writes enrichment rows, publishes `verdict.ready`.
+  2. PMESII/TESSOC enrichment is formalized as an enrichment stage.
+  3. Semantic dedup uses pgvector + the dedicated embedding model, replacing keyword overlap.
+  4. Shadow-run vs the old path matches, then cut over; the Fever poll is removed.
+**Plans**: TBD
 
-**Scope:**
-- Stand up World Monitor on the Mac (Tauri or Docker; Tauri is the air-gapped profile).
-- Wire `LLM_BASE_URL=http://127.0.0.1:8000/v1`, `LLM_API_KEY=omlx`.
-- Inject the `ccir.md` taxonomy + a curated Norwegian-source subset.
-- Score 20 InfoTriage items; write a structured output covering CCIR sections.
-- Decision: go (adopt), no-go (fall back), or partial (use WM for COP only, keep custom scorer + SAB).
+### Phase 6: Brief app
+**Goal**: SAB/digest become an event-driven product plus an Obsidian projection.
+**Depends on**: Phase 5
+**Requirements**: spec §Reading-surface routing
+**Success Criteria** (what must be TRUE):
+  1. `brief` (:22031) subscribes `verdict.ready`, clusters via pgvector, renders the SAB served at :22040, publishes `sab.published`.
+  2. A vault-writer emits high-value items + the SAB as Obsidian `.md` (front-matter via codec; body summary; `[[entity]]` wikilinks).
+  3. Email surfaces here (SAB + Obsidian), not in FreshRSS.
+**Plans**: TBD
 
-**Side-effects regardless of gate outcome:**
-- The InfoTriage FreshRSS+qwen3.6 spike stays the daily driver. No work blocked by this.
-- The decision lands in `docs/RESEARCH-REPORT.md` as an update + a new ADR (proposed: ADR-005).
+### Phase 7: Ops + cutover
+**Goal**: Make the stack operable and retire the old host path. M1 ship gate.
+**Depends on**: Phase 4, Phase 5, Phase 6
+**Requirements**: spec §Management layer
+**Success Criteria** (what must be TRUE):
+  1. `opml-health` (:22032) is a scheduled worker emitting `feed.unhealthy`.
+  2. Compose has per-container healthchecks + restart; structured logging; RabbitMQ DLQ + retention; `ops/Makefile` (up/logs/replay/backfill).
+  3. Host-run scripts + legacy Gmail IMAP bridge deleted.
+  4. The full pipeline runs on the new architecture at parity with today's spike (M1 ship gate).
+**Plans**: TBD
 
-**Out of scope.** Adopting World Monitor in production. Configuring TAK/CloudTAK. Taranis evaluation (separate spike, Open-Q2).
+### Phase 8: Entity resolution
+**Goal**: Cross-modality entity tracking as Postgres truth; Obsidian graph as a projection.
+**Depends on**: Phase 5
+**Requirements**: ADR-003
+**Success Criteria** (what must be TRUE):
+  1. `entities` + `entity_links` populated via extraction + pgvector linking (cross-modality, cross-language).
+  2. The Obsidian graph is generated as a projection of this truth, not the system of record.
+**Plans**: TBD
 
----
+### Phase 9: RAG recall
+**Goal**: Cut LLM caller volume via a CCIR pre-filter and enable thematic recall over the durable corpus.
+**Depends on**: Phase 8
+**Requirements**: ADR-001
+**Success Criteria** (what must be TRUE):
+  1. Clearly off-topic items skip the LLM (`cosine(article, ccir.vector) < τ`), logged in `audit`.
+  2. A thematic recall (`recall.py --topic … --since …`) cites `articles.id`/`url` per claim; heavy synthesis may run on DGX.
+**Plans**: TBD
 
-## Phase 3 — Postgres + pgvector foundation (ADR-001)
+### Phase 10: Wiki-LLM
+**Goal**: An auto-maintained intel wiki synthesized from the corpus, plus on-demand synthesized articles.
+**Depends on**: Phase 9
+**Requirements**: ADR-006, spec §Obsidian
+**Success Criteria** (what must be TRUE):
+  1. A standing, auto-updated per-entity/per-topic wiki is written as cross-linked Obsidian `.md`.
+  2. On-demand synthesized articles answer ad-hoc queries from the corpus; DGX used for heavy synthesis.
+**Plans**: TBD
 
-**Why.** Today the de-facto store is `data/verdicts.jsonl` and dedup is keyword overlap. Both fail in the ways `docs/ARCHITECTURE.md` describes. Postgres+pgvector is the single store, the durability story for our article copies, and the substrate for embeddings (Phase 4).
+### Phase 11: SOCMINT + Arctic collection
+**Goal**: Round out the picture with SOCMINT + authoritative Arctic data via the MCP adapter pattern.
+**Depends on**: Phase 4
+**Requirements**: ADR-003
+**Success Criteria** (what must be TRUE):
+  1. `ingest-telegram` (Telethon), advanced YouTube/transcription, and `ingest-barentswatch` (AIS) land as MCP-pattern adapters with `discipline` tags + Admiralty reliability ratings.
+  2. SOCMINT legal/ToS posture documented; ACLED only with a paid license (never fed to the local LLM without one).
+**Plans**: TBD
 
-**Done when.** FreshRSS runs on Postgres (its own schema) and `InfoTriage.*` schema exists with `articles`, `enrichment`, `ccir` tables. The SAB builds from SQL. `verdicts.jsonl` is no longer the source of truth.
-
-**Scope (corresponds to ARCHITECTURE Phase 0–1):**
-- Add Postgres+pgvector container to `docker-compose.yml`. ARCHITECTURE specifies "PostgreSQL 16 + pgvector" only — verify the latest stable pgvector image tag at the time of the spike (provisional: `postgres:16` and `pgvector/pgvector:pg16`).
-- Re-provision FreshRSS on Postgres (per Phase 1 Q4 decision).
-- Create `InfoTriage` schema + `articles`, `enrichment`, `ccir` tables matching `docs/ARCHITECTURE.md` data model.
-- Replace `score/digest.py`'s `data/verdicts.jsonl` write with `InfoTriage.enrichment` upsert; keep `verdicts.jsonl` as a debug aid for one cycle.
-- Read path (Fever → score → upsert) writes to Postgres; SAB reads from Postgres.
-- Schema validation via `psycopg` constraints; small migration script tracked in `score/migrations/`.
-
-**Side-effects.** Decorates the spike with a real store; paves the way for embeddings and semantic dedup.
-
----
-
-## Phase 4 — Embeddings + semantic dedup
-
-**Why.** Today's keyword-overlap clustering quietly fails across languages (NRK "Nato-toppmøte" ≠ BBC "NATO summit" ≠ TASS "Саммит НАТО"). Semantic dedup collapses them. This phase also resolves Q5 (embedding model).
-
-**Done when.** Same story from three languages collapses to one cluster in `InfoTriage.cluster` view. Embedding model + dim recorded in `docs/RESEARCH-REPORT.md` update.
-
-**Scope:**
-- Stand up Ollama (if not already) on `:11434`; pull `bge-m3` (1024-d) or `mE5-large`, decided by Q5.
-- Embed each `InfoTriage.articles` row (chunked per P-6) into `InfoTriage.embeddings(vector vector(1024))`.
-- ivfflat index over `InfoTriage.embeddings.vector`.
-- Replace keyword-overlap `cluster()` in score/digest.py with cosine clustering against embeddings.
-- Update `InfoTriage.ccir` to include `ccir_def.vector` so that Phase 5 pre-filtering can rank.
-
-**Out of scope.** Replacing the LLM. Adding SOCMINT collectors. Phase-5 pre-filter and RAG build on this.
-
----
-
-## Phase 5 — CCIR pre-filter + RAG SAB
-
-**Why.** Right now every unread item goes to the LLM. Phase 5 cuts caller volume and sharpens tagging using the embedded CCIR definitions, then enables the **RAG SAB** — "what do we know about X since date" — over the durable corpus.
-
-**Done when.** Clearly-off-topic items skip the LLM (logged in `InfoTriage.audit`) AND a themed recall brief cites stored articles with stable IDs.
-
-**Scope:**
-- Pre-filter: `cosine(article.embedding, ccir.vector) < τ` → skip LLM, mark as `pruned`.
-- RAG SAB: vector retrieve top-k by filter, feed to qwen3.6 to write the brief; cite `articles.id` / `articles.url` per claim.
-- Add `InfoTriage.audit` table for the pre-filter decisions (which CCIR it dropped against, model used, latency).
-- Expose thematic recall as a CLI (`python3 score/recall.py --topic "PIR-2 Nordområdene" --since 14d`).
-
-**Out of scope.** Map/autocomplete UI. Push notifications (Phase 7).
-
----
-
-## Phase 6 — SOCMINT + Arctic collection plugins
-
-**Why.** Map of the world is incomplete with only RSS + email. SOCMINT (Telegram, YouTube transcription) and authoritative Arctic data (BarentsWatch AIS) round out the picture per ADR-003.
-
-**Done when.** Telethon Telegram collector, yt-dlp+mlx-whisper YouTube collector, and BarentsWatch AIS poller write to `InfoTriage.articles` with explicit `source.discipline` tags. SOCMINT legal/ToS posture documented.
-
-**Scope:**
-- `collectors/telegram.py` — Telethon, account from environment, writes to `InfoTriage.articles` with `discipline=socmint`.
-- `collectors/yt_dlp_whisper.py` — yt-dlp + mlx-whisper per docs/RESEARCH-REPORT.md §9.
-- `collectors/barentswatch.py` — Live AIS + ArcticInfo with rate-limit posture.
-- Add reliability ratings (Admiralty) per source in `InfoTriage.sources`.
-- Defer Instagram / Facebook (Open).
-- ACLED only if Q3 resolved (paid license); do not feed ACLED to local LLM without one.
-
-**Out of scope.** Cross-source entity resolution (deferred until A-3 lands).
-
----
-
-## Phase 7 — Notification & dissemination
-
-**Why.** A CNR CAT I 🚩 should not require someone to refresh the SAB at 23:00. The InfoTriage-with-RAYVN-style handoff pattern needs an alerting path.
-
-**Done when.** A CAT I event post-write triggers a push (Signal / ntfy) with the SAB excerpt + dedupe ID, AND the SAB remains the canonical artifact.
-
-**Scope:**
-- Pick a push channel (ntfy.sh local-server preferred; free + on-Mac; ADR-004-friendly).
-- `score/fever_triage.py` and `score/digest.py` write a CNR-I event to a tiny in-process queue.
-- A small relay process emits ntfy messages with title + bullet + URL.
-
-**Out of scope.** TAK / CloudTAK CoT markers (deferred — Phase 3+ doctrinal interop, not first step).
-
----
-
-## Sequencing notes
-
-- **Phases 1 and 2 are parallel-safe.** Both run against the live spike; neither depends on Postgres. Do them concurrently or in either order; both emit a clear go/no-go.
-- **Phases 3 onward are sequential.** Phase 3 is the foundation; everything else assumes the schema. Phases 4 → 5 are tightly coupled.
-- **Phases 6 and 7 are independent** after Phase 5.
-- **No phase ever revisits ADR-004.** If a future requirement seems to require a cloud LLM, that's a new ADR, not a phase edit.
-
-## Anti-roadmap (deliberately excluded)
-
-- X / Twitter (constrained; revisit only as separate Nitter spike).
-- Cloud LLM (ADR-004 reject).
-- Multi-user / tenancy.
-- TAK/CloudTAK in early phases.
-- ACLED via local LLM without a paid public-sector license (Q3).
-</content>
+### Phase 12: CNR alerting / dissemination
+**Goal**: A CNR CAT I alert should not require manually refreshing the SAB.
+**Depends on**: Phase 6
+**Requirements**: ADR-003
+**Success Criteria** (what must be TRUE):
+  1. A CNR CAT I 🚩 post-write publishes a push (ntfy local-server preferred; ADR-004-friendly) with SAB excerpt + dedupe ID.
+  2. The SAB remains the canonical artifact.
+**Plans**: TBD
