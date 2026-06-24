@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""trimail bridge · multi-mailbox IMAP -> local Atom feeds.
+"""InfoTriage bridge · multi-mailbox IMAP -> local Atom feeds.
 
 READ-ONLY: connects to one or more IMAP mailboxes, fetches messages matching a
 per-account query, writes one Atom file per mailbox into ../data/feeds/{name}.xml
@@ -24,7 +24,7 @@ Configuration (either path works; env wins):
     ]'
 
 Per-account output:
-  /Users/vidarbrevik/projects/trimail/data/feeds/<name>.xml
+  /Users/vidarbrevik/projects/InfoTriage/data/feeds/<name>.xml
 
 Subscribe in FreshRSS: Subscriptions ▸ add `http://feeds/<name>.xml`.
 
@@ -34,8 +34,9 @@ Notes:
 - **MAILBOXES (as a JSON array starting with `[`) is not loaded from `.env`** — the loader only handles `KEY=VALUE` lines and skips anything that doesn't fit. Set via shell `export MAILBOXES='[…]'` or write `.mailboxes.json`.
 - **Filename collision:** if `name="gmail"`, this script writes `data/feeds/gmail.xml` — the same file the pre-existing `bridge/gmail_to_atom.py` produces. Avoid by giving IMAP Gmail a different `name` (e.g. `name="gmail-multi"`), or run only one of the two scripts against Gmail.
 """
-import os, sys, json, email, imaplib, html, datetime
+import os, sys, json, email, imaplib, datetime
 from email.header import decode_header
+from _util import escape
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(ROOT, "data", "feeds")
@@ -126,16 +127,16 @@ def write_atom(name, entries):
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
     parts = ['<?xml version="1.0" encoding="utf-8"?>',
              '<feed xmlns="http://www.w3.org/2005/Atom">',
-             f'<title>trimail · {name}</title>',
+             f'<title>InfoTriage · {name}</title>',
              f'<updated>{now}</updated>',
-             f'<id>urn:trimail:{name}</id>']
+             f'<id>urn:infotriage:{name}</id>']
     for subj, frm, snippet, mid in reversed(entries):
         parts += ['<entry>',
-                  f'<title>{html.escape(subj)}</title>',
-                  f'<id>{html.escape(mid)}</id>',
-                  f'<author><name>{html.escape(frm)}</name></author>',
+                  f'<title>{escape(subj)}</title>',
+                  f'<id>{escape(mid)}</id>',
+                  f'<author><name>{escape(frm)}</name></author>',
                   f'<updated>{now}</updated>',
-                  f'<summary>{html.escape(snippet)}</summary>',
+                  f'<summary>{escape(snippet)}</summary>',
                   '</entry>']
     parts.append('</feed>')
     os.makedirs(OUT_DIR, exist_ok=True)

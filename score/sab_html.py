@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""trimail · SAB HTML renderer (dual-mode: presentation + scroll).
+"""InfoTriage · SAB HTML renderer (dual-mode: presentation + scroll).
 
 Reads data/verdicts.jsonl (written by digest.py) and produces a styled
 HTML Situational Awareness Brief at data/digests/sab.html with two view
@@ -287,7 +287,7 @@ def build_html(verdicts, period, with_bluf=True, generated_at=None):
 
     # Slide 0: Title
     slide_num += 1
-    slide_index.append((slide_num, "title", "trimail · SAB", ""))
+    slide_index.append((slide_num, "title", "InfoTriage · SAB", ""))
 
     # Slide 1: CNR (if any)
     cnr_html = ""
@@ -407,7 +407,7 @@ HTML_TEMPLATE = """\
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>trimail · SAB — {period}</title>
+<title>InfoTriage · SAB — {period}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -965,7 +965,7 @@ HTML_TEMPLATE = """\
 <section class="slide title-slide" id="sab-title">
   <div class="slide-inner">
     <div class="classification">FOUO</div>
-    <h1>trimail · Situational Awareness Brief</h1>
+    <h1>InfoTriage · Situational Awareness Brief</h1>
     <div class="subtitle">
       <span>📅 {period}</span>
       <span>⏱ Generert: {generated_at}</span>
@@ -1032,7 +1032,7 @@ HTML_TEMPLATE = """\
     {tessoc_dist}
     <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-top:24px;text-align:center;">
       qwen36-ud-4bit · oMLX :8000/v1 · ADR-004 ✅<br>
-      <a href="https://github.com/vbrevik/trimail" style="color:var(--blue);text-decoration:none;">github.com/vbrevik/trimail</a>
+      <a href="https://github.com/vbrevik/infotriage" style="color:var(--blue);text-decoration:none;">github.com/vbrevik/infotriage</a>
     </div>
   </div>
 </section>

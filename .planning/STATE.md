@@ -1,11 +1,11 @@
-# STATE — trimail
+# STATE — InfoTriage
 
 > **Ephemeral.** This file is pick-up-next-session memory. Move durable context into `docs/`, `.planning/PROJECT.md`, `.planning/REQUIREMENTS.md`, `.planning/ROADMAP.md`, or `.planning/codebase/`. Trim aggressively at end-of-session.
 
 ## Session: 2026-06-23 (init)
 
 ### Just-completed
-- Built the `.planning/` scaffold for trimail: `PROJECT.md`, `REQUIREMENTS.md`, `ROADMAP.md`, `STATE.md`, `config.json`, plus a `codebase/` map (`index`, `architecture`, `structure`, `concerns`).
+- Built the `.planning/` scaffold for InfoTriage: `PROJECT.md`, `REQUIREMENTS.md`, `ROADMAP.md`, `STATE.md`, `config.json`, plus a `codebase/` map (`index`, `architecture`, `structure`, `concerns`).
 - Re-read every repo file to ground the docs (README, ccir.md, docker-compose.yml, requirements.txt, opml/feeds.opml, docs/ARCHITECTURE.md, docs/RESEARCH-REPORT.md, score/{digest,triage_score,fever_triage}.py, bridge/gmail_to_atom.py, .gitignore).
 - Reconciled the **"personal info-triage hub" (README) vs "Palantir-grade OSINT** (ARCHITECTURE ADR-003)"** framing tension via the thinker-with-files-gemini → landed on **"OSINT pipeline in transition"** with `ccir.md` as the brain and ADR-004 as a hard load-bearing constraint.
 - Established ROADMAP phasing that interleaves **spike stabilization** + **World Monitor Open-Q1 gate** *before* the Postgres foundation.
@@ -73,7 +73,7 @@ Not touched: `docs/ARCHITECTURE.md`, `docs/RESEARCH-REPORT.md`, `ccir.md`, `READ
 
 ### Decisions logged this session
 
-- PMC-001: trimail's `.planning/` framing = "OSINT pipeline in transition," not LARP-nor-narrow.
+- PMC-001: InfoTriage's `.planning/` framing = "OSINT pipeline in transition," not LARP-nor-narrow.
 - PMC-002: ROADMAP sequencing = Phase 1 (stabilize) → Phase 2 (WM gate) → Phase 3 (Postgres). Embeds the open question as a load-bearing gate, not a side note.
 - PMC-003: REQUIREMENTS grouping = intelligence cycle (Direction / Collection / Processing / Analysis / Production / Dissemination / Navigation), with status tags `[LIVE/SPIKE/TARGET/GATED/OUT]`.
 - PMC-004: STATE.md is ephemeral; durable context goes into the other docs. Trim each session.

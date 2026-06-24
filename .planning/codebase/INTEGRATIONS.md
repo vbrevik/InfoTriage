@@ -1,4 +1,4 @@
-# INTEGRATIONS — trimail
+# INTEGRATIONS — InfoTriage
 
 Source of truth: code-level env reads + bridge entry points.
 Generated: 2026-06-23.
@@ -72,13 +72,13 @@ Generated: 2026-06-23.
 - `score/fever_triage.py:18` — `fever(api_key, query, **params)`.
 - `score/digest.py:38` — `fetch_window(cutoff_epoch, hardcap)` (paginates items by `max_id`).
 **Cron cadence.** `23,53` minutes past the hour (in compose env) — gentler on rate-limited sources. `score/fever_triage.py` runs at `:35` per README's example cron (after the two refresh stamps).
-**Composer rest.** `:35` per trimail cron, after FreshRSS `:23 / :53` refresh windows.
+**Composer rest.** `:35` per InfoTriage cron, after FreshRSS `:23 / :53` refresh windows.
 
 ## rss-bridge
 
 **Service.** `rssbridge/rss-bridge:latest`.
 **Endpoint (container).** `http://localhost:3000`.
-**Used for.** Sites without native RSS — Forsvarets forum, FFI, NUPI, UTSYN, High North News (per README). Bridge protocol: CSS-selector or XPathBridge configured in the rss-bridge UI. The OPML file lists these sites as comments at the end (`<!-- ===== NO native RSS (404) — build with rss-bridge (CSS-selector scrape) ===== -->`) since trimail cannot auto-bridge them.
+**Used for.** Sites without native RSS — Forsvarets forum, FFI, NUPI, UTSYN, High North News (per README). Bridge protocol: CSS-selector or XPathBridge configured in the rss-bridge UI. The OPML file lists these sites as comments at the end (`<!-- ===== NO native RSS (404) — build with rss-bridge (CSS-selector scrape) ===== -->`) since InfoTriage cannot auto-bridge them.
 
 ## OPML ingest
 

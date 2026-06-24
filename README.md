@@ -1,4 +1,4 @@
-# trimail
+# InfoTriage
 
 *triage + e-mail* — a free, fully-local info-triage hub. Email + RSS + websites in
 one searchable app, with a **local LLM on your Mac** deciding what's worth reading.
@@ -26,7 +26,7 @@ Nothing leaves the machine. No paid services.
 ## Run it
 
 ```bash
-cd ~/projects/trimail
+cd ~/projects/InfoTriage
 cp .env.example .env          # then edit .env (see below)
 docker compose up -d          # FreshRSS http://localhost:8088
 ```
@@ -67,12 +67,12 @@ everything (learned that the hard way).
 
 Polite cron (after FreshRSS refreshes at :23/:53 — run at :35):
 ```cron
-35 * * * * cd ~/projects/trimail && /usr/bin/python3 score/fever_triage.py --max 120 >> data/triage.log 2>&1
+35 * * * * cd ~/projects/InfoTriage && /usr/bin/python3 score/fever_triage.py --max 120 >> data/triage.log 2>&1
 ```
 
 ### This FreshRSS instance (local throwaway)
 
-- Web UI: http://localhost:8088 — login **admin** / **trimailLocal23**
+- Web UI: http://localhost:8088 — login **admin** / **InfoTriageLocal23**
 - Fever API password: **feverlocal23** (already in `.env`)
 - Provisioned headless via the container CLI (`do-install.php`, `create-user.php`,
   `import-for-user.php`, `actualize-user.php`) — re-runnable if you wipe `data/`.

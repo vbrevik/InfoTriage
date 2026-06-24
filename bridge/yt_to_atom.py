@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""trimail bridge · YouTube channels -> local Atom feed with transcripts.
+"""InfoTriage bridge · YouTube channels -> local Atom feed with transcripts.
 
 Per channel: yt-dlp fetches the latest N uploads → audio (.m4a) → mlx-whisper
 (Apple Silicon) or `whisper` fallback transcription → Atom entry written to
@@ -34,7 +34,8 @@ Notes:
 - **Read-only of channels.** yt-dlp fetches public metadata and audio; no YouTube credentials are required. **DO NOT** add a YouTube account to `.env` — none is needed, and storing one risks leaks with no upside.
 - **Apple Silicon first.** `mlx_whisper` is the primary runner; `whisper` is the cross-platform fallback. With `transcribe: false`, the script emits a stub summary and the pipeline is wired without any MLX/whisper install.
 """
-import os, sys, json, shutil, subprocess, tempfile, html, datetime, re
+import os, sys, json, shutil, subprocess, tempfile, datetime, re
+from _util import escape
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(ROOT, "data", "feeds")
@@ -83,7 +84,7 @@ def yt_dlp_list(channel, max_n):
 
 def yt_audio_path(video_id):
     """Return a path to a unique audio file in a tmpdir for a given video id."""
-    tmp = tempfile.mkdtemp(prefix="trimail-yt-")
+    tmp = tempfile.mkdtemp(prefix="infotriage-yt-")
     return tmp, os.path.join(tmp, f"{video_id}.m4a")
 
 def fetch_audio(video_id):
@@ -133,16 +134,16 @@ def write_atom(name, entries):
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
     parts = ['<?xml version="1.0" encoding="utf-8"?>',
              '<feed xmlns="http://www.w3.org/2005/Atom">',
-             f'<title>trimail · {name}</title>',
+             f'<title>InfoTriage · {name}</title>',
              f'<updated>{now}</updated>',
-             f'<id>urn:trimail:youtube:{slug(name)}</id>']
+             f'<id>urn:infotriage:youtube:{slug(name)}</id>']
     for vid, title, text in entries:
         parts += ['<entry>',
-                  f'<title>{html.escape(title)}</title>',
+                  f'<title>{escape(title)}</title>',
                   f'<id>urn:youtube:{vid}</id>',
                   f'<link href="https://youtu.be/{vid}"/>',
                   f'<updated>{now}</updated>',
-                  f'<summary>{html.escape(text)}</summary>',
+                  f'<summary>{escape(text)}</summary>',
                   '</entry>']
     parts.append('</feed>')
     os.makedirs(OUT_DIR, exist_ok=True)

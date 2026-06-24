@@ -1,4 +1,4 @@
-# TESTING — trimail
+# TESTING — InfoTriage
 
 Source of truth: absence of a formal test suite + observed smoke patterns.
 Generated: 2026-06-23.
@@ -39,7 +39,7 @@ Verified live per README's "Status" table:
 | Fever API auth + mark-read roundtrip | `python3 score/fever_triage.py` from the cron |
 | Bridge writes to `data/feeds/*.xml` | handshake after the bridge runs |
 | FreshRSS subscribes a bridge feed | manual UI / curl on `:8088` |
-| `http://feeds/gmail.xml` from inside the `trimail` compose network | container-side curl |
+| `http://feeds/gmail.xml` from inside the `InfoTriage` compose network | container-side curl |
 
 ### Smoke at directory level / external services
 

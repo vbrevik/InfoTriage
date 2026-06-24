@@ -1,4 +1,4 @@
-# trimail — Architecture & Build Plan
+# InfoTriage — Architecture & Build Plan
 
 Status: **agreed direction**, 2026-06-23. Supersedes the ad-hoc spike scripts as the
 target; spike stays runnable while we build toward this.
@@ -15,7 +15,7 @@ awareness over time — all local and free.
 
 **Decision.** One **PostgreSQL** instance as the system of record:
 - FreshRSS runs on it (its own schema) for ingestion + reader UI.
-- `trimail` schema holds our **article copy + CCIR/CNR enrichment + pgvector embeddings**.
+- `InfoTriage` schema holds our **article copy + CCIR/CNR enrichment + pgvector embeddings**.
 - Embeddings from a **local multilingual model** (bge-m3 via Ollama; verify in Phase 2).
 - Scoring stays **qwen36** via oMLX. No cloud, no second DB service.
 
@@ -38,10 +38,10 @@ so RAG/history survive feed purges.
                                                             │ Fever API (read new)
                                                             ▼
    qwen36  (score + tag CCIR/CNR) ───▶  ┌──────────────  PostgreSQL  ──────────────┐
-   bge-m3  (embed, multilingual)  ───▶  │ trimail.articles    (our copy)           │
-                                        │ trimail.enrichment  (ccir,cnr,score,why) │
-                                        │ trimail.embeddings  (pgvector)           │
-                                        │ trimail.ccir        (defs + embeddings)  │
+   bge-m3  (embed, multilingual)  ───▶  │ InfoTriage.articles    (our copy)           │
+                                        │ InfoTriage.enrichment  (ccir,cnr,score,why) │
+                                        │ InfoTriage.embeddings  (pgvector)           │
+                                        │ InfoTriage.ccir        (defs + embeddings)  │
                                         │ freshrss.*          (FreshRSS own)       │
                                         └──────────────────────────────────────────┘
                                                             │
@@ -49,7 +49,7 @@ so RAG/history survive feed purges.
                        (CCIR sections, CNR 🚩, since-cutoff window)
 ```
 
-## Data model (trimail schema)
+## Data model (InfoTriage schema)
 
 - **articles** — `id, guid (unique), url, source, title, body, published_at, ingested_at`.
   Keyed by stable GUID/link so it's independent of FreshRSS internal ids.
@@ -74,7 +74,7 @@ RAG = top-k retrieve by vector + filter, feed to qwen36 for the brief.
 ## Phased build plan
 
 **Phase 0 — Postgres foundation.** Add Postgres+pgvector to compose. Point FreshRSS at
-it (migrate/re-provision). Create `trimail` schema + tables. *Done when:* FreshRSS runs
+it (migrate/re-provision). Create `InfoTriage` schema + tables. *Done when:* FreshRSS runs
 on Postgres and the schema exists.
 
 **Phase 1 — Enrichment in DB.** Scorer upserts articles + writes enrichment to Postgres
@@ -123,7 +123,7 @@ local) — Phase 2. When adopting any third-party tool (World Monitor, Taranis),
 "run everything with Ollama" passes; a cloud-only LLM path is disqualifying.
 
 *Scope note:* cloud models are used only for **my** (assistant) orchestration/judgment
-during design — never in trimail's running pipeline. Bulk/IO assist is delegated to
+during design — never in InfoTriage's running pipeline. Bulk/IO assist is delegated to
 qwen3.6 too (ask-omlx / omlx-agent) to conserve cloud tokens.
 
 ---
@@ -168,7 +168,7 @@ User reframing (2026-06-23): RSS is **one collection discipline, not the driver*
 SOCMINT (YouTube, Instagram, Facebook, Telegram); the work is the **intelligence cycle**
 with the SAB as the *commander's extract*; and a **map is the navigation frame (COP)**.
 
-### The intelligence cycle → trimail stages → existing tooling
+### The intelligence cycle → InfoTriage stages → existing tooling
 
 | Stage | What it means here | Existing OSS to use/learn from |
 |---|---|---|
@@ -211,7 +211,7 @@ The FreshRSS spike stays a working daily driver while we evaluate World Monitor 
 - SOCMINT legality/ToS + which platforms are realistically collectable (FB is hostile).
 
 ### Commercial north-stars (reference only — closed, $$$, cloud; NOT adoptable)
-These define "what good looks like"; trimail is the free/local/personal-scale shadow.
+These define "what good looks like"; InfoTriage is the free/local/personal-scale shadow.
 - **Palantir Gotham / Maven Smart System (MSS)** — the apex. Fuses 179+ heterogeneous
   sources (satellite, drone, SIGINT, geoloc) onto a **single fused map/globe**, LLM-assisted
   decision support, **stable entity IDs tracked across modalities**, CCIR-style tasking,
@@ -228,14 +228,14 @@ These define "what good looks like"; trimail is the free/local/personal-scale sh
   multilingual embeddings (NO/EN/RU), an **NL/RAG query interface over the corpus**
   (our Phase 4), and CNR-style real-time alerting.
 
-**Net:** trimail's target feature set = fused map COP (Maven) + entity graph (Cortex) +
+**Net:** InfoTriage's target feature set = fused map COP (Maven) + entity graph (Cortex) +
 NL/RAG investigation (Babel) + CNR alerting (Dataminr), at personal scale, free & local.
 
 ### Norwegian Arctic/maritime collection — BarentsWatch (strong add, free API)
 **BarentsWatch** (Kystverket, Tromsø; since 2012) — authoritative Norwegian maritime/Arctic
 situational awareness with **open APIs** at developer.barentswatch.no:
 - **Live AIS API** — real-time vessel tracking in the Norwegian economic zone, Svalbard
-  fishery-protection zone, Jan Mayen. Feed straight onto trimail's map COP as ship tracks.
+  fishery-protection zone, Jan Mayen. Feed straight onto InfoTriage's map COP as ship tracks.
 - **ArcticInfo** — map service: AIS + sea-ice maps + weather across Barents/North Sea,
   Svalbard, Greenland, Russia, Canada.
 Directly serves **PIR-2 (Nordområdene & Arktis)**. Free, official, geocoded → a real
@@ -248,8 +248,8 @@ reporting, mobile app, collaboration (samvirke). **DSB chose RAYVN in 2023** as 
 public-sector crisis solution — nationwide: 10 regions, 356 municipalities, Sivilforsvaret,
 state agencies. Commercial/closed → reference, not adoptable.
 
-*Relevance:* RAYVN is the **dissemination / incident-response** end. trimail does continuous
+*Relevance:* RAYVN is the **dissemination / incident-response** end. InfoTriage does continuous
 early-warning intelligence (SAB + CNR); RAYVN is what spins up when a **CAT I event becomes an
-actual crisis**. Complementary: trimail's CNR 🚩 is the trigger that, in a real org, hands off
+actual crisis**. Complementary: InfoTriage's CNR 🚩 is the trigger that, in a real org, hands off
 to a RAYVN-style response tool. Validates the SA + alerting framing in a Norwegian-official
 context. *(Not the OSINT tools "Graylark Raven"/GeoSpy image-geoloc or RavenEye — different.)*

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""trimail · Fever-wired triage.
+"""InfoTriage · Fever-wired triage.
 
 Pulls UNREAD items from FreshRSS (Fever API), scores each with the LOCAL model,
 and marks the skip-bucket items READ — so your unread list is only what matters.
@@ -84,7 +84,7 @@ def main():
 
     kept.sort(key=lambda x: x.get("score", 0), reverse=True)
     icon = {"read": "🔥", "maybe": "🤔"}
-    print("# trimail digest — kept (still unread)\n")
+    print("# InfoTriage digest — kept (still unread)\n")
     for v in kept:
         print(f"{icon.get(v.get('bucket'),'•')} **[{v.get('score')}] {v['title']}**")
         print(f"    {v.get('source','')} — {v.get('why','')}\n    {v.get('_url','')}\n")

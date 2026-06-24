@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""trimail · SAB / tiered digests, CCIR-driven.
+"""InfoTriage · SAB / tiered digests, CCIR-driven.
 
 Covers everything that arrived SINCE your last situation update (default: yesterday
 16:00 Europe/Oslo). Scores each item against ccir.md, then writes three views:
@@ -133,6 +133,10 @@ def cluster(items):
 def line(v, withsrc=""):
     return f"- {v.get('why') or v['title']}{withsrc}  [les]({v.get('url','')})"
 
+def _est_tokens(s):
+    """Rough prompt-token estimate. Stdlib-first; chars/4 (Qwen3 average ~4 chars/tok)."""
+    return max(1, len(s) // 4)
+
 # ---- views ---------------------------------------------------------------
 
 def kept(verdicts):
@@ -141,7 +145,7 @@ def kept(verdicts):
 def write_cluster(verdicts, period):
     ks = kept(verdicts)
     cs = sorted(cluster(ks), key=lambda c: (-max(i.get("score", 0) for i in c["items"]), -len(c["items"])))
-    L = [f"# trimail · cluster — {period}", f"\n{len(cs)} saker fra {len(ks)} elementer\n"]
+    L = [f"# InfoTriage · cluster — {period}", f"\n{len(cs)} saker fra {len(ks)} elementer\n"]
     for c in cs:
         lead = max(c["items"], key=lambda i: i.get("score", 0))
         srcs = sorted({i.get("source", "") for i in c["items"]})
@@ -152,7 +156,7 @@ def write_cluster(verdicts, period):
 
 def write_brief(verdicts, period):
     ks = kept(verdicts)
-    L = [f"# trimail · SAB — {period}",
+    L = [f"# InfoTriage · SAB — {period}",
          f"_{len(ks)} saker som svarer på CCIR · ~10 min_\n"]
     # CNR CAT I first
     cat1 = sorted([v for v in ks if v.get("cnr") == "I"], key=lambda x: -x.get("score", 0))
@@ -180,39 +184,55 @@ def write_brief(verdicts, period):
         L.append("")
     return "brief.md", "\n".join(L)
 
-def write_bluf(verdicts, period, top_n=12):
+def write_bluf(verdicts, period, top_n=12, cap_total=6000):
     """Per-topic BLUF (Bottom Line Up Front) digest.
 
     For each CCIR, synthesize 2-3 sentences across the top-scoring items in the
     window. Every claim is footnoted via numbered refs [1]..[N]. If sources
     disagree, both positions are reported (no silent picking).
     Topic is always rendered, even when empty (-> "ingen saker").
-    `top_n` controls how many highest-scoring items per CCIR enter the LLM
-    context window; default 12 (~1500 tokens). Pass --bluf-top N from CLI.
+    `top_n`: highest-scoring items per CCIR considered (default 12).
+    `cap_total`: max input tokens per individual LLM prompt (default 6000).
+      The "total" is the aggregate of frame + items in ONE prompt — not a
+      cumulative budget across sections. If a CCIR's prompt would exceed
+      this, items are dropped from the tail (lowest-score end) until the
+      prompt fits; if even 1 item + frame cannot be sent, the section is
+      skipped cleanly with a markdown marker. Trims are reported to stderr;
+      if any trim happened, bluf.md gets a footer line. Pass --bluf-top N /
+      --bluf-cap-total N from CLI.
     """
     from triage_score import llm  # dynamic: write_bluf is the only caller
     ks = kept(verdicts)
     by = {}
     for v in ks:
         by.setdefault((v.get("ccir") or "none").upper(), []).append(v)
-    L = [f"# trimail · BLUF — {period}",
-         f"_{len(ks)} saker syntetisert på tvers av kilder · én blokk per CCIR_\n"]
+    L = [f"# InfoTriage · BLUF — {period}",
+         f"_{len(ks)} saker syntetisert på tvers av kilder · én blokk per CCIR · "
+         f"per-prompt cap {cap_total} (estimerte tokens)_\n"]
+    trimmed_total = 0
     for cid, title in CCIR_ORDER:
         L.append(f"## {cid} · {title}")
         grp = by.get(cid, [])
         if not grp:
             L.append("_(ingen saker i vinduet)_\n")
             continue
+        # Pre-build items + blocks already sorted high-score first. Trimming
+        # pops from the tail pair-wise so ctx_items and ctx_blocks stay aligned.
         top = sorted(grp, key=lambda x: -x.get("score", 0))[:top_n]  # --bluf-top
-        ctx = []
+        ctx_blocks, ctx_items = [], []
         for i, it in enumerate(top, 1):
-            ctx.append(f"[{i}] KILDE: {it.get('source','')}\n"
-                       f"TITTEL: {it.get('title','')}\n"
-                       f"OPPSUMMERING: {(it.get('summary','') or '')[:500]}\n")
-        prompt = (
+            ctx_blocks.append(
+                f"[{i}] KILDE: {it.get('source','')}\n"
+                f"TITTEL: {it.get('title','')}\n"
+                f"OPPSUMMERING: {(it.get('summary','') or '')[:500]}\n"
+            )
+            ctx_items.append(it)
+        # Frame template; {N} / {CTX} are filled in once items are settled.
+        # Marked `{N}` / `{CTX}` literal via doubled braces so .format plugs them.
+        frame_template = (
             f"You are an intelligence analyst writing a BLUF (Bottom Line Up "
             f"Front) for the topic '{title}' ({cid}).\n\n"
-            f"Recent reports ({len(top)} items):\n" + "\n".join(ctx) + "\n\n"
+            f"Recent reports ({{N}} items):\n{{CTX}}\n\n"
             "Instructions:\n"
             "1. Write a 2-3 sentence BLUF in Norwegian summarizing the "
             "overarching developments *across* these reports.\n"
@@ -226,8 +246,40 @@ def write_bluf(verdicts, period, top_n=12):
             "If the items don't share one overarching story, write one "
             "sentence per cluster, each still cited with bracketed refs."
         )
+        # Per-prompt truncation: drop tail items until prompt ≤ cap_total.
+        while len(ctx_blocks) > 1 and _est_tokens(
+            frame_template.format(N=len(ctx_blocks), CTX="".join(ctx_blocks))
+        ) > cap_total:
+            ctx_blocks.pop()
+            ctx_items.pop()
+        # If 1 item + frame still cannot fit, the cap is below useful → skip.
+        skipped_for_cap = bool(ctx_blocks) and _est_tokens(
+            frame_template.format(N=len(ctx_blocks), CTX="".join(ctx_blocks))
+        ) > cap_total
+        if skipped_for_cap:
+            ctx_blocks, ctx_items = [], []
+        dropped = len(top) - len(ctx_items)
+        prompt = (
+            frame_template.format(N=len(ctx_items), CTX="".join(ctx_blocks))
+            if ctx_items else None
+        )
+        if skipped_for_cap:
+            trimmed_total += len(top)
+            print(f"  …{cid} skipped — cap {cap_total} below frame + 1 item "
+                  f"({len(top)} items not sent)",
+                  file=sys.stderr, flush=True)
+        elif dropped:
+            trimmed_total += dropped
+            print(f"  …{cid} trimmed {dropped} item(s) (lowest-score tail) to fit "
+                  f"{cap_total}-tok cap ({len(ctx_items)}/{len(top)} kept)",
+                  file=sys.stderr, flush=True)
+        if not prompt:
+            L.append(f"_(seksjon hoppet over — cap {cap_total} for lav til å "
+                     f"kjøre BLUF for {cid}, {len(top)} saker droppet)_\n")
+            continue
         try:
-            print(f"  …generating BLUF for {cid} ({len(top)} items)",
+            print(f"  …generating BLUF for {cid} ({len(ctx_items)} items, "
+                  f"~{_est_tokens(prompt)} tok)",
                   file=sys.stderr, flush=True)
             bluf_text = llm([{"role": "user", "content": prompt}],
                             max_tokens=400).strip()
@@ -240,17 +292,22 @@ def write_bluf(verdicts, period, top_n=12):
             bluf_text = "_(Kunne ikke generere BLUF — sjekk logg for detaljer)_"
         L.append(bluf_text)
         L.append("")
-        for i, it in enumerate(top, 1):
+        for i, it in enumerate(ctx_items, 1):
             src = it.get("source", "") or "(ukjent kilde)"
             L.append(f"[{i}] **{src}** · [{it.get('title','')}]"
                      f"({it.get('url','') or '#'})")
         L.append("")
+    if trimmed_total:
+        L.append("---\n"
+                 f"_Trimmet {trimmed_total} elementer for å holde hver LLM-prompt "
+                 f"innenfor cap {cap_total} estimerte tokens. "
+                 f"Juster `--bluf-cap-total` for å heve/grense._")
     return "bluf.md", "\n".join(L)
 
 
 def write_list(verdicts, period):
     strict = sorted([v for v in kept(verdicts) if v.get("score", 0) >= 8], key=lambda x: -x["score"])
-    L = [f"# trimail · list (strict 🔥) — {period}", f"\n{len(strict)} viktigste\n"]
+    L = [f"# InfoTriage · list (strict 🔥) — {period}", f"\n{len(strict)} viktigste\n"]
     for v in strict:
         f = "🚩 " if v.get("cnr") == "I" else ""
         L.append(f"- {f}**[{v['score']}] {v['title']}**  · {v.get('source','')} · {v.get('ccir','')}")
@@ -265,6 +322,11 @@ def main():
     ap.add_argument("--max", type=int, default=400, help="hard cap on items scored")
     ap.add_argument("--bluf-top", type=int, default=12,
                     help="top-N items per CCIR fed to LLM (BLUF mode only); ~1500 tokens at N=12")
+    ap.add_argument("--bluf-cap-total", type=int, default=6000,
+                    help="per-LLM-prompt input token cap for BLUF synthesis (default 6000); "
+                         "items dropped from the tail (lowest-score end) until the prompt fits; "
+                         "set very high (e.g. 100000) to disable trimming entirely. "
+                         "Cap below the smallest frame (~200 estimated tok) skips the section cleanly.")
     args = ap.parse_args()
     load_dotenv(os.path.join(ROOT, ".env"))
 
@@ -285,7 +347,9 @@ def main():
     chosen = writers if args.mode == "all" else {args.mode: writers[args.mode]}
     for name, fn in chosen.items():
         if name == "bluf":
-            fname, text = fn(verdicts, period, top_n=args.bluf_top)
+            fname, text = fn(verdicts, period,
+                             top_n=args.bluf_top,
+                             cap_total=args.bluf_cap_total)
         else:
             fname, text = fn(verdicts, period)
         fpath = os.path.join(OUT, fname)

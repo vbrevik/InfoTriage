@@ -1,4 +1,4 @@
-# STRUCTURE — trimail
+# STRUCTURE — InfoTriage
 
 Source of truth: project root + `ls -R`.
 Generated: 2026-06-23.
@@ -6,7 +6,7 @@ Generated: 2026-06-23.
 ## Layout
 
 ```
-trimail/
+InfoTriage/
 ├── README.md                  — spike overview, runbook, status table, bridge docs
 ├── ccir.md                    — Commander's Critical Information Requirements (the triage brain)
 ├── requirements.txt           — Python deps (one: feedgen)

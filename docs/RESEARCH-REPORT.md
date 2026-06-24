@@ -1,4 +1,4 @@
-# trimail — Deep Research Report (2026-06-23)
+# InfoTriage — Deep Research Report (2026-06-23)
 
 Free, self-hosted, fully-local OSINT/all-source intelligence platform on a Mac with
 local qwen3.6. Fact-checked: 23 sources → 100 claims → 25 verified (24 confirmed, 1
@@ -6,7 +6,7 @@ refuted, 3-vote adversarial). Builds on `ARCHITECTURE.md` (ADR-001..004).
 
 ## Bottom line
 Adopt **World Monitor** as the map-fronted aggregation + COP core and keep the proven
-**trimail FreshRSS+qwen3.6** spike as the CCIR/CNR triage + SAB layer. Add event DBs and
+**InfoTriage FreshRSS+qwen3.6** spike as the CCIR/CNR triage + SAB layer. Add event DBs and
 SOCMINT as **modular collection plugins**, incrementally. TAK is a later doctrinal phase,
 not the first step. **One load-bearing unknown must be tested before betting on World
 Monitor** (below).
@@ -79,8 +79,8 @@ Monitor** (below).
 ## Recommended sequencing (revises ADR-003 roadmap)
 - **Step 0 (cheapest, highest-leverage):** spike World Monitor on the Mac, point it at
   qwen3.6/oMLX, and **answer Open-Q1** — does local Ollama drive scoring+briefing, and can
-  CCIR + Norwegian sources inject? This one test decides adopt-WM vs extend-trimail.
-- **Keep** the trimail FreshRSS+qwen3.6 spike as the working daily driver throughout.
+  CCIR + Norwegian sources inject? This one test decides adopt-WM vs extend-InfoTriage.
+- **Keep** the InfoTriage FreshRSS+qwen3.6 spike as the working daily driver throughout.
 - **Collection plugins, incremental:** open GDELT + UCDP GED (free, legal) → BarentsWatch AIS
   (Arctic) → Telegram (Telethon) → YouTube (yt-dlp + mlx-whisper). Defer IG/FB; ACLED only if licensed.
 - **Storage:** Postgres + pgvector + bge-m3/mE5-large (chunked) — per ADR-001.

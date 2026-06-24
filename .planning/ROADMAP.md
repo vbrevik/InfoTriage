@@ -1,4 +1,4 @@
-# ROADMAP — trimail
+# ROADMAP — InfoTriage
 
 > Sequenced to **stabilize what's running first**, then **gate the architecture on the empirical World Monitor test**, then **build the durable foundation (Postgres)**, then **layer enrichment, dedup, RAG**. Source-of-truth for the phase target lives in `docs/ARCHITECTURE.md` Phase 0–4; this roadmap is the executable cut of that, with the open questions kept load-bearing.
 
@@ -42,17 +42,17 @@
 
 **Why.** `docs/RESEARCH-REPORT.md` identified World Monitor as the map-fronted aggregation + COP core, but the open question is whether its local Ollama path covers **CCIR scoring + SAB briefing** (not just classification/summarization). Until that's answered, do not commit to UI choices. This phase *is* the gate.
 
-**Done when.** World Monitor runs against `http://127.0.0.1:8000/v1` (oMLX) with `LLM_MODEL=qwen36-ud-4bit`, scores a sample of trimail's own items, and writes a brief that mirrors trimail's `brief.md` structure. Pass = adopt WM as the COP layer. Fail = fall back to MapLibre self-built or Taranis (Open-Q2).
+**Done when.** World Monitor runs against `http://127.0.0.1:8000/v1` (oMLX) with `LLM_MODEL=qwen36-ud-4bit`, scores a sample of InfoTriage's own items, and writes a brief that mirrors InfoTriage's `brief.md` structure. Pass = adopt WM as the COP layer. Fail = fall back to MapLibre self-built or Taranis (Open-Q2).
 
 **Scope:**
 - Stand up World Monitor on the Mac (Tauri or Docker; Tauri is the air-gapped profile).
 - Wire `LLM_BASE_URL=http://127.0.0.1:8000/v1`, `LLM_API_KEY=omlx`.
 - Inject the `ccir.md` taxonomy + a curated Norwegian-source subset.
-- Score 20 trimail items; write a structured output covering CCIR sections.
+- Score 20 InfoTriage items; write a structured output covering CCIR sections.
 - Decision: go (adopt), no-go (fall back), or partial (use WM for COP only, keep custom scorer + SAB).
 
 **Side-effects regardless of gate outcome:**
-- The trimail FreshRSS+qwen3.6 spike stays the daily driver. No work blocked by this.
+- The InfoTriage FreshRSS+qwen3.6 spike stays the daily driver. No work blocked by this.
 - The decision lands in `docs/RESEARCH-REPORT.md` as an update + a new ADR (proposed: ADR-005).
 
 **Out of scope.** Adopting World Monitor in production. Configuring TAK/CloudTAK. Taranis evaluation (separate spike, Open-Q2).
@@ -63,13 +63,13 @@
 
 **Why.** Today the de-facto store is `data/verdicts.jsonl` and dedup is keyword overlap. Both fail in the ways `docs/ARCHITECTURE.md` describes. Postgres+pgvector is the single store, the durability story for our article copies, and the substrate for embeddings (Phase 4).
 
-**Done when.** FreshRSS runs on Postgres (its own schema) and `trimail.*` schema exists with `articles`, `enrichment`, `ccir` tables. The SAB builds from SQL. `verdicts.jsonl` is no longer the source of truth.
+**Done when.** FreshRSS runs on Postgres (its own schema) and `InfoTriage.*` schema exists with `articles`, `enrichment`, `ccir` tables. The SAB builds from SQL. `verdicts.jsonl` is no longer the source of truth.
 
 **Scope (corresponds to ARCHITECTURE Phase 0–1):**
 - Add Postgres+pgvector container to `docker-compose.yml`. ARCHITECTURE specifies "PostgreSQL 16 + pgvector" only — verify the latest stable pgvector image tag at the time of the spike (provisional: `postgres:16` and `pgvector/pgvector:pg16`).
 - Re-provision FreshRSS on Postgres (per Phase 1 Q4 decision).
-- Create `trimail` schema + `articles`, `enrichment`, `ccir` tables matching `docs/ARCHITECTURE.md` data model.
-- Replace `score/digest.py`'s `data/verdicts.jsonl` write with `trimail.enrichment` upsert; keep `verdicts.jsonl` as a debug aid for one cycle.
+- Create `InfoTriage` schema + `articles`, `enrichment`, `ccir` tables matching `docs/ARCHITECTURE.md` data model.
+- Replace `score/digest.py`'s `data/verdicts.jsonl` write with `InfoTriage.enrichment` upsert; keep `verdicts.jsonl` as a debug aid for one cycle.
 - Read path (Fever → score → upsert) writes to Postgres; SAB reads from Postgres.
 - Schema validation via `psycopg` constraints; small migration script tracked in `score/migrations/`.
 
@@ -81,14 +81,14 @@
 
 **Why.** Today's keyword-overlap clustering quietly fails across languages (NRK "Nato-toppmøte" ≠ BBC "NATO summit" ≠ TASS "Саммит НАТО"). Semantic dedup collapses them. This phase also resolves Q5 (embedding model).
 
-**Done when.** Same story from three languages collapses to one cluster in `trimail.cluster` view. Embedding model + dim recorded in `docs/RESEARCH-REPORT.md` update.
+**Done when.** Same story from three languages collapses to one cluster in `InfoTriage.cluster` view. Embedding model + dim recorded in `docs/RESEARCH-REPORT.md` update.
 
 **Scope:**
 - Stand up Ollama (if not already) on `:11434`; pull `bge-m3` (1024-d) or `mE5-large`, decided by Q5.
-- Embed each `trimail.articles` row (chunked per P-6) into `trimail.embeddings(vector vector(1024))`.
-- ivfflat index over `trimail.embeddings.vector`.
+- Embed each `InfoTriage.articles` row (chunked per P-6) into `InfoTriage.embeddings(vector vector(1024))`.
+- ivfflat index over `InfoTriage.embeddings.vector`.
 - Replace keyword-overlap `cluster()` in score/digest.py with cosine clustering against embeddings.
-- Update `trimail.ccir` to include `ccir_def.vector` so that Phase 5 pre-filtering can rank.
+- Update `InfoTriage.ccir` to include `ccir_def.vector` so that Phase 5 pre-filtering can rank.
 
 **Out of scope.** Replacing the LLM. Adding SOCMINT collectors. Phase-5 pre-filter and RAG build on this.
 
@@ -98,12 +98,12 @@
 
 **Why.** Right now every unread item goes to the LLM. Phase 5 cuts caller volume and sharpens tagging using the embedded CCIR definitions, then enables the **RAG SAB** — "what do we know about X since date" — over the durable corpus.
 
-**Done when.** Clearly-off-topic items skip the LLM (logged in `trimail.audit`) AND a themed recall brief cites stored articles with stable IDs.
+**Done when.** Clearly-off-topic items skip the LLM (logged in `InfoTriage.audit`) AND a themed recall brief cites stored articles with stable IDs.
 
 **Scope:**
 - Pre-filter: `cosine(article.embedding, ccir.vector) < τ` → skip LLM, mark as `pruned`.
 - RAG SAB: vector retrieve top-k by filter, feed to qwen3.6 to write the brief; cite `articles.id` / `articles.url` per claim.
-- Add `trimail.audit` table for the pre-filter decisions (which CCIR it dropped against, model used, latency).
+- Add `InfoTriage.audit` table for the pre-filter decisions (which CCIR it dropped against, model used, latency).
 - Expose thematic recall as a CLI (`python3 score/recall.py --topic "PIR-2 Nordområdene" --since 14d`).
 
 **Out of scope.** Map/autocomplete UI. Push notifications (Phase 7).
@@ -114,13 +114,13 @@
 
 **Why.** Map of the world is incomplete with only RSS + email. SOCMINT (Telegram, YouTube transcription) and authoritative Arctic data (BarentsWatch AIS) round out the picture per ADR-003.
 
-**Done when.** Telethon Telegram collector, yt-dlp+mlx-whisper YouTube collector, and BarentsWatch AIS poller write to `trimail.articles` with explicit `source.discipline` tags. SOCMINT legal/ToS posture documented.
+**Done when.** Telethon Telegram collector, yt-dlp+mlx-whisper YouTube collector, and BarentsWatch AIS poller write to `InfoTriage.articles` with explicit `source.discipline` tags. SOCMINT legal/ToS posture documented.
 
 **Scope:**
-- `collectors/telegram.py` — Telethon, account from environment, writes to `trimail.articles` with `discipline=socmint`.
+- `collectors/telegram.py` — Telethon, account from environment, writes to `InfoTriage.articles` with `discipline=socmint`.
 - `collectors/yt_dlp_whisper.py` — yt-dlp + mlx-whisper per docs/RESEARCH-REPORT.md §9.
 - `collectors/barentswatch.py` — Live AIS + ArcticInfo with rate-limit posture.
-- Add reliability ratings (Admiralty) per source in `trimail.sources`.
+- Add reliability ratings (Admiralty) per source in `InfoTriage.sources`.
 - Defer Instagram / Facebook (Open).
 - ACLED only if Q3 resolved (paid license); do not feed ACLED to local LLM without one.
 
@@ -130,7 +130,7 @@
 
 ## Phase 7 — Notification & dissemination
 
-**Why.** A CNR CAT I 🚩 should not require someone to refresh the SAB at 23:00. The trimail-with-RAYVN-style handoff pattern needs an alerting path.
+**Why.** A CNR CAT I 🚩 should not require someone to refresh the SAB at 23:00. The InfoTriage-with-RAYVN-style handoff pattern needs an alerting path.
 
 **Done when.** A CAT I event post-write triggers a push (Signal / ntfy) with the SAB excerpt + dedupe ID, AND the SAB remains the canonical artifact.
 

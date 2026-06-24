@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""trimail scorer — the noise-killer.
+"""InfoTriage scorer — the noise-killer.
 
 Scores incoming items (newsletters, RSS, web) with a LOCAL model on the Mac and
 buckets them read / maybe / skip against the user's interest profile. No cloud.
@@ -66,7 +66,7 @@ Tier quick-reference (full descriptions in ccir.md above):
 - PIR-6 OSINT & etterforskning — krigsforbrytelser, sanksjonsomgåelse, aktør-identifisering (Bellingcat, OCCRP)
 - FFIR-1 Norsk forsvar & sikkerhetspolitikk — Stortinget, Forsvaret, beredskap, E-tjenesten
 - FFIR-2 Norsk politikk & samfunn — strategisk/nasjonal betydning
-- FFIR-3 Egen teknologikapabilitet — lokale LLM-er, AI-agenter, DFIR, Rust, homelab
+- FFIR-3 Egen teknologikapabilitet — lokale LLM-er (Mac/Qwen/MLX/Ollama), AI-agenter, DFIR, Rust, homelab, NVIDIA-stack (DGX Spark / GB10 Grace Blackwell / CUDA-versjoner)
 - SIR-1 Midtøsten & US-Iran — IRGC, proxyer, atomprogram, sanksjonspress (tidsavgrenset)
 - SIR-2 Sport — VM 2026 (FIFA) — sikkerhets-/geopolitisk dimensjon; CARVE-OUT løfter over CNR-Routine
 - "none" if the item answers no CCIR at all.
@@ -193,7 +193,7 @@ def main():
         print(json.dumps(scored, indent=2)); return
 
     icon = {"read": "🔥", "maybe": "🤔", "skip": "🗑️"}
-    print("# trimail digest\n")
+    print("# InfoTriage digest\n")
     for it in scored:
         print(f"{icon.get(it.get('bucket'),'•')} **[{it.get('score')}] {it['title']}**")
         print(f"    {it.get('source','')} — {it.get('why','')}\n")

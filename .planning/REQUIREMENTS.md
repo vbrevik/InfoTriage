@@ -1,4 +1,4 @@
-# REQUIREMENTS — trimail
+# REQUIREMENTS — InfoTriage
 
 > Status legend. **`[LIVE]`** = in working spike today. **`[SPIKE]`** = partial / smoke-test only. **`[TARGET]`** = defined in `docs/ARCHITECTURE.md` or `docs/RESEARCH-REPORT.md`, not yet built. **`[GATED]`** = blocked on an open question.
 
@@ -64,7 +64,7 @@ Grouped by the **intelligence cycle** (ADR-003) so each requirement maps to a st
 | PR-2 | SAB structure: CNR 🚩 first, then one section per CCIR, ~10 min read | `[LIVE]` | score/digest.py write_brief |
 | PR-3 | Since-cutoff default = yesterday 16:00 Europe/Oslo; explicit `--since` or `--hours` override | `[LIVE]` | score/digest.py |
 | PR-4 | Append-only score history → `data/verdicts.jsonl` | `[LIVE]` | score/digest.py persist |
-| PR-5 | SAB writes only to `data/verdicts.jsonl` (no DB) | `[SPIKE]` | score/digest.py — to be replaced by `trimail.enrichment` in Phase 1 |
+| PR-5 | SAB writes only to `data/verdicts.jsonl` (no DB) | `[SPIKE]` | score/digest.py — to be replaced by `InfoTriage.enrichment` in Phase 1 |
 | PR-6 | RAG-assisted SAB ("what do we know about X since date") | `[TARGET]` | docs/ARCHITECTURE.md Phase 4 |
 | PR-7 | Equipment-friendly brief export (PDF / handoff to RAYVN-style downstream) | `[TARGET]` | docs/ARCHITECTURE.md ADR-003 |
 
@@ -94,7 +94,7 @@ Grouped by the **intelligence cycle** (ADR-003) so each requirement maps to a st
 |---|---|---|---|
 | NF-1 | All LLM stages use **local qwen3.6** (oMLX :8000/v1; Ollama :11434/v1 fallback) — hard rule, ADR-004 | `[LIVE]` | score/triage_score.py llm() env contract |
 | NF-2 | No paid services, no cloud LLM, no SaaS | `[LIVE]` | docker-compose + .env contract |
-| NF-3 | One query surface in target state — Postgres with `trimail.*` schema, pgvector | `[TARGET]` | ADR-001 |
+| NF-3 | One query surface in target state — Postgres with `InfoTriage.*` schema, pgvector | `[TARGET]` | ADR-001 |
 | NF-4 | Read-only against all source systems (Gmail IMAP `readonly=True`) | `[LIVE]` | bridge/gmail_to_atom.py |
 | NF-5 | Operator-tunable CCIR profile; the Python prompt never re-defines the taxonomy | `[LIVE]` | score/triage_score.py CCIR_PATH |
 | NF-6 | `.env` is external / gitignored, never committed | `[LIVE]` | .gitignore |

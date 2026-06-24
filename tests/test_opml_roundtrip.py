@@ -12,8 +12,8 @@ import xml.etree.ElementTree as ET
 
 OPML = os.path.join(os.path.dirname(__file__), "..", "opml", "feeds.opml")
 
-EXPECTED_TOP_OUTLINES = 10  # Norske aviser, Offentlig Norge, ... , Sport VM 2026
-EXPECTED_RSS_FEEDS = 61     # total type="rss" outlines
+EXPECTED_TOP_OUTLINES = 11  # Norske aviser, Offentlig Norge, ... , Sport VM 2026 (SIR-2)
+EXPECTED_RSS_FEEDS = 64     # total type="rss" outlines (verified 2026-06-24)
 
 
 class TestOpmlRoundtrip(unittest.TestCase):

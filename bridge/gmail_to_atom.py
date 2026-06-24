@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""trimail bridge — Gmail newsletters -> local Atom feed.
+"""InfoTriage bridge — Gmail newsletters -> local Atom feed.
 
 READ-ONLY: connects to Gmail IMAP, fetches messages matching GMAIL_QUERY, writes
 an Atom file into ../data/feeds/ which the `feeds` container serves to FreshRSS
@@ -11,8 +11,9 @@ Then in FreshRSS add subscription:  http://feeds/gmail.xml
 
 Env (or .env): GMAIL_USER, GMAIL_APP_PASSWORD, GMAIL_QUERY.
 """
-import os, email, imaplib, html, datetime
+import os, email, imaplib, datetime
 from email.header import decode_header
+from _util import escape
 
 OUT = os.path.join(os.path.dirname(__file__), "..", "data", "feeds", "gmail.xml")
 
@@ -80,16 +81,16 @@ def main():
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
     parts = ['<?xml version="1.0" encoding="utf-8"?>',
              '<feed xmlns="http://www.w3.org/2005/Atom">',
-             '<title>trimail · Gmail newsletters</title>',
+             '<title>InfoTriage · Gmail newsletters</title>',
              f'<updated>{now}</updated>',
-             '<id>urn:trimail:gmail</id>']
+             '<id>urn:infotriage:gmail</id>']
     for subj, frm, snippet, mid in reversed(entries):
         parts += ['<entry>',
-                  f'<title>{html.escape(subj)}</title>',
-                  f'<id>{html.escape(mid)}</id>',
-                  f'<author><name>{html.escape(frm)}</name></author>',
+                  f'<title>{escape(subj)}</title>',
+                  f'<id>{escape(mid)}</id>',
+                  f'<author><name>{escape(frm)}</name></author>',
                   f'<updated>{now}</updated>',
-                  f'<summary>{html.escape(snippet)}</summary>',
+                  f'<summary>{escape(snippet)}</summary>',
                   '</entry>']
     parts.append('</feed>')
 

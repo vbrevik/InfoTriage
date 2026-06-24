@@ -1,7 +1,11 @@
-# trimail CCIR — Commander's Critical Information Requirements
+# InfoTriage CCIR — Commander's Critical Information Requirements
 
-This file IS the triage brain. The scorer reads it and tags every item with the
-CCIR it answers and a CNR notification level. Edit freely — add/remove/retune.
+This file is the canonical taxonomy. The scorer's LLM prompt inlines the full
+file (`score/triage_score.py:score_item`'s CCIR section) and layers on a
+disambiguation guide + worked examples so the model can route items — so
+editing here changes triage. Carve-out intent (se SIR-2 / CNR Routine NB
+nedenfor) utføres av scorer-promptens regler + worked examples, ikke av en
+hardkodet parser mot denne filen. Edit freely — add/remove/retune.
 
 ## PIR — Priority Intelligence Requirements (eksternt: verden, trussel, miljø)
 
@@ -41,10 +45,21 @@ CCIR it answers and a CNR notification level. Edit freely — add/remove/retune.
 - **FFIR-2 Norsk politikk & samfunn** — saker av strategisk/nasjonal betydning
   (ikke kjendis/sport/livsstil).
   `PMESII: Political, Social` · `TESSOC: Organization, Communications`
-- **FFIR-3 Egen teknologikapabilitet** — lokale LLM-er på Mac (Qwen/MLX/Ollama,
-  kvantisering, tok/s), AI-agenter, Claude Code, skills/workflows, sikkerhet/pentest/
-  DFIR, Rust, self-hosting/homelab.
-  `PMESII: Information` · `TESSOC: Skills, Communications`
+- **FFIR-3 Egen teknologikapabilitet** — *egen* plattform og spark-stack for
+  lokal AI og analysearbeid:
+  - **Mac-basert**: Qwen/MLX/Ollama, kvantisering, lokale Claude Code-arbeidsflyter,
+    AI-agenter og skills, Rust-verktøy, homelab, DFIR/pentest.
+  - **NVIDIA-stack**: **DGX Spark (GB10 Grace Blackwell)** plattformstatus og releaser;
+    **GB10-brikke**-spesifikasjoner og supply; **CUDA-versjoner** og toolchain-endringer
+    (`nvidia-smi`, driver-matrise, breaking changes mellom CUDA 12.x og 13.x); ytelse
+    per token (tok/s) per CUDA-versjon.
+  - **NB**: DGX Spark- og GB10-saker er FFIR-3 (relevant for *egen plattform*),
+    ikke noen PIR — de er ikke ekstern trussel, men *hardware- og software-stack
+    for lokal AI*. Bruk FFIR-3 også for konkurranse-sammenlikninger («Mac vs
+    DGX Spark», «Apple Silicon vs Grace Blackwell») så lenge vinklingen er
+    «hva kan *jeg* kjøre lokalt». Hvis vinklingen er geopolitisk (f.eks.
+    Kinas chip-exports, USAs eksportkontroll), faller saken tilbake til PIR-5.
+  `PMESII: Information` · `TESSOC: Skills, Communications, Equipment`
 
 ## SIR — Specific Intelligence Requirements (tidsavgrenset, oppheves ved endt hendelse)
 
@@ -57,10 +72,17 @@ CCIR it answers and a CNR notification level. Edit freely — add/remove/retune.
 - **SIR-2 Sport — VM 2026 (FIFA)** — sikkerhets- og geopolitisk dimensjon ved
   Fotball-VM 2026 (vertsnasjoner USA/Canada/Mexico): kritisk infrastruktur, protester
   /boikott, politisk ladede kamper (Iran, Saudi-Arabia), terrortrusler, store
-  kontroverser. **CARVE-OUT**: standard sport er CNR-Routine; VM 2026 er sikkerhets-
-  og politikkrelevant — alle saker her eskaleres til PIR (CAT II dagsbrief, eller
-  CAT I ved sikkerhetshendelse). Kildegruppe: BBC Sport Football, ESPN FC, Reuters
-  Sports, Google News WC2026.
+  kontroverser. **Carve-out-intent**: VM 2026-hits med sikkerhets-/politisk
+  signal (protester, boikott, terrortrussel, politisk kontrovers) eskaleres til
+  SIR-2 (CAT II dagsbrief) eller CAT I ved konkret sikkerhetshendelse —
+  sammenliknet med ren sportsdekning som forblir CNR-Routine. Carve-out er
+  utført av `score/triage_score.py:score_item`-promptens disambigueringsguide
+  "Sport vs SIR-2" og worked examples (jf. "FIFA bekrefter utvidet
+  48-lagsformat" → SIR-2 score 5; "Trussel om masseprotester ved VM-arenaer"
+  → SIR-2 score 7) — ikke av en hardkodet parser mot denne filen. Dersom
+  SIR-2-seksjonen utvides eller carve-out-regelen endres, oppdater også
+  scorer-promptens regel + eksempler i `triage_score.py:score_item`. Kildegruppe:
+  BBC Sport Football, ESPN FC, Reuters Sports, Google News WC2026.
   `PMESII: Political, Social, Infrastructure` · `TESSOC: Organization, Space, Communications`
 
 ## CNR — Commander's Notification Requirements (varslingsterskler)
@@ -71,8 +93,11 @@ CCIR it answers and a CNR notification level. Edit freely — add/remove/retune.
   alvorlig cyberhendelse mot Norge. (Skal aldri drukne i bunken.)
 - **CAT II 📋 — dagsbrief**: alt annet som svarer på en CCIR (PIR eller FFIR).
 - **Routine — utelat**: svarer ikke på noen CCIR (reklame, kjendis, sport, livsstil,
-  generisk PR, ren clickbait). **NB**: `SIR-2 Fotball-VM 2026` er eksplisitt carve-out
-  — alle saker fra den kilden eskaleres til PIR (aldri Routine), jf. SIR-seksjonen.
+  generisk PR, ren clickbait). **NB**: VM 2026-saker med sikkerhets-/politisk
+  signal eskaleres per SIR-2-carve-out (se SIR-2 over) — men standard
+  BBC Sport Football / ESPN FC / Reuters Sports-dekning uten slikt signal
+  forblir CNR-Routine. Ikke alle saker fra disse kildene eskaleres; kun de
+  med sikkerhets-/politisk vinkling.
 
 ## PMESII — operasjonelle domener (analytisk berikelse)
 

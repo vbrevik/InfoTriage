@@ -1,4 +1,4 @@
-# ARCHITECTURE — trimail
+# ARCHITECTURE — InfoTriage
 
 Source of truth: `docs/ARCHITECTURE.md` ADRs + code-level data flow.
 Generated: 2026-06-23.
@@ -32,7 +32,7 @@ Generated: 2026-06-23.
                           │                             ├─ brief.md   (SAB)
                           │                             └─ bluf.md    (LLM-synth)
                           │
-                          └─ Container-compose network "trimail"
+                          └─ Container-compose network "InfoTriage"
 ```
 
 ## Target pipeline (ADR-001, Phase 0..4)
@@ -42,10 +42,10 @@ Generated: 2026-06-23.
                                                               │ Fever API (read new)
                                                               ▼
    qwen36  (score + tag CCIR/CNR) ──┐                     ┌───  PostgreSQL  ───────┐
-   bge-m3  (embed multilingual)  ──┘                     │ trimail.articles      │
-                                                          │ trimail.enrichment    │
-                                                          │ trimail.embeddings    │── pgvector
-                                                          │ trimail.ccir          │
+   bge-m3  (embed multilingual)  ──┘                     │ InfoTriage.articles      │
+                                                          │ InfoTriage.enrichment    │
+                                                          │ InfoTriage.embeddings    │── pgvector
+                                                          │ InfoTriage.ccir          │
                                                           │ freshrss.*            │
                                                           └───────────────────────┘
                                                                   │
@@ -66,10 +66,10 @@ Generated: 2026-06-23.
 | Layer | Today | Tomorrow (Phase 0+) |
 |---|---|---|
 | Article store | FreshRSS SQLite (or Postgres) | FreshRSS Postgres |
-| trimail copy of bodies | none | `trimail.articles` |
-| Scoring history | `data/verdicts.jsonl` (append-only) | `trimail.enrichment` |
-| Embeddings | none | `trimail.embeddings` (pgvector) |
-| CCIR taxonomy source | `ccir.md` (file) | `ccir.md` + `trimail.ccir` (embedded) |
+| InfoTriage copy of bodies | none | `InfoTriage.articles` |
+| Scoring history | `data/verdicts.jsonl` (append-only) | `InfoTriage.enrichment` |
+| Embeddings | none | `InfoTriage.embeddings` (pgvector) |
+| CCIR taxonomy source | `ccir.md` (file) | `ccir.md` + `InfoTriage.ccir` (embedded) |
 | Reader UI | FreshRSS | FreshRSS (unchanged) |
 
 ## LLM touch-points (all local qwen3.6 — ADR-004)

@@ -1,4 +1,4 @@
-# CONVENTIONS — trimail
+# CONVENTIONS — InfoTriage
 
 Source of truth: code-level patterns + ccir.md headings + opml/feeds.opml.
 Generated: 2026-06-23.

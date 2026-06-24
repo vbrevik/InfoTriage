@@ -1,6 +1,6 @@
 # Sites via rss-bridge — operational notes
 
-trimail's `FreshRSS` + `rss-bridge` stack is already running per [`docker-compose.yml`](../../docker-compose.yml):
+InfoTriage's `FreshRSS` + `rss-bridge` stack is already running per [`docker-compose.yml`](../../docker-compose.yml):
 
 - FreshRSS: <http://localhost:8088>
 - rss-bridge: <http://localhost:3000>

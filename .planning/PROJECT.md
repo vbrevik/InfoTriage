@@ -1,8 +1,8 @@
-# PROJECT — trimail
+# PROJECT — InfoTriage
 
 > **Status:** OSINT pipeline in transition. Current implementation is a local spike on FreshRSS + Gmail + rss-bridge. Target is a Postgres-backed, CCIR-driven, COP-fronted intelligence fusion system, all-local, all-free, all-LLM = local qwen3.6.
 
-## What trimail is
+## What InfoTriage is
 
 A **local, free, COP-ready OSINT/all-source intelligence platform** for one operator — a Norwegian-context information triage hub that fuses RSS, email, websites, and (eventually) SOCMINT + event databases against a Commander's Critical Information Requirements (`ccir.md`) taxonomy, scores each item with a local LLM, and produces a daily Situational Awareness Brief (SAB) with a CNR (Commander's Notification Requirements) alerting lane.
 
@@ -10,9 +10,9 @@ The point is the **noise killer**: most items answer no CCIR and should disappea
 
 The north star is **Palantir Gotham-grade fusion at personal scale** — a single fused map (Common Operating Picture, COP) with reliable entities tracked across modalities, LLM-assisted analytics, CCIR-style tasking, NL/RAG recall over the corpus, and real-time CNR alerting. Free, local, on a Mac.
 
-## What trimail is *not*
+## What InfoTriage is *not*
 
-- Not a reader. FreshRSS is the reader; trimail sits behind it.
+- Not a reader. FreshRSS is the reader; InfoTriage sits behind it.
 - Not a cloud service. ADR-004 forbids cloud LLMs anywhere in the runtime.
 - Not multi-user. Single operator. No auth, no tenancy.
 - Not complete. FreshRSS+Gmail+rss-bridge is the **current** scope. The PQ+vector + COP + SOCMINT layers are **target**.
@@ -39,10 +39,10 @@ The north star is **Palantir Gotham-grade fusion at personal scale** — a singl
                                      │ Fever
                                      ▼
                        ┌─── PostgreSQL + pgvector ───┐
-                       │ trimail.articles            │  ← our copy, durable
-                       │ trimail.enrichment          │  ← ccir, cnr, score, why
-                       │ trimail.embeddings          │  ← bge-m3 multilingual
-                       │ trimail.ccir                │  ← defs + embeddings
+                       │ InfoTriage.articles            │  ← our copy, durable
+                       │ InfoTriage.enrichment          │  ← ccir, cnr, score, why
+                       │ InfoTriage.embeddings          │  ← bge-m3 multilingual
+                       │ InfoTriage.ccir                │  ← defs + embeddings
                        │ freshrss.*                  │  ← FreshRSS own schema
                        └─────────────────────────────┘
                                        │
@@ -57,7 +57,7 @@ These are not defaults — they are rules. If a future change appears to violate
 1. **ADR-004 — All LLM is local.** Every stage runs against the local qwen3.6 (`qwen36-ud-4bit` via oMLX `:8000/v1`, API key `omlx`; Ollama `:11434/v1` fallback). **No cloud LLM in the runtime pipeline, ever.** Cloud models are only used for *this* assistant during design.
 2. **No paid services.** Free + self-hosted. RSS, IMAP, FreshRSS, Postgres, oMLX, Ollama. The OPML is curated accordingly.
 3. **Read-only against sources.** Gmail IMAP is `readonly=True`. No markup, no deletes, no replies.
-4. **One query surface in target state.** One Postgres instance; FreshRSS owns its schema; `trimail.*` owns ours. No fan-out.
+4. **One query surface in target state.** One Postgres instance; FreshRSS owns its schema; `InfoTriage.*` owns ours. No fan-out.
 5. **The CCIR is the brain.** `ccir.md` is the taxonomy. Editing it changes triage. Editing code to change triage is wrong.
 6. **Polite polling.** GDELT ≤1 req / 5 s. Compose cadence is twice an hour at `:23,:53`. Per-feed TTLs are operator-tunable in the UI. Manual "Refresh all" is discouraged in the README.
 
@@ -69,18 +69,18 @@ These are not defaults — they are rules. If a future change appears to violate
 | qwen36 triage vs oMLX endpoint | ✅ correct buckets, ~3 s/item |
 | Internal `http://feeds/gmail.xml` | ✅ reachable |
 | Scorer → Fever auto-mark-read | ⚠️ Imports clean (PROFILE alias added 2026-06-23; CCIR mirrored). **Runtime smoke against live FreshRSS still pending** — the original "✅ wired + tested live" claim from README is unverified-in-our-session, only the import surface has been re-validated. |
-| FreshRSS provisioned headless (admin/trimailLocal23, 44 feeds, 1642 articles) | ✅ done |
+| FreshRSS provisioned headless (admin/InfoTriageLocal23, 44 feeds, 1642 articles) | ✅ done |
 | Gmail→Atom bridge | ⚠️ written, **untested** — needs GMAIL_APP_PASSWORD |
 | `.env.example` | ❌ referenced by README, missing in tree |
 
 ## North-star benchmark (ADR-003)
 
-| Capability | North star | trimail's personal-scale shadow |
+| Capability | North star | InfoTriage's personal-scale shadow |
 |---|---|---|
 | Fused map / globe | Palantir Maven Smart System | World Monitor (globe.gl+deck.gl, Ollama, 500+ feeds) — gated on Open-Q1 |
 | Entity / relationship graph | Semantica Pro + Cortex EIP | OpenCTI / MISP (deferred — STIX2 cyber-CTI flavoured) |
-| NL/RAG investigation | Babel Street Investigator | trimail Phase 4 RAG SAB / recall |
-| Real-time alerting | Dataminr | trimail CNR 🚩 surfaced in SAB (push TBD) |
+| NL/RAG investigation | Babel Street Investigator | InfoTriage Phase 4 RAG SAB / recall |
+| Real-time alerting | Dataminr | InfoTriage CNR 🚩 surfaced in SAB (push TBD) |
 | Crisis handoff | RAYVN (DSB 2023 Norway) | out of scope (trigger-throws-handoff only) |
 
 ## References

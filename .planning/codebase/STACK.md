@@ -1,4 +1,4 @@
-# STACK — trimail
+# STACK — InfoTriage
 
 Source of truth: `requirements.txt`, `docker-compose.yml`, `README.md`, code-level imports.
 Generated: 2026-06-23.
@@ -53,7 +53,7 @@ The bridges **do not** auto-install any of these — they fail loudly and tell t
 | `rssbridge` | `rssbridge/rss-bridge:latest` | `:3000` | Sites without native RSS → RSS bridge (CSS-selector / XPathBridge). |
 | `feeds` | `halverneus/static-file-server:latest` | (internal) | Serves `data/feeds/*.xml` to FreshRSS at `http://feeds/<name>.xml`. Read-only mount. |
 
-All on user-defined compose network `trimail`. FreshRSS cron is `23,53` (twice-an-hour, off the :00 stampede — gentler on rate-limited sources like GDELT).
+All on user-defined compose network `InfoTriage`. FreshRSS cron is `23,53` (twice-an-hour, off the :00 stampede — gentler on rate-limited sources like GDELT).
 
 ## Container services (planned, ADR-001 phase 0)
 
@@ -65,7 +65,7 @@ All on user-defined compose network `trimail`. FreshRSS cron is `23,53` (twice-a
 
 | Var | Where loaded | Lifetime |
 |---|---|---|
-| `.env` | `load_dotenv()` in every bridge + digest/scorer. Gitignored. | Per-run; never persisted by trimail. |
+| `.env` | `load_dotenv()` in every bridge + digest/scorer. Gitignored. | Per-run; never persisted by InfoTriage. |
 | `.mailboxes.json` | `bridge/imap_to_atom.py`. Gitignored. | File-based; plaintext IMAP creds. |
 | `.yt_channels.json` | `bridge/yt_to_atom.py`. Gitignored. | File-based; channel URLs only (no creds). |
 
