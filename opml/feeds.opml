@@ -73,6 +73,14 @@
       <outline type="rss" text="Deutsche Welle"  title="Deutsche Welle"  xmlUrl="https://rss.dw.com/rdf/rss-en-all" htmlUrl="https://www.dw.com/"/>
       <outline type="rss" text="TASS"            title="TASS"            xmlUrl="https://tass.com/rss/v2.xml" htmlUrl="https://tass.com/"/>
     </outline>
+    <outline text="Infrastruktur &amp; energi" title="Infrastruktur &amp; energi">
+      <!-- Infrastructure + energy feeds. Fills the PMESII Infrastructure gap.
+           Primary CCIR: PIR-4 (Hybrid &amp; cyber + infrastrukturpostur), PIR-2 (Arktis).
+           Also touches: Economic (energy markets), Military (critical infra defence). -->
+      <outline type="rss" text="Offshore Energy"     title="Offshore Energy"     xmlUrl="https://www.offshore-energy.biz/feed/" htmlUrl="https://www.offshore-energy.biz/"/>
+      <outline type="rss" text="Rigzone"             title="Rigzone"             xmlUrl="https://www.rigzone.com/news/rss/rigzone_latest.aspx" htmlUrl="https://www.rigzone.com/"/>
+      <outline type="rss" text="Upstream Online"     title="Upstream Online"     xmlUrl="https://www.upstreamonline.com/rss_companynews" htmlUrl="https://www.upstreamonline.com/"/>
+    </outline>
     <outline text="Datakilder" title="Datakilder">
       <!-- GDELT global news API as RSS. Works, but RATE-LIMITED to 1 req / 5 s —
            keep FreshRSS refresh slow (>=15 min). Edit query=... to your topic. -->
@@ -104,6 +112,12 @@
          NUPI               https://www.nupi.no/
          UTSYN              https://www.utsyn.no/
          High North News    https://www.highnorthnews.com/
+         Statnett           https://www.statnett.no/ (grid operator — no RSS; API only)
+         Gassco             https://www.gassco.no/ (gas pipelines — no RSS)
+         Kystverket         https://www.kystverket.no/ (coastal admin — no RSS)
+         NVE                https://www.nve.no/ (energy directorate — no RSS; API only)
+         ENTSO-E            https://transparency.entsoe.eu/ (EU grid — no RSS; platform API)
+         BarentsWatch       https://www.barentswatch.no/ (Arctic maritime — API only)
          X / Twitter        — no free RSS; see README "X / Twitter" section
     -->
   </body>
