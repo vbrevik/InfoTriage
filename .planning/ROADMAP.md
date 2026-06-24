@@ -49,7 +49,14 @@ before any production build. Does NOT re-spike the already-working ingest→scor
   3. Postgres entity-resolution feasibility demonstrated on a sample (entities + links).
   4. Wiki-LLM feasibility shown (standing + on-demand) on qwen36/DGX with a sample output.
   5. COP need + World Monitor outcome recorded (cross-ref SP-COP).
-**Plans**: TBD
+**Plans**: 7 plans
+- [ ] 00-01-PLAN.md — Ephemeral spike infra (RabbitMQ + pgvector on 22060-22062) + shared NRK/BBC/TASS corpus fetch (W1)
+- [ ] 00-02-PLAN.md — R1: RabbitMQ topology publish→consume round-trip + poison→DLQ (W2)
+- [ ] 00-03-PLAN.md — R2: Norwegian semantic dedup bake-off (bge-m3 vs mE5-large, threshold sweep) (W2)
+- [ ] 00-04-PLAN.md — R3: Postgres entity resolution (pgvector cosine link, NATO merge + control split) (W2)
+- [ ] 00-05-PLAN.md — R4: Wiki-LLM feasibility (cited standing page + on-demand article on qwen36) (W3)
+- [ ] 00-06-PLAN.md — R5: COP/World Monitor adopt/build/drop vs InfoTriage CCIR brief (W2)
+- [ ] 00-07-PLAN.md — Closeout: SPIKE-FINDINGS.md + ADR-005..008, then delete .spike/ (W4)
 
 ### Phase 1: Contracts + monorepo skeleton
 **Goal**: One shared contract package all apps depend on; no app imports another. No behavior change
