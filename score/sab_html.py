@@ -1032,7 +1032,7 @@ HTML_TEMPLATE = """\
     {tessoc_dist}
     <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-top:24px;text-align:center;">
       qwen36-ud-4bit · oMLX :8000/v1 · ADR-004 ✅<br>
-      <a href="https://github.com/vbrevik/infotriage" style="color:var(--blue);text-decoration:none;">github.com/vbrevik/infotriage</a>
+      <a href="https://github.com/vbrevik/InfoTriage" style="color:var(--blue);text-decoration:none;">github.com/vbrevik/InfoTriage</a>
     </div>
   </div>
 </section>
