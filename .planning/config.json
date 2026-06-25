@@ -21,14 +21,21 @@
     "skip_research_when_existing_report": true,
     "use_thinker_for_framing_decisions": true,
     "use_code_reviewer_for_docs_and_code": true,
-    "sync_state_at_end_of_session": true
+    "sync_state_at_end_of_session": true,
+    "_auto_chain_active": false
   },
   "research": {
     "skip_when_present": [
       "docs/RESEARCH-REPORT.md"
     ],
     "open_questions_resolved_via_doc_review": true,
-    "open_question_ids": ["Q1", "Q2", "Q3", "Q4", "Q5"]
+    "open_question_ids": [
+      "Q1",
+      "Q2",
+      "Q3",
+      "Q4",
+      "Q5"
+    ]
   },
   "roadmap": {
     "phase_naming": "phase-NN-kebab-name",
@@ -54,8 +61,23 @@
     "never_commit_env_files": true
   },
   "links": {
-    "docs": [".planning/PROJECT.md", ".planning/REQUIREMENTS.md", ".planning/ROADMAP.md", ".planning/STATE.md"],
-    "repo_docs": ["docs/ARCHITECTURE.md", "docs/RESEARCH-REPORT.md", "README.md", "ccir.md"],
-    "codebase_map": [".planning/codebase/index.md", ".planning/codebase/architecture.md", ".planning/codebase/structure.md", ".planning/codebase/concerns.md"]
+    "docs": [
+      ".planning/PROJECT.md",
+      ".planning/REQUIREMENTS.md",
+      ".planning/ROADMAP.md",
+      ".planning/STATE.md"
+    ],
+    "repo_docs": [
+      "docs/ARCHITECTURE.md",
+      "docs/RESEARCH-REPORT.md",
+      "README.md",
+      "ccir.md"
+    ],
+    "codebase_map": [
+      ".planning/codebase/index.md",
+      ".planning/codebase/architecture.md",
+      ".planning/codebase/structure.md",
+      ".planning/codebase/concerns.md"
+    ]
   }
 }
