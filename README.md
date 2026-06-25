@@ -81,8 +81,8 @@ Polite cron (after FreshRSS refreshes at :23/:53 — run at :35):
 
 | Var | Default | Note |
 |-----|---------|------|
-| `LLM_BASE_URL` | `http://127.0.0.1:8000/v1` | oMLX. Ollama: `:11434/v1` |
-| `LLM_API_KEY` | `omlx` | `ollama` for Ollama |
+| `LLM_BASE_URL` | `http://127.0.0.1:8000/v1` | oMLX (fallback). Spark: `192.168.10.2:8000/v1` |
+| `LLM_API_KEY` | `omlx` | `EMPTY` for Spark (vLLM) |
 | `LLM_MODEL` | `qwen36-ud-4bit` | any model your server lists |
 | `GMAIL_APP_PASSWORD` | — | Google app password, read-only IMAP |
 | `GMAIL_QUERY` | newsletters, 7d | Gmail search syntax |

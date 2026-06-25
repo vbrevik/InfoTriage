@@ -49,7 +49,7 @@
     ]
   },
   "ai": {
-    "scoring_model": "local qwen36 via oMLX :8000/v1 (Ollama :11434/v1 fallback)",
+    "scoring_model": "DGX Spark vLLM qwen80b (primary) | oMLX qwen36-ud-4bit :8000/v1 (fallback)",
     "sab_model": "local qwen36 (same) — ADR-004",
     "embeddings_model_under_test": "bge-m3 or mE5-large (multilingual)",
     "scoring_prompt_source": "ccir.md verbatim"

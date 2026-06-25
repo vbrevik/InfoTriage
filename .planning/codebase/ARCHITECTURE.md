@@ -102,7 +102,7 @@ InfoTriage is a **local OSINT intelligence hub** — a free, fully-local info-tr
 - Purpose: Apply LLM-driven triage against CCIR requirements; enrich each item with tactical metadata.
 - Location: `score/triage_score.py` (scorer entry point), plus `score/digest.py` (report generator).
 - Contains: Prompt templates (CCIR inlined from ccir.md), LLM integration (oMLX/Ollama), JSON parsing, bucket assignment.
-- Depends on: `ccir.md` (taxonomy), local LLM endpoint (oMLX `:8000/v1` or Ollama `:11434/v1`).
+- Depends on: `ccir.md` (taxonomy), local LLM endpoint (Spark vLLM `192.168.10.2:8000/v1` (primary) or oMLX `:8000/v1` (fallback)).
 - Used by: `score/fever_triage.py` (mark-read loop), `score/digest.py` (batch scoring for reports).
 
 **Verdict Store:**

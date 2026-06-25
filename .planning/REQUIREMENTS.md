@@ -92,7 +92,7 @@ Grouped by the **intelligence cycle** (ADR-003) so each requirement maps to a st
 
 | ID | Statement | Status | Source |
 |---|---|---|---|
-| NF-1 | All LLM stages use **local qwen3.6** (oMLX :8000/v1; Ollama :11434/v1 fallback) — hard rule, ADR-004 | `[LIVE]` | score/triage_score.py llm() env contract |
+| NF-1 | All LLM stages use **local qwen3.6** (DGX Spark vLLM (primary); oMLX :8000/v1 (fallback)) — hard rule, ADR-004 | `[LIVE]` | score/triage_score.py llm() env contract |
 | NF-2 | No paid services, no cloud LLM, no SaaS | `[LIVE]` | docker-compose + .env contract |
 | NF-3 | One query surface in target state — Postgres with `InfoTriage.*` schema, pgvector | `[TARGET]` | ADR-001 |
 | NF-4 | Read-only against all source systems (Gmail IMAP `readonly=True`) | `[LIVE]` | bridge/gmail_to_atom.py |

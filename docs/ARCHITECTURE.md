@@ -106,7 +106,7 @@ X/Twitter ingestion · separate vector service · cloud · multi-user.
 ## ADR-004 — All LLM work runs on local qwen3.6 (hard constraint)
 
 Every LLM stage uses the **local qwen3.6** (`qwen36-ud-4bit` via oMLX `:8000/v1`, key
-`omlx`; Ollama `:11434/v1` fallback). **No cloud LLM, ever**, in the runtime. This is a
+`omlx`; DGX Spark (vLLM) primary). **No cloud LLM, ever**, in the runtime. This is a
 requirement, not a default.
 
 | Stage | qwen3.6 role |

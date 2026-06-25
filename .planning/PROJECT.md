@@ -37,7 +37,7 @@ The north star is **Palantir Gotham-grade fusion at personal scale** — a singl
                                                                        ccir.md (the taxonomy)
                                                                                 ▲
                                                                   qwen3.6 via oMLX :8000/v1
-                                                                            (Ollama :11434/v1 fallback)
+                                                                            (oMLX :8000/v1 fallback)
 ```
 
 ## How it works (target — ARCHITECTURE Phase 0–4 + ADR-003)
@@ -62,7 +62,7 @@ The north star is **Palantir Gotham-grade fusion at personal scale** — a singl
 
 These are not defaults — they are rules. If a future change appears to violate one, stop and re-decide.
 
-1. **ADR-004 — All LLM is local.** Every stage runs against the local qwen3.6 (`qwen36-ud-4bit` via oMLX `:8000/v1`, API key `omlx`; Ollama `:11434/v1` fallback). **No cloud LLM in the runtime pipeline, ever.** Cloud models are only used for *this* assistant during design.
+1. **ADR-004 — All LLM is local.** Every stage runs against the local qwen3.6 (`qwen36-ud-4bit` via oMLX `:8000/v1` (fallback); DGX Spark vLLM qwen80b (primary) on `192.168.10.2:8000/v1`). **No cloud LLM in the runtime pipeline, ever.** Cloud models are only used for *this* assistant during design.
 2. **No paid services.** Free + self-hosted. RSS, IMAP, FreshRSS, Postgres, oMLX, Ollama. The OPML is curated accordingly.
 3. **Read-only against sources.** Gmail IMAP is `readonly=True`. No markup, no deletes, no replies.
 4. **One query surface in target state.** One Postgres instance; FreshRSS owns its schema; `InfoTriage.*` owns ours. No fan-out.
