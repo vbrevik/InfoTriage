@@ -73,7 +73,16 @@ progress:
 - 00-06-PLAN.md: R5 COP/World Monitor spike
 - 00-07-PLAN.md: Spike closeout (ADRs + SPIKE-FINDINGS.md + teardown)
 
+### Infrastructure corrections (2026-06-25)
+
+- **No Ollama** — removed from all docs and configs. Stack is oMLX (Mac) + vLLM (Spark) only.
+- **DGX Spark now active** — vLLM serving qwen 80B at `http://192.168.10.2:8000/v1`, key=EMPTY. Spark has no internet; models must be transferred from Mac.
+- **Embedder**:
+  - Mac: `intfloat/multilingual-e5-large` (1024-dim) via oMLX
+  - Spark: `Alibaba-NLP/gte-Qwen2-7B-instruct` (7B) via vLLM
+- **New source — The Telegraph (UK)**: Added for Ukraine coverage. RSS blocked (bot detection). Recommended path: subscribe to Telegraph Ukraine newsletter → ingest via IMAP bridge (`bridge/imap_to_atom.py`). No new code needed until Phase 4.
+
 ### Carried-over open questions
 
 - Q1 World Monitor CCIR/SAB coverage → **R5 spike** (still open).
-- Q5 embedding model (bge-m3 vs mE5-large) → decided in **R2 spike** (still open).
+- Q5 embedding model (bge-m3 vs mE5-large) → decided in **R2 spike** (in progress, awaiting labeling).
