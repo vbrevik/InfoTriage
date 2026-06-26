@@ -100,6 +100,19 @@
   .hl-tier h3 { font-family:var(--mono); font-size:12px; color:var(--accent); letter-spacing:.5px;
     border-bottom:1px solid var(--border); padding-bottom:5px; display:flex; gap:8px; align-items:center; }
   .hl-tier h3 .ct { color:var(--text-dim); font-size:10px; }
+  .hl-tier h3 .tier-act { margin-left:auto; display:flex; gap:5px; opacity:0; transition:opacity .15s; }
+  .hl-tier:hover h3 .tier-act { opacity:1; }
+  .bluf { background:linear-gradient(var(--surface),var(--bg-2)); border:1px solid var(--border);
+    border-left:3px solid var(--accent); border-radius:6px; padding:11px 13px; margin:10px 0 4px;
+    color:var(--text-bright); line-height:1.55; font-size:13px; position:relative; }
+  .bluf .bluf-tag { font-family:var(--mono); font-size:9px; letter-spacing:.7px; color:var(--accent);
+    text-transform:uppercase; display:block; margin-bottom:5px; opacity:.85; }
+  .bluf sup { color:var(--accent); font-family:var(--mono); font-size:9px; cursor:pointer; padding:0 1px; }
+  .bluf sup:hover { color:var(--text-bright); background:var(--accent); border-radius:2px; }
+  .bluf.poc { border-left-color:var(--ok); }
+  .bluf.poc .bluf-tag { color:var(--ok); }
+  .cited { padding-left:8px; }
+  .hl .num { font-family:var(--mono); font-size:10px; color:var(--accent); min-width:18px; }
   .hl { display:flex; gap:10px; padding:9px 0; border-bottom:1px solid rgba(35,48,68,.5); align-items:baseline; }
   .hl .cnr { font-family:var(--mono); font-size:9px; padding:1px 6px; border-radius:3px; white-space:nowrap; }
   .hl .cnr.c1 { background:rgba(255,77,94,.16); color:var(--cnr1); border:1px solid rgba(255,77,94,.4); }
@@ -288,6 +301,15 @@ const ITEMS = [
 const TIERLABEL = {'PIR-1':'PIR-1 · Russland/Ukraina','PIR-3':'PIR-3 · NATO & europeisk sikkerhet',
   'PIR-5':'PIR-5 · Stormaktsrivalisering','SIR-1':'SIR-1 · Midtøsten & US-Iran',
   'FFIR-2':'FFIR-2 · Norsk politikk','FFIR-3':'FFIR-3 · Egen teknologi (AI/LLM)'};
+/* synthesized BLUF per topic — the analyst summary up front (write_bluf shape), [N] = cited item */
+const BLUF = {
+  'PIR-1':'Ukraina eskalerer angrep inn i russisk territorium: droneangrep mot oljedepot i Kuban <sup>[1]</sup> og artilleri mot Belgorod med fem sivile skadd <sup>[2]</sup>. Mønsteret er krigshandlinger som flytter seg inn i russiske regioner — infrastruktur og sivile direkte rammet.',
+  'PIR-3':'E5-landene (UK, Italia, Polen, Frankrike, Tyskland) styrker europeisk forsvarssamarbeid <sup>[1]</sup> og signaliserer å bringe Ukraina nærmere NATO <sup>[2]</sup>. Tegn på en sterkere europeisk rolle innenfor alliansen — uten samlet enighet om tidspunkt.',
+  'PIR-5':'Stormaktsrivalisering på to fronter: USA utvider engasjement i Venezuela med humanitær/militær hjelp <sup>[1]</sup>, mens Medvedev advarer om at Moldova og Armenia står overfor samme scenario som Ukraina <sup>[2]</sup>.',
+  'SIR-1':'Spenning mellom eskalering og diplomati: Trump ber Kongressen om $87 mrd til Iran-krigen <sup>[1]</sup>, samtidig som IAEA bekrefter inspektørbesøk som del av en avtale <sup>[2]</sup>.',
+  'FFIR-2':'Utdanningsdirektoratets undersøkelse avdekker narkotika, vold og trusler ved norske videregående skoler <sup>[1]</sup> — en nasjonal beredskaps- og samfunnsbekymring.',
+  'FFIR-3':'Anthropic anklager Alibaba for ulovlig uthenting av AI-kapasitet <sup>[1]</sup> — direkte relevant for egen teknologikapabilitet og AI-leverandørkjede. Kandidat for egen POC/utforskning.'};
+const POC_TIERS = ['FFIR-3'];
 
 /* ---------- variant switching ---------- */
 function showVariant(id, btn){
@@ -377,13 +399,25 @@ function focusEntity(id){
 function renderHeadlines(){
   const tiers={}; ITEMS.forEach(it=>{(tiers[it.tier]=tiers[it.tier]||[]).push(it);});
   let h=''; Object.keys(TIERLABEL).forEach(t=>{ if(!tiers[t])return;
-    h+=`<div class="hl-tier"><h3>${TIERLABEL[t]} <span class="ct">${tiers[t].length} saker</span></h3>`;
-    tiers[t].forEach(it=>{ const c=it.cnr===1?'c1':it.cnr===2?'c2':'c0'; const lbl=it.cnr===1?'CNR I':it.cnr===2?'CNR II':'—';
-      h+=`<div class="hl"><span class="cnr ${c}">${lbl}</span><span class="txt">${it.t}</span>
+    const maxCnr=Math.max(...tiers[t].map(i=>i.cnr));
+    const flag=maxCnr===1?'<span class="cnr c1" style="margin-left:6px">CNR I</span>':'';
+    const isPoc=POC_TIERS.includes(t);
+    h+=`<div class="hl-tier"><h3>${TIERLABEL[t]} <span class="ct">${tiers[t].length} saker</span>${flag}
+      <span class="tier-act">
+        <span class="miniact" onclick="toast('Synthesize topic BLUF → Wiki-LLM')">↻ re-synthesize</span>
+        ${isPoc?'<span class="miniact" style="color:var(--ok);border-color:var(--ok)" onclick="toast(\'Start POC from topic (AI / FFIR-3)\')">⚙ POC</span>':''}
+        <span class="miniact" onclick="parkLead('${TIERLABEL[t].split('·')[1].trim()}')">⊟ park topic</span>
+      </span></h3>`;
+    // BLUF first
+    if(BLUF[t]) h+=`<div class="bluf ${isPoc?'poc':''}"><span class="bluf-tag">BLUF · bottom line up front</span>${BLUF[t]}</div>`;
+    // then cited evidence, numbered to match [N]
+    h+='<div class="cited">';
+    tiers[t].forEach((it,i)=>{ const c=it.cnr===1?'c1':it.cnr===2?'c2':'c0'; const lbl=it.cnr===1?'CNR I':it.cnr===2?'CNR II':'—';
+      h+=`<div class="hl"><span class="num">[${i+1}]</span><span class="cnr ${c}">${lbl}</span><span class="txt">${it.t}</span>
         <span class="src">${it.src}</span>
         <span class="act"><span class="miniact" onclick="focusEntity('${it.ent}')">focus</span>
-        <span class="miniact" onclick="parkLead('${it.t.slice(0,28)}…')">park</span></span></div>`; });
-    h+='</div>'; });
+        <span class="miniact" onclick="parkLead('${it.t.slice(0,30).replace(/'/g,'')}…')">park</span></span></div>`; });
+    h+='</div></div>'; });
   document.getElementById('hlList').innerHTML=h;
 }
 
@@ -404,6 +438,7 @@ renderNet(document.getElementById('netC'));
 renderTimeline(document.getElementById('tlA'), false);
 renderTimeline(document.getElementById('tlC'), true);
 renderHeadlines();
+showVariant('b');  // open on HEADLINES — the keeper
 </script>
 </body>
 </html>
