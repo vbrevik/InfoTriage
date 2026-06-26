@@ -179,3 +179,22 @@ to the running pipeline.
   1. A CNR CAT I 🚩 post-write publishes a push (ntfy local-server preferred; ADR-004-friendly) with SAB excerpt + dedupe ID.
   2. The SAB remains the canonical artifact.
 **Plans**: TBD
+
+## Backlog
+
+### Phase 999.1: On-demand per-item translation (ru/de/es → no/en) (BACKLOG)
+
+**Goal:** On-demand, per-item translation of source items into Norwegian/English so the
+operator (no/en only) can read and **verify** non-no/en sources. Primary driver is citation
+verification — the wiki/SAB trust model (R4) requires spot-checking that each `[N]` supports
+its claim, but ru/de/es sources are unreadable to the operator without translation. Secondary:
+reading the original item in the reading surface (Obsidian/FreshRSS). Reuses local `llm()`/qwen36
+(ADR-004, no cloud). NOT needed for triage scoring, dedup, or synthesis (qwen36 is natively
+multilingual and already emits no/en). Scope: on-demand per-item, never eager whole-corpus.
+Likely home: enrichment stage in **Phase 5** (store translated field) or render-time action in
+**Phase 6** (brief/Obsidian). Surfaced during R4 (00-05) Wiki-LLM spike, 2026-06-26.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd-review-backlog when ready)
