@@ -1,0 +1,28 @@
+/* InfoTriage SP-COP — dark intel-console theme */
+:root {
+  --bg:            #0a0e14;
+  --bg-2:          #0e131c;
+  --surface:       #121826;
+  --surface-2:     #18202f;
+  --border:        #233044;
+  --border-2:      #2e3e57;
+  --text:          #c8d3e3;
+  --text-dim:      #6b7a92;
+  --text-bright:   #eaf1fb;
+  --accent:        #46c6ff;   /* directed / known — cyan */
+  --accent-2:      #ffb347;   /* discovery / unknown — amber */
+  --discovery:     #ff8adf;   /* serendipity highlight — magenta */
+  /* CNR urgency */
+  --cnr1:          #ff4d5e;   /* CAT I  — red */
+  --cnr2:          #ffb347;   /* CAT II — amber */
+  --cnr0:          #4a6a8a;   /* none   — slate */
+  --ok:            #46d39a;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --r: 6px;
+  --glow: 0 0 0 1px rgba(70,198,255,.25), 0 0 18px rgba(70,198,255,.12);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); }
+body { font-size: 13px; }
+::selection { background: rgba(70,198,255,.3); }
