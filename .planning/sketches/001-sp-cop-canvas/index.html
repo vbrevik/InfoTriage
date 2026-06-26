@@ -113,6 +113,25 @@
   .bluf.poc .bluf-tag { color:var(--ok); }
   .cited { padding-left:8px; }
   .hl .num { font-family:var(--mono); font-size:10px; color:var(--accent); min-width:18px; }
+  /* headline view controls */
+  .hl-controls { display:flex; align-items:center; gap:12px; margin-bottom:16px;
+    padding-bottom:10px; border-bottom:1px solid var(--border); font-family:var(--mono); }
+  .seg { display:flex; gap:3px; background:var(--surface); border:1px solid var(--border); border-radius:7px; padding:3px; }
+  .seg button { background:transparent; border:none; color:var(--text-dim); padding:5px 11px; border-radius:5px;
+    cursor:pointer; font:inherit; font-size:11px; display:flex; align-items:center; gap:6px; }
+  .seg button.on { background:var(--surface-2); color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
+  .seg .badge { background:var(--accent-2); color:#1a1205; font-size:9px; padding:0 5px; border-radius:99px; font-weight:600; }
+  .asof-slider { display:flex; align-items:center; gap:8px; color:var(--text-dim); font-size:11px; }
+  .asof-slider input[type=range] { width:200px; accent-color:var(--accent); }
+  .asof-slider .now { color:var(--accent); }
+  .asof-slider .lbl { font-size:10px; opacity:.7; }
+  .newdot { width:7px; height:7px; border-radius:50%; background:var(--accent-2); display:inline-block;
+    box-shadow:0 0 6px var(--accent-2); }
+  .new-badge { font-family:var(--mono); font-size:9px; color:#1a1205; background:var(--accent-2);
+    padding:0 5px; border-radius:99px; font-weight:600; margin-left:6px; }
+  .hl-tier.unchanged { opacity:.5; }
+  .latest-stamp { font-family:var(--mono); font-size:9.5px; color:var(--text-dim); margin-left:8px; }
+  .hidden-note { color:var(--text-dim); font-family:var(--mono); font-size:11px; padding:10px 0; font-style:italic; opacity:.7; }
   .hl { display:flex; gap:10px; padding:9px 0; border-bottom:1px solid rgba(35,48,68,.5); align-items:baseline; }
   .hl .cnr { font-family:var(--mono); font-size:9px; padding:1px 6px; border-radius:3px; white-space:nowrap; }
   .hl .cnr.c1 { background:rgba(255,77,94,.16); color:var(--cnr1); border:1px solid rgba(255,77,94,.4); }
@@ -223,9 +242,23 @@
     <button onclick="showVariant('c')">FOCUS</button>
   </div>
   <div class="headlines">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <div style="font-family:var(--mono);color:var(--text-bright);font-size:15px">BLUF · Standing brief <span style="color:var(--text-dim);font-size:11px">— CCIR-tiered · CNR-elevated · cited</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-family:var(--mono);color:var(--text-bright);font-size:15px">BLUF · Standing brief <span style="color:var(--text-dim);font-size:11px">— CCIR-tiered · cited</span></div>
       <button class="miniact" onclick="toast('Present mode → linear briefing')">▶ Present</button>
+    </div>
+    <div class="hl-controls">
+      <div class="seg">
+        <button class="on" data-mode="fresh" onclick="setHlMode('fresh',this)">● Since last read <span class="badge" id="freshCt">5</span></button>
+        <button data-mode="latest" onclick="setHlMode('latest',this)">Latest / current</button>
+        <button data-mode="asof" onclick="setHlMode('asof',this)">⟲ Back in time</button>
+      </div>
+      <div class="asof-slider" id="asofWrap" style="display:none">
+        <span class="lbl">as of day</span>
+        <input type="range" id="asof" min="1" max="7" step="0.5" value="7" oninput="onAsof(this.value)">
+        <span class="now" id="asofNow">7.0</span><span class="lbl">/ 7</span>
+      </div>
+      <span style="flex:1"></span>
+      <button class="miniact" onclick="markRead()">✓ mark all read</button>
     </div>
     <div id="hlList"></div>
   </div>
@@ -288,14 +321,14 @@ const LINKS = [
 ];
 const ITEMS = [
   {t:'UK, Italy, Poland, France, Germany agree to strengthen defence cooperation', src:'tass', tier:'PIR-3', cnr:2, day:5, ent:'NATO'},
-  {t:'E5 announce intention to bring Ukraine closer to NATO', src:'tass', tier:'PIR-3', cnr:2, day:6, ent:'NATO'},
+  {t:'E5 announce intention to bring Ukraine closer to NATO', src:'tass', tier:'PIR-3', cnr:2, day:6, ent:'NATO', n:1},
   {t:'Ukrainian attacks leave five civilians injured in Belgorod', src:'tass', tier:'PIR-1', cnr:1, day:4, ent:'Russia'},
   {t:'Fire at Poltavskaya oil depot in Kuban after drone attacks', src:'tass', tier:'PIR-1', cnr:1, day:3, ent:'Russia'},
-  {t:'Trump asks Congress for $87bn, mostly for Iran war costs', src:'bbc', tier:'SIR-1', cnr:1, day:6, ent:'Iran'},
+  {t:'Trump asks Congress for $87bn, mostly for Iran war costs', src:'bbc', tier:'SIR-1', cnr:1, day:6, ent:'Iran', n:1},
   {t:'UN nuclear chief says inspectors will visit Iran sites', src:'bbc', tier:'SIR-1', cnr:2, day:5, ent:'Iran'},
-  {t:'Rubio: USA sender humanitær hjelp til Venezuela', src:'nrk', tier:'PIR-5', cnr:2, day:7, ent:'Venezuela'},
-  {t:'Moldova, Armenia now facing same scenario as Ukraine — Medvedev', src:'tass', tier:'PIR-5', cnr:2, day:6, ent:'Medvedev'},
-  {t:'Anthropic accuses Alibaba of illicitly extracting AI capabilities', src:'bbc', tier:'FFIR-3', cnr:2, day:5, ent:'Alibaba'},
+  {t:'Rubio: USA sender humanitær hjelp til Venezuela', src:'nrk', tier:'PIR-5', cnr:2, day:7, ent:'Venezuela', n:1},
+  {t:'Moldova, Armenia now facing same scenario as Ukraine — Medvedev', src:'tass', tier:'PIR-5', cnr:2, day:6, ent:'Medvedev', n:1},
+  {t:'Anthropic accuses Alibaba of illicitly extracting AI capabilities', src:'bbc', tier:'FFIR-3', cnr:2, day:5, ent:'Alibaba', n:1},
   {t:'Undersøkelse: narkotikabruk og vold på videregående skoler', src:'nrk', tier:'FFIR-2', cnr:0, day:4, ent:'USA'}
 ];
 const TIERLABEL = {'PIR-1':'PIR-1 · Russland/Ukraina','PIR-3':'PIR-3 · NATO & europeisk sikkerhet',
@@ -396,28 +429,50 @@ function focusEntity(id){
 }
 
 /* ---------- headlines ---------- */
+let HL_MODE='fresh', ASOF=7;
+function setHlMode(m,btn){ HL_MODE=m;
+  document.querySelectorAll('.seg button').forEach(b=>b.classList.remove('on')); btn.classList.add('on');
+  document.getElementById('asofWrap').style.display = m==='asof'?'flex':'none';
+  renderHeadlines(); }
+function onAsof(v){ ASOF=+v; document.getElementById('asofNow').textContent=(+v).toFixed(1); renderHeadlines(); }
+function markRead(){ ITEMS.forEach(it=>it.n=0); document.getElementById('freshCt').textContent='0';
+  toast('Marked all read — deltas cleared'); if(HL_MODE==='fresh') renderHeadlines(); }
+
 function renderHeadlines(){
-  const tiers={}; ITEMS.forEach(it=>{(tiers[it.tier]=tiers[it.tier]||[]).push(it);});
-  let h=''; Object.keys(TIERLABEL).forEach(t=>{ if(!tiers[t])return;
-    const maxCnr=Math.max(...tiers[t].map(i=>i.cnr));
+  const freshTotal = ITEMS.filter(it=>it.n).length;
+  document.getElementById('freshCt').textContent = freshTotal;
+  // group, applying time filter for as-of mode
+  const tiers={}; ITEMS.forEach(it=>{ if(HL_MODE==='asof' && it.day>ASOF) return; (tiers[it.tier]=tiers[it.tier]||[]).push(it); });
+  let h='', hiddenTiers=0;
+  Object.keys(TIERLABEL).forEach(t=>{ if(!tiers[t]||!tiers[t].length) return;
+    const items=tiers[t].slice().sort((a,b)=>b.day-a.day);   // latest first
+    const freshN=items.filter(i=>i.n).length;
+    // mode filter: 'fresh' hides tiers with no new items
+    if(HL_MODE==='fresh' && freshN===0){ hiddenTiers++; return; }
+    const maxCnr=Math.max(...items.map(i=>i.cnr));
     const flag=maxCnr===1?'<span class="cnr c1" style="margin-left:6px">CNR I</span>':'';
     const isPoc=POC_TIERS.includes(t);
-    h+=`<div class="hl-tier"><h3>${TIERLABEL[t]} <span class="ct">${tiers[t].length} saker</span>${flag}
+    const newBadge = freshN ? `<span class="new-badge">${freshN} NEW</span>` : '';
+    const latest = items[0];
+    const stamp = HL_MODE==='asof' ? `<span class="latest-stamp">as of day ${ASOF.toFixed(1)} · latest day ${latest.day}</span>`
+                                   : `<span class="latest-stamp">latest · day ${latest.day}</span>`;
+    h+=`<div class="hl-tier"><h3>${TIERLABEL[t]} <span class="ct">${items.length} saker</span>${newBadge}${flag}${stamp}
       <span class="tier-act">
         <span class="miniact" onclick="toast('Synthesize topic BLUF → Wiki-LLM')">↻ re-synthesize</span>
-        ${isPoc?'<span class="miniact" style="color:var(--ok);border-color:var(--ok)" onclick="toast(\'Start POC from topic (AI / FFIR-3)\')">⚙ POC</span>':''}
-        <span class="miniact" onclick="parkLead('${TIERLABEL[t].split('·')[1].trim()}')">⊟ park topic</span>
+        ${isPoc?'<span class="miniact" style="color:var(--ok);border-color:var(--ok)" onclick="toast(\'Start POC (AI / FFIR-3)\')">⚙ POC</span>':''}
+        <span class="miniact" onclick="parkLead('${TIERLABEL[t].split('·')[1].trim()}')">⊟ park</span>
       </span></h3>`;
-    // BLUF first
-    if(BLUF[t]) h+=`<div class="bluf ${isPoc?'poc':''}"><span class="bluf-tag">BLUF · bottom line up front</span>${BLUF[t]}</div>`;
-    // then cited evidence, numbered to match [N]
+    if(BLUF[t]) h+=`<div class="bluf ${isPoc?'poc':''}"><span class="bluf-tag">BLUF · bottom line up front${freshN?' · updated':''}</span>${BLUF[t]}</div>`;
     h+='<div class="cited">';
-    tiers[t].forEach((it,i)=>{ const c=it.cnr===1?'c1':it.cnr===2?'c2':'c0'; const lbl=it.cnr===1?'CNR I':it.cnr===2?'CNR II':'—';
-      h+=`<div class="hl"><span class="num">[${i+1}]</span><span class="cnr ${c}">${lbl}</span><span class="txt">${it.t}</span>
-        <span class="src">${it.src}</span>
+    items.forEach((it,i)=>{ const c=it.cnr===1?'c1':it.cnr===2?'c2':'c0'; const lbl=it.cnr===1?'CNR I':it.cnr===2?'CNR II':'—';
+      const nd = it.n?'<span class="newdot" title="new since last read"></span>':'<span style="width:7px;display:inline-block"></span>';
+      h+=`<div class="hl"><span class="num">${nd} [${i+1}]</span><span class="cnr ${c}">${lbl}</span><span class="txt">${it.t}</span>
+        <span class="src">${it.src} · d${it.day}</span>
         <span class="act"><span class="miniact" onclick="focusEntity('${it.ent}')">focus</span>
         <span class="miniact" onclick="parkLead('${it.t.slice(0,30).replace(/'/g,'')}…')">park</span></span></div>`; });
     h+='</div></div>'; });
+  if(HL_MODE==='fresh' && hiddenTiers) h+=`<div class="hidden-note">— ${hiddenTiers} topic(s) unchanged since last read · switch to “Latest” to see all —</div>`;
+  if(HL_MODE==='fresh' && freshTotal===0) h=`<div class="hidden-note">✓ All caught up — nothing new since last read. Switch to “Latest” or “Back in time”.</div>`;
   document.getElementById('hlList').innerHTML=h;
 }
 
