@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in-progress
-last_updated: "2026-06-26T08:30:00Z"
+last_updated: "2026-06-26T10:45:00Z"
 progress:
   total_phases: 13
   completed_phases: 0
   total_plans: 7
-  completed_plans: 4
-  percent: 57
+  completed_plans: 5
+  percent: 71
 ---
 
 # STATE — InfoTriage
@@ -17,9 +17,19 @@ progress:
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
 
-## Session: 2026-06-26 — Phase 00 plan 03 verdict synced
+## Session: 2026-06-26 — Phase 00 plan 05 (R4) complete + R2 synced
 
 ### Just-completed
+
+- **00-05-PLAN.md (R4 Wiki-LLM)**: local qwen36 (oMLX, DGX Spark unavailable) synthesizes coherent
+  4-section citation-grounded intel-wiki pages. Standing NATO page (5 items, 5 grounded cites) +
+  on-demand Venezuela article (17 items gathered across en/no/ru via R3 entity_links, 8 cited).
+  Grounding PASS both (hard-exit on ungrounded ref). **Verdict PARTIAL** — synthesis mechanism GO,
+  but cross-language synthesis **drops Russian sources** (all 7 TASS items gathered, none cited).
+  This directly motivates backlog 999.1 (on-demand translation). Commit 232929e + verdict.
+  Deviation: max_tokens 800→1100 (800 truncated section 4).
+
+### Just-completed (R2, this session)
 
 - **00-03-PLAN.md (R2 Norwegian Dedup Bake-off)**: mE5-large vs bge-m3 threshold sweep on 24-row
   hand-labeled corpus (13 yes / 11 no). bge-m3 disqualified (collapse_rate < 0.05 all thresholds).
@@ -81,9 +91,8 @@ progress:
 
 ### Pending — Phase 00 plans
 
-- 00-05-PLAN.md: R4 Wiki-LLM feasibility spike
 - 00-06-PLAN.md: R5 COP/World Monitor spike
-- 00-07-PLAN.md: Spike closeout (ADRs + SPIKE-FINDINGS.md + teardown)
+- 00-07-PLAN.md: Spike closeout (ADRs + SPIKE-FINDINGS.md + teardown) — gated on R5
 
 ### Infrastructure corrections (2026-06-25)
 
