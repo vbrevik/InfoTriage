@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in-progress
-last_updated: "2026-06-25T08:02:00Z"
+last_updated: "2026-06-26T08:30:00Z"
 progress:
   total_phases: 13
   completed_phases: 0
   total_plans: 7
-  completed_plans: 3
-  percent: 43
+  completed_plans: 4
+  percent: 57
 ---
 
 # STATE — InfoTriage
@@ -17,9 +17,17 @@ progress:
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
 
-## Session: 2026-06-25 — Phase 00 plan 04 complete
+## Session: 2026-06-26 — Phase 00 plan 03 verdict synced
 
 ### Just-completed
+
+- **00-03-PLAN.md (R2 Norwegian Dedup Bake-off)**: mE5-large vs bge-m3 threshold sweep on 24-row
+  hand-labeled corpus (13 yes / 11 no). bge-m3 disqualified (collapse_rate < 0.05 all thresholds).
+  **mE5-large chosen @ threshold 0.84** (collapse_rate 0.783, control_overmerge 1). No pair cleared
+  both bars — control set too topically narrow. Verdict: PARTIAL — mechanism + model GO; threshold
+  needs held-out corpus in Phase 5. Commit: d5aacee. Input `title + summary[:512]`; `passage:`/`query:` prefixes.
+
+### Just-completed (prior session)
 
 - **00-04-PLAN.md (R3 Entity Resolution)**: pgvector cosine entity resolution proven via bge-m3
   1024-dim embeddings + HNSW index. 285 entities, 599 entity_links from 144-item corpus.
@@ -39,6 +47,11 @@ progress:
   Commits: 14ead5e (infra), f317cd4 (fetcher).
 
 ### Decisions recorded
+
+- **R2 → mE5-large @ 0.84**: bge-m3 disqualified for Norwegian dedup (collapse_rate < 0.05).
+  mE5-large locked as Q5 embedding model for ADR / Phase 5. Threshold 0.84 is a starting point —
+  PARTIAL because no (model,threshold) cleared both bars on this narrow single-day corpus; Phase 5
+  must recalibrate on a held-out corpus with genuinely off-topic controls.
 
 - **R3 PARTIAL**: pgvector HNSW cosine entity resolution mechanism GO; cross-language NATO coverage
   limited by corpus date. Schema (entities+entity_links+HNSW), threshold 0.85, bge-m3 1024-dim
@@ -68,7 +81,6 @@ progress:
 
 ### Pending — Phase 00 plans
 
-- 00-03-PLAN.md: R2 Norwegian dedup spike
 - 00-05-PLAN.md: R4 Wiki-LLM feasibility spike
 - 00-06-PLAN.md: R5 COP/World Monitor spike
 - 00-07-PLAN.md: Spike closeout (ADRs + SPIKE-FINDINGS.md + teardown)
@@ -85,4 +97,4 @@ progress:
 ### Carried-over open questions
 
 - Q1 World Monitor CCIR/SAB coverage → **R5 spike** (still open).
-- Q5 embedding model (bge-m3 vs mE5-large) → decided in **R2 spike** (in progress, awaiting labeling).
+- Q5 embedding model (bge-m3 vs mE5-large) → **DECIDED: mE5-large @ 0.84** (R2, PARTIAL — recalibrate Phase 5).
