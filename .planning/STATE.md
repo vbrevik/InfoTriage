@@ -8,8 +8,8 @@ progress:
   total_phases: 13
   completed_phases: 0
   total_plans: 7
-  completed_plans: 5
-  percent: 71
+  completed_plans: 6
+  percent: 86
 ---
 
 # STATE — InfoTriage
@@ -17,7 +17,20 @@ progress:
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
 
-## Session: 2026-06-26 — Phase 00 plan 05 (R4) complete + R2 synced
+## Session: 2026-06-26 — Phase 00 plans 05 (R4) + 06 (R5) complete
+
+### Just-completed
+
+- **00-06-PLAN.md (R5 COP / World Monitor)**: cloned + built + launched the real WM desktop app
+  (oMLX-pinned, cloud keys blank). Operator judged the globe hands-on. **Verdict: DROP WM as
+  product/engine; BUILD own interactive-SAB canvas/COP (SP-COP).** WM is an online aggregator with a
+  local shell (api.worldmonitor.app backend, own RSS feeds, Convex/Clerk/Vercel); its globe is 100%
+  open libs (globe.gl/three-globe MIT, maplibre BSD). WM HAS a CCIR-like concept (SOURCE_REGION_MAP
+  AOIs→feeds + source tiers + instability score) — at personal scale InfoTriage's CCIR/CNR = "what I'm
+  interested in" + "how urgent," scored vs own ccir.md. **Product vision:** SAB → interactive canvas
+  (topics/news/info, globe + panels), NOT a static brief. SP-COP feature wishlist: keep floating
+  pickers; add timeline/time-scrubber; add views beyond geo (timeline/topic/entity/list). Build trap
+  found: `tauri build` ships broken app — must use `desktop:build:full`. Commit da77120 (Task 1) + verdict.
 
 ### Just-completed
 
@@ -91,8 +104,7 @@ progress:
 
 ### Pending — Phase 00 plans
 
-- 00-06-PLAN.md: R5 COP/World Monitor spike
-- 00-07-PLAN.md: Spike closeout (ADRs + SPIKE-FINDINGS.md + teardown) — gated on R5
+- 00-07-PLAN.md: Spike closeout (ADRs + SPIKE-FINDINGS.md + teardown) — all of R1-R5 now done; ready to run
 
 ### Infrastructure corrections (2026-06-25)
 

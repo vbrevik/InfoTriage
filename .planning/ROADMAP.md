@@ -55,7 +55,7 @@ before any production build. Does NOT re-spike the already-working ingest→scor
 - [x] 00-03-PLAN.md — R2: Norwegian semantic dedup bake-off (bge-m3 vs mE5-large, threshold sweep) (W2) — PARTIAL: mE5-large chosen @0.84, threshold uncalibrated (corpus too narrow)
 - [x] 00-04-PLAN.md — R3: Postgres entity resolution (pgvector cosine link, NATO merge + control split) (W2) — PARTIAL: mechanism GO, 1-lang coverage (corpus date)
 - [x] 00-05-PLAN.md — R4: Wiki-LLM feasibility (cited standing page + on-demand article on qwen36) (W3) — PARTIAL: synthesis GO; cross-lang synthesis drops ru sources
-- [ ] 00-06-PLAN.md — R5: COP/World Monitor adopt/build/drop vs InfoTriage CCIR brief (W2)
+- [x] 00-06-PLAN.md — R5: COP/World Monitor adopt/build/drop vs InfoTriage CCIR brief (W2) — DROP WM; BUILD own interactive-SAB canvas/COP (SP-COP) on open globe stack w/ InfoTriage data+CCIR
 - [ ] 00-07-PLAN.md — Closeout: SPIKE-FINDINGS.md + ADR-005..008, then delete .spike/ (W4)
 
 ### Phase 1: Contracts + monorepo skeleton
