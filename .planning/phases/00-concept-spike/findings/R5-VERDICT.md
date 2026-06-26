@@ -73,7 +73,44 @@ Therefore: drop WM, build own.
     and an **entity network (nodes + relations)** in the other, as **linked views** over the same
     corpus. The network is fed by **R3 entity resolution** (`entities` + `entity_links`, pgvector →
     Phase 8); selecting an entity/region in one half filters the other. (Pairs with graphify/KG theme.)
+  - ➕ **Presentation mode** — flip the interactive canvas into a linear **briefing/presentation** (same
+    data, two projections: explore ⟷ present). Ties to the canonical SAB render (Phase 6 `write_bluf()`).
+  - ➕ **Actionable topics (launchpad)** — every topic/entity is a launchpad, not just a read: **follow
+    up**, **dig in** (→ RAG recall Phase 9 / Wiki-LLM synthesis Phase 10), or **spin up a POC** — esp.
+    AI/tech topics (operator's FFIR-3: own tech capability, local LLMs, NVIDIA/DGX stack). The intel
+    surface becomes a *doing* surface.
+  - ➕ **Park leads for later** — when discovery surfaces something interesting but there's no time now,
+    **park the lead** to a pending-investigations tray / queue to follow up later (information-foraging
+    "patch to return to"). Reuses the GSD seed/backlog habit; a parked lead can later become a dig-in or POC.
   - (running list — feeds SP-COP planning; reuse WM only as concept reference, no WM code.)
+
+### Prior art — others' takes on this ask (research 2026-06-26)
+
+The look/headlines/focus + directed/serendipity ask is well-trodden in visual-analytics and sensemaking
+research. Closest references:
+
+- **Shneiderman's mantra — "overview first, zoom and filter, details on demand"** + **semantic zooming**
+  (the representation itself changes with the level of scrutiny). This IS look→headlines→focus; persistent
+  global filters + linked highlighting = the cross-filter. The canonical structure for the whole canvas.
+- **Information foraging + sensemaking (Pirolli & Card) / berrypicking (Bates).** Exploration interleaves
+  *foraging* (find patches) and *sensemaking* (synthesize); the query **evolves as you go** — matches "I
+  don't fully know what I want." "Information scent" guides the next move. Validates park-leads (patches)
+  + directed-plus-serendipity.
+- **Serendipity design.** Serendipity = unexpected info **+ the ability to act on it**. Enabled by
+  "information scents": hover-previews of interconnections, topic suggestions that nudge deviation off-profile.
+  → discovery affordances on the network (preview links, AI-suggested off-profile topics).
+- **OSINT link-analysis tools — IBM i2 Analyst's Notebook, Maltego, Linkurious, Sintelix.** i2 is the
+  closest professional analog: **social-network + geospatial + temporal** analysis in one tool (= the split
+  geo+network+timeline). Maltego's "transforms" (pull more data on an entity) = the **dig-in** action.
+- **InfraNodus / Nodus Labs.** Text→knowledge-graph that surfaces **structural gaps** (clusters not well
+  connected), influential/bridge nodes, and **AI-generated research questions** — a ready-made model for
+  the *unknown/discovery* half ("what you didn't know to ask"). Portable GraphRAG; has an Obsidian plugin
+  (ties to the operator's vault/graphify habit).
+- **Sensecape (UIST 2023).** Multilevel exploration + sensemaking with LLMs — hierarchical canvas managing
+  complexity across abstraction levels; a research precedent for look/headlines/focus zoom.
+- **Calm technology / ambient analytics.** Info in the attentional periphery, glanceable, pre-attentive,
+  progressive disclosure ("show more only as curiosity increases") — the design language for **LOOK/ambient**
+  mode. Caveat from the literature: ambient news can become an anxiety trigger; design for calm, not a feed.
 
 ### SP-COP design inspiration — Palantir Gotham / Semantica (research 2026-06-26)
 
@@ -102,6 +139,29 @@ worth copying (concept only):
 **Synthesis for SP-COP:** an entity-link **Graph Canvas** (network half) + **globe** (geo half) + a shared
 **timeline scrubber** with brushing/playback, all **cross-filtered**, with **floating pickers** (from WM) and
 a faceted **CCIR/CNR-tier explorer** as an additional non-geo view — all over InfoTriage's own corpus, local.
+
+**Core use-case = directed + serendipitous discovery (operator, 2026-06-26).** "I know parts of what I want
+to know more about, and a lot that I do not know that I want." The canvas must serve BOTH:
+- **Known (directed):** CCIR-as-interests filters/lanes — monitor the topics I've declared.
+- **Unknown (serendipity):** surface what I did NOT ask for — emergent entity clusters, **bridge entities**
+  linking my interests to things outside them, volume/sentiment **anomalies**, newly-appeared entities. The
+  R3 entity-resolution graph IS the discovery engine: unqueried relationships reveal themselves. Discovery
+  affordances (anomaly highlights, "new signal" treatment on out-of-profile nodes, neighborhood spotlight
+  to wander from known→unknown) are first-class, not an afterthought. This known/unknown balance is the
+  central design question for SP-COP sketches.
+
+**THESIS — multiple modes, no limits (operator, 2026-06-26).** "Multiple modes, that's the ask. I do not
+want limits, but possibility to **look**, get **headlines**, or **focus**." SP-COP is a spectrum of
+engagement over one canvas, not a fixed view — the user picks their depth/tempo at will:
+- **LOOK** (ambient/lean-back, low time): glance the operating picture; discovery comes to you — what's
+  moving/anomalous that you didn't ask about. Geo+network alive, minimal chrome.
+- **HEADLINES** (digest): the SAB/brief level — CCIR-tiered cited headlines, CNR-elevated, scannable. Ties
+  to `write_bluf()` (Phase 6). Also the **presentation mode** (explore ⟷ present, same data).
+- **FOCUS** (lean-forward, have time): directed deep-dive on a specific want — neighborhood graph + topic
+  timeline + source items + the **action launchpad** (follow-up / dig-in via RAG/Wiki-LLM / spin-up-POC,
+  esp. AI/FFIR-3). The intel surface becomes a *doing* surface.
+Two crossing axes — **known↔unknown** and **ambient↔focused** — and the three modes are points the user
+moves between freely. No mode is a cage. This is the organizing principle for SP-COP.
 - **Relationship to Phase 6:** the Brief app / SAB renderer (`write_bluf()`) remains the canonical
   intelligence product; the interactive canvas is a second reading-surface projection of the same data.
 - `.spike/r5_worldmonitor/worldmonitor/` (clone + node_modules + Rust target, large) is throwaway —
