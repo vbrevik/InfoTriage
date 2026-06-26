@@ -334,15 +334,23 @@ const ITEMS = [
 const TIERLABEL = {'PIR-1':'PIR-1 · Russland/Ukraina','PIR-3':'PIR-3 · NATO & europeisk sikkerhet',
   'PIR-5':'PIR-5 · Stormaktsrivalisering','SIR-1':'SIR-1 · Midtøsten & US-Iran',
   'FFIR-2':'FFIR-2 · Norsk politikk','FFIR-3':'FFIR-3 · Egen teknologi (AI/LLM)'};
-/* synthesized BLUF per topic — the analyst summary up front (write_bluf shape), [N] = cited item */
+/* time-versioned BLUF per topic — the analyst summary re-states as the situation evolves.
+   Each snapshot {d:day, t:text}; the view shows the latest snapshot at/<= the selected time. */
 const BLUF = {
-  'PIR-1':'Ukraina eskalerer angrep inn i russisk territorium: droneangrep mot oljedepot i Kuban <sup>[1]</sup> og artilleri mot Belgorod med fem sivile skadd <sup>[2]</sup>. Mønsteret er krigshandlinger som flytter seg inn i russiske regioner — infrastruktur og sivile direkte rammet.',
-  'PIR-3':'E5-landene (UK, Italia, Polen, Frankrike, Tyskland) styrker europeisk forsvarssamarbeid <sup>[1]</sup> og signaliserer å bringe Ukraina nærmere NATO <sup>[2]</sup>. Tegn på en sterkere europeisk rolle innenfor alliansen — uten samlet enighet om tidspunkt.',
-  'PIR-5':'Stormaktsrivalisering på to fronter: USA utvider engasjement i Venezuela med humanitær/militær hjelp <sup>[1]</sup>, mens Medvedev advarer om at Moldova og Armenia står overfor samme scenario som Ukraina <sup>[2]</sup>.',
-  'SIR-1':'Spenning mellom eskalering og diplomati: Trump ber Kongressen om $87 mrd til Iran-krigen <sup>[1]</sup>, samtidig som IAEA bekrefter inspektørbesøk som del av en avtale <sup>[2]</sup>.',
-  'FFIR-2':'Utdanningsdirektoratets undersøkelse avdekker narkotika, vold og trusler ved norske videregående skoler <sup>[1]</sup> — en nasjonal beredskaps- og samfunnsbekymring.',
-  'FFIR-3':'Anthropic anklager Alibaba for ulovlig uthenting av AI-kapasitet <sup>[1]</sup> — direkte relevant for egen teknologikapabilitet og AI-leverandørkjede. Kandidat for egen POC/utforskning.'};
+  'PIR-1':[{d:3,t:'Ukraina rammer russisk oljeinfrastruktur: droneangrep mot oljedepot i Kuban <sup>[1]</sup>.'},
+           {d:4,t:'Ukraina eskalerer inn i russisk territorium: droneangrep mot oljedepot i Kuban <sup>[2]</sup> og artilleri mot Belgorod med fem sivile skadd <sup>[1]</sup>. Krigshandlinger flytter seg inn i russiske regioner.'}],
+  'PIR-3':[{d:5,t:'E5-landene styrker europeisk forsvarssamarbeid <sup>[1]</sup> — tegn på en sterkere europeisk rolle i NATO.'},
+           {d:6,t:'E5-landene styrker forsvarssamarbeid <sup>[2]</sup> og signaliserer å bringe Ukraina nærmere NATO <sup>[1]</sup> — uten samlet enighet om tidspunkt.'}],
+  'PIR-5':[{d:6,t:'Medvedev advarer om at Moldova og Armenia står overfor samme scenario som Ukraina <sup>[1]</sup>.'},
+           {d:7,t:'Stormaktsrivalisering på to fronter: USA utvider engasjement i Venezuela med humanitær/militær hjelp <sup>[1]</sup>, mens Medvedev advarer Moldova/Armenia <sup>[2]</sup>.'}],
+  'SIR-1':[{d:5,t:'IAEA bekrefter inspektørbesøk til Iran som del av en avtale <sup>[1]</sup>.'},
+           {d:6,t:'Spenning mellom eskalering og diplomati: Trump ber Kongressen om $87 mrd til Iran-krigen <sup>[1]</sup>, samtidig som IAEA bekrefter inspektørbesøk <sup>[2]</sup>.'}],
+  'FFIR-2':[{d:4,t:'Utdanningsdirektoratets undersøkelse avdekker narkotika, vold og trusler ved norske videregående skoler <sup>[1]</sup>.'}],
+  'FFIR-3':[{d:5,t:'Anthropic anklager Alibaba for ulovlig uthenting av AI-kapasitet <sup>[1]</sup> — relevant for egen teknologikapabilitet. Kandidat for egen POC.'}]};
 const POC_TIERS = ['FFIR-3'];
+function blufAsOf(t, day, latest){ const arr=BLUF[t]; if(!arr) return null;
+  if(latest) return arr[arr.length-1].t;
+  let pick=null; arr.forEach(b=>{ if(b.d<=day) pick=b; }); return pick?pick.t:null; }
 
 /* ---------- variant switching ---------- */
 function showVariant(id, btn){
@@ -454,7 +462,11 @@ function renderHeadlines(){
     const isPoc=POC_TIERS.includes(t);
     const newBadge = freshN ? `<span class="new-badge">${freshN} NEW</span>` : '';
     const latest = items[0];
-    const stamp = HL_MODE==='asof' ? `<span class="latest-stamp">as of day ${ASOF.toFixed(1)} · latest day ${latest.day}</span>`
+    // time-aware BLUF: as-of mode re-states the assessment to the selected moment
+    const blufText = HL_MODE==='asof' ? blufAsOf(t, ASOF, false) : blufAsOf(t, 99, true);
+    const blufTag = HL_MODE==='asof' ? `BLUF · as of day ${ASOF.toFixed(1)}`
+                   : (freshN ? 'BLUF · updated since last read' : 'BLUF · bottom line up front');
+    const stamp = HL_MODE==='asof' ? `<span class="latest-stamp">as of day ${ASOF.toFixed(1)}</span>`
                                    : `<span class="latest-stamp">latest · day ${latest.day}</span>`;
     h+=`<div class="hl-tier"><h3>${TIERLABEL[t]} <span class="ct">${items.length} saker</span>${newBadge}${flag}${stamp}
       <span class="tier-act">
@@ -462,14 +474,19 @@ function renderHeadlines(){
         ${isPoc?'<span class="miniact" style="color:var(--ok);border-color:var(--ok)" onclick="toast(\'Start POC (AI / FFIR-3)\')">⚙ POC</span>':''}
         <span class="miniact" onclick="parkLead('${TIERLABEL[t].split('·')[1].trim()}')">⊟ park</span>
       </span></h3>`;
-    if(BLUF[t]) h+=`<div class="bluf ${isPoc?'poc':''}"><span class="bluf-tag">BLUF · bottom line up front${freshN?' · updated':''}</span>${BLUF[t]}</div>`;
+    if(blufText) h+=`<div class="bluf ${isPoc?'poc':''}"><span class="bluf-tag">${blufTag}</span>${blufText}</div>`;
+    else h+=`<div class="hidden-note" style="padding:4px 0 0">ingen vurdering ennå per dag ${ASOF.toFixed(1)}</div>`;
+    // fresh mode: show ONLY the new items (the delta); note the rest hidden
+    const shown = HL_MODE==='fresh' ? items.filter(i=>i.n) : items;
+    const olderHidden = items.length - shown.length;
     h+='<div class="cited">';
-    items.forEach((it,i)=>{ const c=it.cnr===1?'c1':it.cnr===2?'c2':'c0'; const lbl=it.cnr===1?'CNR I':it.cnr===2?'CNR II':'—';
+    shown.forEach((it,i)=>{ const c=it.cnr===1?'c1':it.cnr===2?'c2':'c0'; const lbl=it.cnr===1?'CNR I':it.cnr===2?'CNR II':'—';
       const nd = it.n?'<span class="newdot" title="new since last read"></span>':'<span style="width:7px;display:inline-block"></span>';
       h+=`<div class="hl"><span class="num">${nd} [${i+1}]</span><span class="cnr ${c}">${lbl}</span><span class="txt">${it.t}</span>
         <span class="src">${it.src} · d${it.day}</span>
         <span class="act"><span class="miniact" onclick="focusEntity('${it.ent}')">focus</span>
         <span class="miniact" onclick="parkLead('${it.t.slice(0,30).replace(/'/g,'')}…')">park</span></span></div>`; });
+    if(HL_MODE==='fresh' && olderHidden) h+=`<div class="hidden-note" style="padding:6px 0 0">+ ${olderHidden} earlier item(s) in this topic — already read</div>`;
     h+='</div></div>'; });
   if(HL_MODE==='fresh' && hiddenTiers) h+=`<div class="hidden-note">— ${hiddenTiers} topic(s) unchanged since last read · switch to “Latest” to see all —</div>`;
   if(HL_MODE==='fresh' && freshTotal===0) h=`<div class="hidden-note">✓ All caught up — nothing new since last read. Switch to “Latest” or “Back in time”.</div>`;
