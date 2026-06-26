@@ -74,6 +74,34 @@ Therefore: drop WM, build own.
     corpus. The network is fed by **R3 entity resolution** (`entities` + `entity_links`, pgvector →
     Phase 8); selecting an entity/region in one half filters the other. (Pairs with graphify/KG theme.)
   - (running list — feeds SP-COP planning; reuse WM only as concept reference, no WM code.)
+
+### SP-COP design inspiration — Palantir Gotham / Semantica (research 2026-06-26)
+
+The split geo+network interactive-SAB canvas maps almost 1:1 onto established intel-analysis UX. Patterns
+worth copying (concept only):
+
+- **Object–link ontology (Gotham).** Everything is objects (entities) + links (relations) on a **Graph
+  Canvas** — add/rearrange/annotate/style/filter/search nodes spatially, with helper panels (Table, charts).
+  → InfoTriage `entities` + `entity_links` (R3) ARE this ontology; the network half is a Graph Canvas.
+- **Neighborhood exploration ("spotlight," Gotham).** Show the local neighborhood of a node (3–4 hops) like
+  a magnifying glass, to keep context manageable. → entity-graph navigation over entity_links.
+- **Timeline + brushing + playback (Gotham Map/Timeline)** — directly answers the time-scrubber want:
+  - Draggable **time cursor** = "selected time"; its position drives the temporal focus of ALL linked views.
+  - **Playback**: play button with 1×–100×+ speed; cursor loops through the window (temporal animation).
+  - **Brush to filter**: Shift-drag a time window; in-window objects stay opaque, out-of-window fade.
+  - Timeline **bars** for time-range objects + **event lines** for point-in-time; scroll-zoom, zoom-to-fit.
+  - "Latest data" mode for streaming/real-time.
+- **Linked views / cross-filter (Gotham).** Timeline ↔ map ↔ graph stay in sync; charts/widgets cross-filter
+  each other (toggleable). → selecting a region in the geo half filters the entity-network half and the
+  timeline, and vice-versa. This is the core of the split canvas.
+- **Object Explorer / faceted top-down (Gotham).** Aggregate many records as bar/histogram/pie, filter by
+  shared characteristics. → the "views beyond geo": a CCIR-tier / topic / source faceted view + histograms.
+- **Semantica (Semantic AI).** Patented graph-based knowledge discovery + link analysis (Semantica Pro /
+  Cortex EIP) — reinforces an entity-relationship-centric exploration model as the spine of the canvas.
+
+**Synthesis for SP-COP:** an entity-link **Graph Canvas** (network half) + **globe** (geo half) + a shared
+**timeline scrubber** with brushing/playback, all **cross-filtered**, with **floating pickers** (from WM) and
+a faceted **CCIR/CNR-tier explorer** as an additional non-geo view — all over InfoTriage's own corpus, local.
 - **Relationship to Phase 6:** the Brief app / SAB renderer (`write_bluf()`) remains the canonical
   intelligence product; the interactive canvas is a second reading-surface projection of the same data.
 - `.spike/r5_worldmonitor/worldmonitor/` (clone + node_modules + Rust target, large) is throwaway —
