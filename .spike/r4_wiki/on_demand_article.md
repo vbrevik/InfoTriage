@@ -1,33 +1,43 @@
-# Intel-wiki: NATO
+# Intel-wiki: Venezuela
 
-_Syntetisert på lokal qwen36 (oMLX) fra 5 korpus-elementer · on-demand · 5 [N]-sitater_
+_Syntetisert på lokal qwen36 (oMLX) fra 17 korpus-elementer · on-demand · 8 [N]-sitater_
 
 ## Bakgrunn
-
-NATO (North Atlantic Treaty Organization) har lenge vært sentral i vestlig sikkerhetspolitikk, men alliansens indre dynamikk og eksterne relasjoner er under betydelig press. Historisk har Russland sett på NATO som en trussel, der tidligere sikkerhetsråd-medlem Dmitry Medvedev hevder at alliansen etter Sovjetunionens fall har brukt «marionettregimer» som batterirammeslag mot Russland [4]. Denne geopolitiske spenningen har eskalert, spesielt med tanke på naboland som Moldova og Armenia, som Medvedev advarer om nå står overfor samme scenario som Ukraina [4]. I tillegg har Medvedev uttrykt skepsis til alliansens sammenhold, påstått at NATO-enhet ikke har stor verdi i reelle krigssituasjoner, og hevdet at Washingtons allierte raskt kan snu ryggen til hverandre [5].
+Venezuela har vært preget av en dyp økonomisk og politisk krise i over ti år, noe som har svekket landets institusjonelle kapasitet og infrastruktur [6]. Denne langvarige ustabiliteten skaper et sårbart grunnlag for håndtering av naturkatastrofer. Landet har ingen egen ambassade i Venezuela, noe som kompliserer direkte diplomatisk kontakt og evnen til å kartlegge situasjonen for utenlandske statsborgere [7].
 
 ## Sentrale utviklingstrekk
+Natt til torsdag norsk tid ble Venezuela rammet av to kraftige jordskjelv som traff hovedstaden i løpet av sekunder. Det første skjelvet målte 7,2 på Richters skala, fulgt kort tid senere av et på 7,5 [1]. Videoopptak viser omfattende kollaps av bygninger og panikk blant beboere som evakuerer området [2].
 
-Det er synlige sprekker i alliansens politiske enighet, spesielt knyttet til forsvarsutgifter og strategisk prioritering. Den amerikanske presidenten har uttrykt skuffelse over flere europeiske allierte, inkludert Storbritannia, Spania, Italia, Frankrike og Tyskland [1]. Spesielt har spanske myndigheter blitt kritisert for å «ikke ville betale noe» for forsvarsinnsatsen [1]. Til tross for disse spenningene har en gruppe ledende europeiske nasjoner – Storbritannia, Italia, Polen, Frankrike og Tyskland – fornyet sitt engasjement for å styrke det europeiske forsvaret [2]. Disse lederne har befestet sin forpliktelse til en «sterkere europeisk rolle innenfor NATO» [2].
+Ifølge fungerende president Delcy Rodríguez er 32 personer bekreftet omkommet og 700 skadet [8]. Imidlertid er det usikkerhet knyttet til de endelige tallene, da myndighetene venter på rapporter fra La Guaira, som er den regionen som antas å være hardest rammet [8]. Hovedflyplassen Maiquetía er stengt på grunn av skader, og regjeringen har erklært unntakstilstand i landet [10].
 
-En annen viktig utvikling er alliansens forhold til Ukraina. De samme fem nasjonene (E5) har annonsert intensjonen om å bringe Ukraina nærmere NATO [3]. I en felles uttalelse understreker lederne sin forpliktelse til å fordype NATOs partnerskap med Ukraina [3]. Dette indikerer en strategisk vilje blant nøkkelmedlemmer om å integrere Ukraina, selv om det ikke er enighet om tidspunkt eller betingelser på tvers av hele alliansen.
+Internasjonalt har USA raskt reagert. USAs president Donald Trump uttrykte på plattformen Truth Social at USA står klar, villig og i stand til å hjelpe, og hevdet at skjelvene har ført til "svært mange dødsfall" uten å referere til offisielle tall [8]. Utenriksminister Marco Rubio bekreftet at USA sender søketeam, medisinske ressurser og militær hjelp [3]. Viseutenriksminister Christopher Landau opplyste at USA er i kontakt med venezuelanske myndigheter og gjør klar bistand [9].
+
+Norske myndigheter har uttrykt bekymring. Utenriksminister Espen Barth Eide beskrev nyhetene om ødeleggelser og dødsfall som "fryktelige" og påpekte at katastrofen forverrer situasjonen i et land som allerede er i krise [6]. Utenriksdepartementet (UD) opplyste at de ikke har full oversikt over antall nordmenn i landet, da registreringen er frivillig [7]. Likevel har ambassaden kommet i kontakt med nordmenn som befinner seg i landet, og disse oppgis å ha det bra [7].
 
 ## Aktuell vurdering
-
-Den nåværende situasjonen preges av en dualitet mellom politisk uenighet og strategisk tilnærming. På den ene siden er det en tydelig konflikt mellom USA og flere europeiske makter angående byrdefordelingen, noe som skaper usikkerhet om alliansens langsiktige stabilitet [1]. På den andre siden viser E5-landene en vilje til å ta ansvar gjennom dypere samarbeid og støtte til Ukraina [2][3].
-
-Russland, representert ved Medvedev, tolker disse bevegelserne som en direkte trussel. Hans påstand om at NATO-enhet er illusorisk i krigstid [5], og hans analyse av alliansens bruk av proxy-regimer [4], reflekterer en dyp mistillit til vestlige intensjoner. Medvedev hevder at hendelser som angrepene på Iran og blokkeringen av Hormuz-stredet har demonstrert hvor raskt allierte kan svikte hverandre [5]. Dette skaper et paradoks: mens europeiske ledere forsøker å styrke sin egen rolle innenfor NATO for å sikre stabilitet [2], ser Russland dette som en del av en offensiv strategi rettet mot deres sikkerhetsinteresser [4].
+Situasjonen er prekær med tanke på den eksisterende økonomiske krisen, som gjør gjenoppbygging og nødhjelp ekstra utfordrende [6]. Det er fryktet omfattende ødeleggelser og svært høye dødstall utover de bekreftede tallene [9]. Den internasjonale hjelpen fra USA er raskt på plass, men det er uklart hvordan dette vil samspille med Venezuelas politiske ledelse. For norske borgere er situasjonen foreløpig stabil, men mangelen på offisiell oversikt over antall nordmenn i landet utgjør en risiko for kommunikasjon og evakuering hvis situasjonen forverres [7].
 
 ## Åpne spørsmål
-
-Det gjenstår flere uavklarte spørsmål knyttet til NATOs fremtidige struktur og effektivitet. Først og fremst er spørsmålet om forsvarsutgifter kritisk; hvor lenge kan USA tolerere skuffelsen over land som Storbritannia, Spania og Tyskland før det fører til konkrete politiske konsekvenser [1]? For det andre er spørsmålet om Ukrainas integrasjon sentralt; hvordan vil E5-landenes innsats for å bringe Ukraina nærmere alliansen påvirke den samlede NATO-strategien, og vil dette skape ytterligere splittelse med land som er mer tilbakeholdne [3]? For det tredje er spørsmålet om alliansens reelle handlekraft under press viktig; støtter Medvedevs påstand om at enhet er verdiløs i krig, eller er dette en russisk narrativ for å undergrave tilliten til vestlige allianser [5]? Til slutt er spørsmålet om hvordan naboland som Moldova og Armenia vil håndtere den økte spenningen og NATOs utvidelseshorisont, gitt Russlands advarsler om at de nå står overfor samme scenario som Ukraina [4].
+Det er fortsatt usikkerhet knyttet til det endelige antallet drepte og skadede, spesielt med tanke på La Guaira-regionen [8]. Det er også uklart hvor mange nordmenn som oppholder seg i Venezuela, da UD ikke har oversikt over dette [7]. Videre er det spørsmål om hvordan den amerikanske bistanden vil bli koordinert med de venezuelanske myndighetene under unntakstilstand [10].
 
 ---
 ## Kildekart (citation grounding)
-- [1] `tass_021` — tass (ru) — US disappointed with UK, Spain, Italy, France, Germany as NATO allies — Trump  _✓ sitert_
-- [2] `tass_043` — tass (ru) — UK, Italy, Poland, France, Germany agree to strengthen defense cooperation  _✓ sitert_
-- [3] `tass_051` — tass (ru) — UK, Italy, Poland, France, Germany announce intention to bring Ukraine closer to NATO  _✓ sitert_
-- [4] `tass_077` — tass (ru) — Moldova, Armenia now facing same scenario as Ukraine once adopted — Medvedev  _✓ sitert_
-- [5] `tass_084` — tass (ru) — NATO unity not worth much in real war situations — Medvedev  _✓ sitert_
+- [1] `bbc_001` — bbc (en) — 'I thought building would fall on top of me' - Venezuelans describe earthquake panic  _✓ sitert_
+- [2] `bbc_021` — bbc (en) — Moment earthquake hits Venezuela and leaves buildings collapsed  _✓ sitert_
+- [3] `nrk_001` — nrk (no) — Rubio: USA sender humanitær hjelp til Venezuela  _✓ sitert_
+- [4] `nrk_004` — nrk (no) — Jordskjelv i Venezuela: – Akkurat nå er jeg i sjokk  _· ikke sitert_
+- [5] `nrk_006` — nrk (no) — Eide til Aftenposten: – Fryktelige nyheter  _· ikke sitert_
+- [6] `nrk_007` — nrk (no) — UD: Har ikke oversikt over norske borgere i Venezuela  _✓ sitert_
+- [7] `nrk_008` — nrk (no) — 32 bekreftet døde i jordskjelv så langt  _✓ sitert_
+- [8] `nrk_011` — nrk (no) — Trump: – USA står klare  _✓ sitert_
+- [9] `nrk_014` — nrk (no) — USA vil hjelpe Venezuela etter jordskjelvene  _✓ sitert_
+- [10] `nrk_016` — nrk (no) — Unntakstilstand og stengt hovedflyplass i Venezuela  _✓ sitert_
+- [11] `tass_003` — tass (ru) — Earthquake causes heavy infrastructure damage in Venezuelan capital — radio  _· ikke sitert_
+- [12] `tass_005` — tass (ru) — At least 32 people killed in Venezuelan earthquake — agency  _· ikke sitert_
+- [13] `tass_007` — tass (ru) — Massive damage done by earthquake in Venezuela — radio  _· ikke sitert_
+- [14] `tass_012` — tass (ru) — State of emergency declared in Venezuela after earthquake  _· ikke sitert_
+- [15] `tass_014` — tass (ru) — USGS lowers estimate of potential damage from quake in Venezuela  _· ikke sitert_
+- [16] `tass_019` — tass (ru) — USGS estimates potential losses from quake in Venezuela at from 2 to 20% of GDP  _· ikke sitert_
+- [17] `tass_024` — tass (ru) — Powerful earthquake rocks Venezuela  _· ikke sitert_
 
-**Grounding check: PASS** — citations [1, 2, 3, 4, 5]; every [N] maps to a real source id: True
+**Grounding check: PASS** — citations [1, 2, 3, 6, 7, 8, 9, 10]; every [N] maps to a real source id: True
