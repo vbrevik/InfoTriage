@@ -2,7 +2,7 @@
 sketch: 001
 name: sp-cop-canvas
 question: "How does one canvas flex across LOOK / HEADLINES / FOCUS without caging the user — while serving both known (CCIR) and unknown (discovery)?"
-winner: null
+winner: "B"  # HEADLINES — BLUF-first, time-aware, delta-default. LOOK/FOCUS parked for later.
 tags: [cop, canvas, sab, network, geo, timeline, discovery, modes]
 ---
 

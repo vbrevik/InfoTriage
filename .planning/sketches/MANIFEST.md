@@ -18,4 +18,4 @@ Sensecape (LLM multilevel sensemaking) · Shneiderman semantic-zoom mantra · ca
 
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
-| 001 | sp-cop-canvas | One canvas across LOOK/HEADLINES/FOCUS, serving known (CCIR) + unknown (discovery) | TBD | cop, canvas, sab, network, geo, timeline, discovery, modes |
+| 001 | sp-cop-canvas | One canvas across LOOK/HEADLINES/FOCUS, serving known (CCIR) + unknown (discovery) | **B · HEADLINES** (BLUF-first, time-aware, delta-default) | cop, canvas, sab, network, geo, timeline, discovery, modes |
