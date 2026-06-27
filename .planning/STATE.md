@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in-progress
-stopped_at: Phase 1 PLANNED — 3 plans (01-01..01-03) across 3 waves, verified, ready to execute
-last_updated: "2026-06-27T20:17:07.834Z"
+stopped_at: 01-02 COMPLETE — monorepo restructured, 83 tests green; ready for 01-03
+last_updated: "2026-06-27T20:28:16.533Z"
 progress:
   total_phases: 13
   completed_phases: 0
   total_plans: 10
-  completed_plans: 7
+  completed_plans: 8
   percent: 0
 ---
 
@@ -17,6 +17,15 @@ progress:
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-06-27 — Phase 1 01-02 COMPLETE (monorepo restructure)
+
+### Just-completed
+
+- **01-02-PLAN.md (Monorepo restructure + test migration)**: Re-homed bridge/score/opml into apps/{ingest,triage,opml}. Applied exhaustive 7-expression path-depth fix table (3 expressions RESEARCH/PATTERNS missed: sab_html.py ROOT, gmail_to_atom.py OUT + .env). D-08 wiring: digest.py imports Item from contracts. Root pyproject.toml pytest config (pythonpath replaces all sys.path.insert). Migrated 6 unittest files to pytest functions. **83 tests green** (27 contracts + 56 migrated). Commits c22d10c (pyproject), 9035fe5 (re-home), 8d9ca9d (test migration).
+  - Q1 resolved: sab_html.py in apps/triage/ (sibling import forces co-location)
+  - Q2 resolved: working.opml moved (git-tracked)
+  - Q3 resolved: pyproject.toml chosen over pytest.ini / conftest.py
 
 ## Session: 2026-06-27 — Phase 0 COMPLETE (00-07 closeout + teardown)
 
@@ -140,6 +149,6 @@ progress:
 
 ## Session
 
-**Last session:** 2026-06-27T20:17:07.826Z
+**Last session:** 2026-06-27T20:28:16.525Z
 **Stopped at:** Phase 1 PLANNED — 3 plans (01-01..01-03) across 3 waves, verified, ready to execute
 **Resume file:** .planning/phases/01-contracts-monorepo-skeleton/01-01-PLAN.md

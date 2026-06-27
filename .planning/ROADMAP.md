@@ -76,14 +76,14 @@ to the running pipeline.
   4. Repo restructured into `apps/` + `libs/`; existing scripts import from contracts; 56 tests still pass.
   5. Three stale doc claims fixed (imap/yt not "scaffolded"; PMESII/TESSOC done; `.env.example` exists).
 
-**Plans**: 1/3 plans executed
+**Plans**: 2/3 plans executed
 **Wave 1**
 
 - [x] 01-01-PLAN.md — libs/contracts package: Item, 4 event schemas, PyYAML codec, Protocol bus + in-memory impl, contracts tests (W1) — R1-R4
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-02-PLAN.md — Monorepo re-root into apps/+libs/: re-home scripts with exhaustive path-depth fixes, root pytest config, Item import wiring, migrate 6 tests to pytest (W2) — R5
+- [x] 01-02-PLAN.md — Monorepo re-root into apps/+libs/: re-home scripts with exhaustive path-depth fixes, root pytest config, Item import wiring, migrate 6 tests to pytest (W2) — R5
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
