@@ -793,22 +793,25 @@ def test_bus_empty_subscribe_no_op():
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **`sab_html.py` destination in apps/**
    - What we know: It generates SAB HTML, logically belongs more to the "brief" app than "triage".
    - What's unclear: Phase 4+ splits apps into their own containers. The re-home here is temporary. Does it matter which app dir it goes to?
    - Recommendation: Re-home to `apps/triage/` (current score/ peer) for consistency; note it will move again in Phase 4+.
+   - **RESOLVED:** `sab_html.py` re-homes to `apps/triage/` (NOT `apps/brief/`). It does `from triage_score import load_dotenv, llm` as a runtime sibling via `sys.path.insert(0, os.path.dirname(__file__))`, so it MUST be co-located with `triage_score.py`. Co-location with triage_score forces `apps/triage/`. See plan 01-02 Task 2.
 
 2. **conftest.py vs pyproject.toml pythonpath**
    - What we know: Both approaches work; pyproject.toml is cleaner.
    - What's unclear: Does the project already have a root `pyproject.toml`? (Currently no — only a `requirements.txt`.)
    - Recommendation: Create a root `pyproject.toml` with `[tool.pytest.ini_options]` for pytest config. This is also the place to declare dev dependencies.
+   - **RESOLVED:** Use a root `pyproject.toml` `[tool.pytest.ini_options]` with `pythonpath = ["apps/triage", "apps/opml", "apps/ingest"]` — NO `conftest.py` is created. The `pythonpath` option alone replaces every removed `sys.path.insert`. See plan 01-02 Task 1.
 
 3. **`working.opml` gitignore status**
    - What we know: `working.opml` exists in `opml/` and appears to be a generated output (the result of running `_check.py --emit-working`).
    - What's unclear: Is it committed and should move, or is it gitignored and will be regenerated?
    - Recommendation: Check `.gitignore`; if gitignored, it stays where it is. If committed, move to `apps/opml/`.
+   - **RESOLVED:** `working.opml` IS git-tracked (confirmed via `git ls-files`), so it moves to `apps/opml/working.opml` along with `feeds.opml` — it is not left behind. See plan 01-02 Task 2.
 
 ---
 
