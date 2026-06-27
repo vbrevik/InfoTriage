@@ -62,6 +62,25 @@
   .region-label { fill:var(--text-dim); font-family:var(--mono); font-size:9px; letter-spacing:.5px; }
   .dot { cursor:pointer; transition:opacity .25s; }
   .dot:hover { stroke:#fff; stroke-width:1.2; }
+  /* OSINT asset layers */
+  .layer-grp { font-family:var(--mono); font-size:9px; text-transform:uppercase; letter-spacing:.6px;
+    color:var(--text-dim); margin:5px 0 1px; opacity:.7; }
+  .ptag { margin-left:auto; font-family:var(--mono); font-size:8.5px; color:var(--accent);
+    border:1px solid var(--border-2); border-radius:99px; padding:0 5px; }
+  .chk.off .ptag { color:var(--text-dim); }
+  .lsrc { font-family:var(--mono); font-size:8px; color:var(--text-dim); opacity:.75; }
+  .chk:not(.off) .lsrc { color:#7fa6c8; }
+  .osint-layer .cluster { fill:var(--surface-2); stroke:var(--accent); stroke-width:1; }
+  .osint-layer .cluster-txt { fill:var(--accent); font-family:var(--mono); font-size:9px; text-anchor:middle; }
+  .osint-layer .vtrack { stroke:#7fd6ff; stroke-width:.8; fill:none; stroke-dasharray:2 3; opacity:.6; }
+  .osint-layer .cable { stroke:var(--accent); stroke-width:1.3; fill:none; stroke-dasharray:5 3; opacity:.7; }
+  .osint-layer .cable.dmg { stroke:var(--cnr1); stroke-dasharray:2 2; }
+  .osint-layer .pipe { stroke:var(--accent-2); stroke-width:1.6; fill:none; opacity:.6; }
+  .osint-layer .base { fill:var(--ok); }
+  .osint-layer .nuke { fill:var(--cnr1); }
+  .osint-layer .vessel { fill:#7fd6ff; }
+  .osint-layer .arctic-zone { fill:rgba(127,214,255,.06); stroke:#7fd6ff; stroke-width:.6; stroke-dasharray:3 3; }
+  .osint-layer .asset-lbl { fill:var(--text-dim); font-family:var(--mono); font-size:8px; }
 
   /* network pane */
   .net svg { width:100%; height:100%; }
@@ -207,12 +226,20 @@
     <div class="pane">
       <span class="pane-label">◍ GEO · what's moving</span>
       <div class="geo"><svg id="geoA" viewBox="0 0 600 360" preserveAspectRatio="xMidYMid slice"></svg></div>
-      <div class="picker" style="left:14px; bottom:14px;">
-        <h4>Layers <span class="pill">ambient</span></h4>
+      <div class="picker" style="left:14px; bottom:14px; min-width:196px;">
+        <h4>Map layers <span class="pill">OSINT</span></h4>
         <div class="body">
-          <label class="chk"><i style="background:var(--cnr1)"></i> CNR I · critical</label>
-          <label class="chk"><i style="background:var(--cnr2)"></i> CNR II · elevated</label>
-          <label class="chk off"><i style="background:var(--cnr0)"></i> routine</label>
+          <div class="layer-grp">events</div>
+          <label class="chk" onclick="toggleLayer('cnr1',this)"><i style="background:var(--cnr1)"></i> CNR I · critical</label>
+          <label class="chk" onclick="toggleLayer('cnr2',this)"><i style="background:var(--cnr2)"></i> CNR II · elevated</label>
+          <label class="chk off" onclick="toggleLayer('heat',this)"><i style="background:var(--discovery)"></i> ▦ Density heatmap</label>
+          <div class="layer-grp">OSINT assets · feed</div>
+          <label class="chk" onclick="toggleLayer('cables',this)"><i style="background:var(--accent)"></i> 🔌 Subsea cables <span class="lsrc">cable DB</span><span class="ptag">PIR-4</span></label>
+          <label class="chk" onclick="toggleLayer('pipes',this)"><i style="background:var(--accent-2)"></i> ⛽ Pipelines <span class="lsrc">energy DB</span><span class="ptag">PIR-4</span></label>
+          <label class="chk" onclick="toggleLayer('arctic',this)"><i style="background:#7fd6ff"></i> ❄ Arctic / AIS <span class="lsrc">AISStream</span><span class="ptag">PIR-2</span></label>
+          <label class="chk off" onclick="toggleLayer('bases',this)"><i style="background:var(--ok)"></i> 🎖 Mil bases <span class="lsrc">OSINT</span><span class="ptag">PIR-3</span></label>
+          <label class="chk off" onclick="toggleLayer('flights',this)"><i style="background:var(--text-dim)"></i> ✈ Flights <span class="lsrc">OpenSky</span></label>
+          <label class="chk off" onclick="toggleLayer('nuke',this)"><i style="background:var(--cnr1)"></i> ☢ Nuclear <span class="lsrc">OSINT</span><span class="ptag">SIR-1</span></label>
         </div>
       </div>
     </div>
@@ -367,11 +394,70 @@ function renderGeo(svg){
   for(let y=0;y<=360;y+=60) h+=`<line class="graticule" x1="0" y1="${y}" x2="600" y2="${y}"/>`;
   const regions=[['Europe',260,70,120,70],['N.America',60,120,120,80],['Mid-East',430,200,120,70],['S.America',40,250,110,80]];
   regions.forEach(r=>{h+=`<rect class="region" x="${r[1]}" y="${r[2]}" width="${r[3]}" height="${r[4]}" rx="8"/><text class="region-label" x="${r[1]+6}" y="${r[2]+16}">${r[0]}</text>`;});
+  // ---- density heatmap (off by default) ----
+  h+=`<defs>
+    <radialGradient id="heatg"><stop offset="0%" stop-color="rgba(255,77,94,.55)"/><stop offset="60%" stop-color="rgba(255,138,223,.18)"/><stop offset="100%" stop-color="transparent"/></radialGradient>
+    </defs>
+    <g class="osint-layer" data-layer="heat" style="display:none">
+      <circle class="heatbloom" data-days="3,4,5,6" data-base="70" cx="330" cy="100" r="70" fill="url(#heatg)"/>
+      <circle class="heatbloom" data-days="7" data-base="46" cx="120" cy="280" r="46" fill="url(#heatg)"/>
+      <circle class="heatbloom" data-days="5,6" data-base="40" cx="478" cy="225" r="40" fill="url(#heatg)"/>
+    </g>`;
+  // ---- OSINT asset layers (each toggleable <g data-layer>) ----
+  // subsea cables (PIR-4) — incl. a damaged GIUK-gap segment
+  h+=`<g class="osint-layer" data-layer="cables"><path class="cable" d="M120,160 C220,120 300,130 420,120"/>
+    <path class="cable dmg" d="M300,70 C340,95 360,110 400,95"/><text class="asset-lbl" x="305" y="64">GIUK · degraded</text>
+    <path class="cable" d="M110,170 C150,230 200,260 95,285"/></g>`;
+  // pipelines / energy (PIR-4)
+  h+=`<g class="osint-layer" data-layer="pipes"><path class="pipe" d="M400,90 C360,120 320,120 285,110"/>
+    <text class="asset-lbl" x="345" y="128">RU→EU energy</text></g>`;
+  // arctic / AIS (PIR-2) — northern zone + multiple vessel tracks (AISStream-style)
+  h+=`<g class="osint-layer" data-layer="arctic"><rect class="arctic-zone" x="250" y="14" width="220" height="46" rx="6"/>
+    <text class="asset-lbl" x="258" y="27" fill="#7fd6ff">Arctic · nordlig sjørute · AIS</text>
+    <path class="vtrack" d="M300,42 C340,36 380,42 420,34"/><polygon class="vessel" points="420,32 426,35 420,38 422,35"/>
+    <path class="vtrack" d="M270,50 C310,52 350,46 400,50"/><polygon class="vessel" points="400,48 406,51 400,54 402,51"/>
+    <path class="vtrack" d="M330,24 C360,26 390,22 430,24"/><polygon class="vessel" points="430,22 436,25 430,28 432,25"/></g>`;
+  // military bases (PIR-3) — off by default
+  h+=`<g class="osint-layer" data-layer="bases" style="display:none">
+    <rect class="base" x="282" y="78" width="5" height="5"/><rect class="base" x="262" y="92" width="5" height="5"/>
+    <rect class="base" x="430" y="40" width="5" height="5"/></g>`;
+  // flights — off by default
+  h+=`<g class="osint-layer" data-layer="flights" style="display:none">
+    <text class="asset-lbl" x="200" y="140" style="font-size:11px">✈</text><text class="asset-lbl" x="360" y="170" style="font-size:11px">✈</text></g>`;
+  // nuclear sites (SIR-1) — off by default
+  h+=`<g class="osint-layer" data-layer="nuke" style="display:none">
+    <circle class="nuke" cx="478" cy="222" r="3.5"/><text class="asset-lbl" x="484" y="225">☢ Iran</text></g>`;
+  // ---- event dots (CNR) ----
   const geoPos={NATO:[310,95],Russia:[400,90],Ukraine:[330,100],USA:[110,150],Iran:[480,225],Venezuela:[95,285],Trump:[120,165]};
   ITEMS.forEach((it,i)=>{ const p=geoPos[it.ent]||[150+i*30,300]; const col=it.cnr===1?'var(--cnr1)':it.cnr===2?'var(--cnr2)':'var(--cnr0)';
-    h+=`<circle class="dot" data-day="${it.day}" cx="${p[0]+(i%3)*9}" cy="${p[1]+(i%2)*8}" r="${it.cnr===1?6:4.5}" fill="${col}" opacity=".9"><title>${it.t}</title></circle>`;
-    if(it.cnr===1) h+=`<circle class="dot pulse" cx="${p[0]+(i%3)*9}" cy="${p[1]+(i%2)*8}" r="11" fill="none" stroke="${col}" stroke-width="1"/>`;});
+    const lg = it.cnr===1?'cnr1':it.cnr===2?'cnr2':'cnr0';
+    h+=`<g class="osint-layer" data-layer="${lg}" style="display:inline"><circle class="dot" data-day="${it.day}" cx="${p[0]+(i%3)*9}" cy="${p[1]+(i%2)*8}" r="${it.cnr===1?6:4.5}" fill="${col}" opacity=".9"><title>${it.t}</title></circle>`;
+    if(it.cnr===1) h+=`<circle class="dot pulse" cx="${p[0]+(i%3)*9}" cy="${p[1]+(i%2)*8}" r="11" fill="none" stroke="${col}" stroke-width="1"/>`;
+    h+='</g>';});
+  // ---- cluster badges (Aegis-style) over dense areas ----
+  h+=`<g class="osint-layer" data-layer="clusters" style="display:inline">
+    <circle class="cluster" cx="335" cy="96" r="11"/><text class="cluster-txt" x="335" y="99">4</text>
+    <circle class="cluster" cx="120" cy="282" r="9"/><text class="cluster-txt" x="120" y="285">2</text></g>`;
   svg.innerHTML=h;
+}
+
+/* ---------- OSINT layer toggle ---------- */
+function toggleLayer(name, el){ const on=el.classList.toggle('off')===false;
+  document.querySelectorAll('#geoA [data-layer="'+name+'"]').forEach(g=>{ g.style.display = on?'inline':'none'; });
+  if(name==='heat' && on) updateHeat(geoDay);
+  toast((on?'Layer on · ':'Layer off · ')+name); }
+
+/* ---------- heatmap wired to timeline: density within the cursor's time window ---------- */
+let geoDay = 4.7;   // default cursor position (≈62% of day 1–7)
+function updateHeat(day){ geoDay=day;
+  document.querySelectorAll('#geoA .heatbloom').forEach(b=>{
+    const days=(b.getAttribute('data-days')||'').split(',').map(Number);
+    const base=+b.getAttribute('data-base');
+    const near=days.filter(d=>Math.abs(d-day)<=1.4).length;   // events inside ±1.4-day window
+    const frac=Math.min(1, near/Math.max(1,days.length));       // 0 = quiet, 1 = all events active now
+    b.setAttribute('r', (base*(0.35+0.65*frac)).toFixed(1));
+    b.style.opacity = (0.12 + 0.88*frac).toFixed(2);
+  });
 }
 
 /* ---------- network render ---------- */
@@ -411,9 +497,10 @@ function renderTimeline(host, withWindow){
   const move=e=>{ if(!drag)return; const r=track.getBoundingClientRect();
     let p=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)); cursor.style.left=(p*100)+'%';
     const day=(1+p*6); host.querySelector('[data-now]').textContent=day.toFixed(1);
-    // fade geo dots outside ±1.2 day window of cursor
+    // fade geo dots outside ±1.4 day window of cursor
     document.querySelectorAll('.dot[data-day]').forEach(d=>{ const dd=+d.getAttribute('data-day');
-      d.style.opacity = Math.abs(dd-day)<=1.4?'.95':'.12'; }); };
+      d.style.opacity = Math.abs(dd-day)<=1.4?'.95':'.12'; });
+    updateHeat(day); };  // heat blooms track the time window too
   track.addEventListener('mousedown',e=>{drag=true;move(e);});
   window.addEventListener('mousemove',move); window.addEventListener('mouseup',()=>drag=false);
 }
@@ -421,6 +508,7 @@ function playTL(btn){ const host=btn.closest('.timeline'); const cur=host.queryS
   let p=0; btn.textContent='❚❚ playing'; const iv=setInterval(()=>{ p+=0.02; if(p>1){clearInterval(iv);btn.textContent='▶ play';return;}
     cur.style.left=(p*100)+'%'; const day=(1+p*6); host.querySelector('[data-now]').textContent=day.toFixed(1);
     document.querySelectorAll('.dot[data-day]').forEach(d=>{const dd=+d.getAttribute('data-day'); d.style.opacity=Math.abs(dd-day)<=1.4?'.95':'.12';});
+    updateHeat(day);
   },40); }
 
 /* ---------- focus mode ---------- */
