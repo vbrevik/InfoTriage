@@ -20,7 +20,7 @@ gate = parity with today. **M2 Fusion** (Phases 8–12) layers the north-star fe
 urgent insertions. The all-local-LLM rule (ADR-004) is never revisited by a phase.
 
 - [x] **Phase 0: Concept spike** (M1) - throwaway spike gating the unproven bits before any build — COMPLETE (R1 GO, R2/R3/R4 PARTIAL, R5 drop-WM/build-SP-COP); ADR-005..008 written, .spike/ torn down
-- [ ] **Phase 1: Contracts + monorepo skeleton** (M1) - `libs/contracts` (Item, events, codec, bus interface)
+- [x] **Phase 1: Contracts + monorepo skeleton** (M1) - `libs/contracts` (Item, events, codec, bus interface) (completed 2026-06-27)
 - [ ] **Phase 2: Storage — Postgres + blobs** (M1) - canonical store behind a store interface
 - [ ] **Phase 3: Bus — RabbitMQ** (M1) - AMQP transport + bus client
 - [ ] **Phase 4: Ingest adapters + Gmail MCP** (M1) - containerize bridges + self-hosted Gmail MCP (OAuth2)
@@ -87,7 +87,7 @@ to the running pipeline.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 01-03-PLAN.md — Fix 3 stale doc claims (REQUIREMENTS C-9/C-13/A-5) + README apps/ path hygiene (W3) — R6
+- [x] 01-03-PLAN.md — Fix 3 stale doc claims (REQUIREMENTS C-9/C-13/A-5) + README apps/ path hygiene (W3) — R6
 
 ### Phase 2: Storage — Postgres + blobs
 

@@ -3,20 +3,29 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in-progress
-stopped_at: 01-02 COMPLETE — monorepo restructured, 83 tests green; ready for 01-03
-last_updated: "2026-06-27T20:28:16.533Z"
+stopped_at: Phase 1 COMPLETE — 01-03 done (SPEC R6 stale doc fixes); all 3 plans executed
+last_updated: "2026-06-27T20:35:00Z"
 progress:
-  total_phases: 13
-  completed_phases: 0
+  total_phases: 14
+  completed_phases: 1
   total_plans: 10
-  completed_plans: 8
-  percent: 0
+  completed_plans: 9
+  percent: 7
 ---
 
 # STATE — InfoTriage
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-06-27 — Phase 1 COMPLETE (01-03 stale doc fixes, SPEC R6)
+
+### Just-completed
+
+- **01-03-PLAN.md (Stale doc fixes, SPEC R6)**: Corrected three stale claims in REQUIREMENTS.md (C-9 yt_to_atom: "scaffolded" → "implemented" + apps/ingest/ path; C-13 imap_to_atom: same; A-5 PMESII: [PLANNED] → [LIVE] with Phase 1.5 archive ref) and updated README.md run-commands + Bridges section to use apps/triage/, apps/ingest/, apps/opml/ paths from plan 01-02 restructure. Commits b9a1606 (REQUIREMENTS.md), 70e5a25 (README.md).
+  - Decision: A-5 set to [LIVE] — PMESII/TESSOC enrichment confirmed shipped in Phase 1.5
+  - Decision: C-9/C-13 kept [SPIKE] — runtime blockers (yt-dlp + transcribe; IMAP creds) still pending
+  - Planner-script bug noted: `grep 'opml/feeds.opml'` matches apps/opml/feeds.opml substring; spirit of check confirmed satisfied
 
 ## Session: 2026-06-27 — Phase 1 01-02 COMPLETE (monorepo restructure)
 
@@ -149,6 +158,6 @@ progress:
 
 ## Session
 
-**Last session:** 2026-06-27T20:28:16.525Z
+**Last session:** 2026-06-27T20:34:45.762Z
 **Stopped at:** Phase 1 PLANNED — 3 plans (01-01..01-03) across 3 waves, verified, ready to execute
-**Resume file:** .planning/phases/01-contracts-monorepo-skeleton/01-01-PLAN.md
+**Resume file:** None
