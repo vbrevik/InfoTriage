@@ -38,7 +38,7 @@ import os, sys, json, email, imaplib, datetime
 from email.header import decode_header
 from _util import escape
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT_DIR = os.path.join(ROOT, "data", "feeds")
 
 def load_dotenv(path):

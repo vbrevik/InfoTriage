@@ -37,7 +37,7 @@ Notes:
 import os, sys, json, shutil, subprocess, tempfile, datetime, re
 from _util import escape
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT_DIR = os.path.join(ROOT, "data", "feeds")
 
 def slug(s):
