@@ -69,7 +69,10 @@ to the running pipeline.
   3. A frontmatter⇆JSONB codec and a transport-swappable bus-client interface exist.
   4. Repo restructured into `apps/` + `libs/`; existing scripts import from contracts; 56 tests still pass.
   5. Three stale doc claims fixed (imap/yt not "scaffolded"; PMESII/TESSOC done; `.env.example` exists).
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 01-01-PLAN.md — libs/contracts package: Item, 4 event schemas, PyYAML codec, Protocol bus + in-memory impl, contracts tests (W1) — R1-R4
+- [ ] 01-02-PLAN.md — Monorepo re-root into apps/+libs/: re-home scripts with exhaustive path-depth fixes, root pytest config, Item import wiring, migrate 6 tests to pytest (W2) — R5
+- [ ] 01-03-PLAN.md — Fix 3 stale doc claims (REQUIREMENTS C-9/C-13/A-5) + README apps/ path hygiene (W3) — R6
 
 ### Phase 2: Storage — Postgres + blobs
 **Goal**: Postgres is the single canonical store; SQLite is rejected (concurrent writers).
