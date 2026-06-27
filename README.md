@@ -37,7 +37,7 @@ docker compose up -d          # FreshRSS http://localhost:8088
    build one at http://localhost:3000 (rss-bridge) and subscribe to its URL.
 3. **Email** — put your Gmail **app password** (not your real one) in `.env`, then:
    ```bash
-   python3 bridge/gmail_to_atom.py        # writes data/feeds/gmail.xml (READ-ONLY on Gmail)
+   python3 apps/ingest/gmail_to_atom.py        # writes data/feeds/gmail.xml (READ-ONLY on Gmail)
    ```
    In FreshRSS, add subscription: `http://feeds/gmail.xml`. Schedule the bridge with
    `cron`/launchd to refresh.
@@ -45,8 +45,8 @@ docker compose up -d          # FreshRSS http://localhost:8088
 ## The noise-killer (the point)
 
 ```bash
-python3 score/triage_score.py --sample          # demo against your local model
-cat items.json | python3 score/triage_score.py  # score real items
+python3 apps/triage/triage_score.py --sample          # demo against your local model
+cat items.json | python3 apps/triage/triage_score.py  # score real items
 ```
 
 Scores each item 0–10 against your interest profile (local LLMs/Mac, Claude Code,
@@ -56,8 +56,8 @@ all on qwen36, ~$0. Edit `ccir.md` to tune the dial — it's the triage brain.
 ### Fever-wired triage (the auto-hide-junk loop) — ✅ working
 
 ```bash
-python3 score/fever_triage.py --dry-run --max 20   # score real unread, change nothing
-python3 score/fever_triage.py --max 80             # also mark junk read
+python3 apps/triage/fever_triage.py --dry-run --max 20   # score real unread, change nothing
+python3 apps/triage/fever_triage.py --max 80             # also mark junk read
 ```
 
 Pulls unread from FreshRSS (Fever API), scores each with qwen36, marks score≤3 read,
@@ -67,7 +67,7 @@ everything (learned that the hard way).
 
 Polite cron (after FreshRSS refreshes at :23/:53 — run at :35):
 ```cron
-35 * * * * cd ~/projects/InfoTriage && /usr/bin/python3 score/fever_triage.py --max 120 >> data/triage.log 2>&1
+35 * * * * cd ~/projects/InfoTriage && /usr/bin/python3 apps/triage/fever_triage.py --max 120 >> data/triage.log 2>&1
 ```
 
 ### This FreshRSS instance (local throwaway)
@@ -89,26 +89,26 @@ Polite cron (after FreshRSS refreshes at :23/:53 — run at :35):
 
 ## Bridges (ingest paths)
 
-Three `bridge/` scripts write Atom feeds into `data/feeds/<name>.xml`, which the `feeds` container serves to FreshRSS at `http://feeds/<name>.xml`. All are read-only of their source.
+Three `apps/ingest/` scripts write Atom feeds into `data/feeds/<name>.xml`, which the `feeds` container serves to FreshRSS at `http://feeds/<name>.xml`. All are read-only of their source.
 
-- **`bridge/gmail_to_atom.py`** — single-account Gmail (IMAP `imap.gmail.com`, `X-GM-RAW`, Google app-password auth). Writes `data/feeds/gmail.xml`. Run on the host (not Docker) so it can reach Gmail directly.
-- **`bridge/imap_to_atom.py`** — multi-IMAP mailboxes (Gmail / Outlook / Fastmail / ProtonMail / custom-domain). One runner, per-account provider dispatch (Gmail + `googlemail.com` → `X-GM-RAW`; everyone else → standard RFC 3501 SEARCH). **Use either this OR `gmail_to_atom.py`; not both for the same Gmail account** — the default example uses `name="gmail-multi"` so the output file doesn't collide with `gmail.xml` from the legacy script.
+- **`apps/ingest/gmail_to_atom.py`** — single-account Gmail (IMAP `imap.gmail.com`, `X-GM-RAW`, Google app-password auth). Writes `data/feeds/gmail.xml`. Run on the host (not Docker) so it can reach Gmail directly.
+- **`apps/ingest/imap_to_atom.py`** — multi-IMAP mailboxes (Gmail / Outlook / Fastmail / ProtonMail / custom-domain). One runner, per-account provider dispatch (Gmail + `googlemail.com` → `X-GM-RAW`; everyone else → standard RFC 3501 SEARCH). **Use either this OR `gmail_to_atom.py`; not both for the same Gmail account** — the default example uses `name="gmail-multi"` so the output file doesn't collide with `gmail.xml` from the legacy script.
 
       Env / config:
       - `MAILBOXES='[…]'` — JSON array, set as a shell env var.
       - `.mailboxes.json` — sibling file fallback. **Plaintext IMAP creds; gitignored.**
-- **`bridge/yt_to_atom.py`** — YouTube channels → optional audio transcription → Atom feed. Default runner: `mlx_whisper` (Apple Silicon); cross-platform fallback: `whisper`. With `transcribe: false`, the script emits stub summaries so the wiring is end-to-end testable without any MLX install.
+- **`apps/ingest/yt_to_atom.py`** — YouTube channels → optional audio transcription → Atom feed. Default runner: `mlx_whisper` (Apple Silicon); cross-platform fallback: `whisper`. With `transcribe: false`, the script emits stub summaries so the wiring is end-to-end testable without any MLX install.
 
       Env / config:
       - `YT_CHANNELS='[…]'` — JSON array, set as a shell env var.
       - `.yt_channels.json` — sibling file fallback (gitignored).
       - Channel name slug is the output-filename stem (`youtube-<slug>.xml`); provide an explicit `name` if two channel URLs slug to the same string.
 
-For sites without native RSS (Forsvarets forum, FFI, NUPI, UTSYN, High North News), see [`bridge/RSS_BRIDGE_NOTES.md`](bridge/RSS_BRIDGE_NOTES.md) for how to bridge them via rss-bridge at [`http://localhost:3000`](http://localhost:3000).
+For sites without native RSS (Forsvarets forum, FFI, NUPI, UTSYN, High North News), see [`apps/ingest/RSS_BRIDGE_NOTES.md`](apps/ingest/RSS_BRIDGE_NOTES.md) for how to bridge them via rss-bridge at [`http://localhost:3000`](http://localhost:3000).
 
 ## Feeds (Norwegian + world + defense/geopolitics)
 
-`opml/feeds.opml` — ~45 feeds, all URL-verified live 2026-06-23, grouped: Norske
+`apps/opml/feeds.opml` — ~45 feeds, all URL-verified live 2026-06-23, grouped: Norske
 aviser · Offentlig Norge · Norsk forsvar & sikkerhet · Forsvar & geopolitikk (intl)
 · Verdensnyheter · Datakilder (GDELT) · Medium. Import in FreshRSS ▸ Subscription
 management ▸ Import.
