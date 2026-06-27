@@ -76,10 +76,10 @@ to the running pipeline.
   4. Repo restructured into `apps/` + `libs/`; existing scripts import from contracts; 56 tests still pass.
   5. Three stale doc claims fixed (imap/yt not "scaffolded"; PMESII/TESSOC done; `.env.example` exists).
 
-**Plans**: 3 plans
+**Plans**: 1/3 plans executed
 **Wave 1**
 
-- [ ] 01-01-PLAN.md — libs/contracts package: Item, 4 event schemas, PyYAML codec, Protocol bus + in-memory impl, contracts tests (W1) — R1-R4
+- [x] 01-01-PLAN.md — libs/contracts package: Item, 4 event schemas, PyYAML codec, Protocol bus + in-memory impl, contracts tests (W1) — R1-R4
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
