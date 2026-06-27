@@ -245,7 +245,7 @@ multilingual and already emits no/en). Scope: on-demand per-item, never eager wh
 Likely home: enrichment stage in **Phase 5** (store translated field) or render-time action in
 **Phase 6** (brief/Obsidian). Surfaced during R4 (00-05) Wiki-LLM spike, 2026-06-26.
 **Requirements:** TBD
-**Plans:** 0 plans
+**Plans:** 3/3 plans complete
 
 Plans:
 
