@@ -323,3 +323,30 @@ def test_bus_cross_routing_key_isolation():
 def test_bus_satisfies_protocol():
     """InMemoryBus structurally satisfies BusClient Protocol."""
     assert isinstance(InMemoryBus(), BusClient)
+
+
+# ---------------------------------------------------------------------------
+# Phase 1 code-review regression tests (WR-01, WR-02)
+# ---------------------------------------------------------------------------
+
+
+def test_bus_same_item_id_across_routing_keys_not_deduped():
+    """Same item_id on different routing keys must both deliver (WR-01).
+
+    The event lifecycle reuses Item.id across item.ingested -> verdict.ready,
+    so dedup must be per (routing_key, item_id), not a global item_id set.
+    """
+    bus = InMemoryBus()
+    bus.publish("item.ingested", item_id="id1", payload={"event": "ingested"})
+    bus.publish("verdict.ready", item_id="id1", payload={"event": "verdict"})  # same id, different key
+    assert bus.subscribe("item.ingested")[0]["event"] == "ingested"
+    assert bus.subscribe("verdict.ready")[0]["event"] == "verdict"
+
+
+def test_codec_value_containing_triple_dash_round_trips():
+    """A frontmatter VALUE containing '---' must not corrupt the round-trip (WR-02)."""
+    payload = {"note": "before---after", "title": "a - b --- c"}
+    text = to_frontmatter(payload)
+    result = from_frontmatter(text)
+    assert result["note"] == "before---after"
+    assert result["title"] == "a - b --- c"

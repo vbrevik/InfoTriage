@@ -36,8 +36,14 @@ def from_frontmatter(text: str) -> dict:
 
     Raises ValueError if text contains no frontmatter delimiters (---).
     Returns {} if the frontmatter block is empty (valid YAML null).
+
+    Delimiters are matched as whole lines (a leading '---' line and the next '---'
+    line), so a '---' appearing inside a frontmatter VALUE does not split the block.
     """
-    parts = text.split("---", 2)
-    if len(parts) < 3:
+    lines = text.split("\n")
+    if not lines or lines[0].strip() != "---":
         raise ValueError(f"No YAML frontmatter found in text: {text[:80]!r}")
-    return yaml.safe_load(parts[1]) or {}
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":            # closing delimiter on its own line
+            return yaml.safe_load("\n".join(lines[1:i])) or {}
+    raise ValueError(f"Unterminated YAML frontmatter in text: {text[:80]!r}")

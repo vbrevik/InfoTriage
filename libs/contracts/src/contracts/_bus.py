@@ -26,7 +26,8 @@ class BusClient(Protocol):
     """
 
     def publish(self, routing_key: str, item_id: str, payload: dict) -> None:
-        """Publish payload to routing_key. Idempotent: re-publishing same item_id is a no-op."""
+        """Publish payload to routing_key. Idempotent: re-publishing the same item_id
+        to the same routing_key is a no-op (the same item_id may flow through other keys)."""
         ...
 
     def subscribe(self, routing_key: str) -> list[dict]:
@@ -40,20 +41,23 @@ class InMemoryBus:
     Thread-safety: NOT thread-safe. Phase 1 scope only; Phase 3 replaces with
     aio-pika which handles concurrent access via asyncio event loop.
 
-    Dedup: keyed on item_id (which equals Item.id — SHA-256 of source_type+url+title).
-    A second publish with the same item_id is silently dropped.
+    Dedup: keyed on (routing_key, item_id). item_id equals Item.id — SHA-256 of
+    source_type+url+title. Re-publishing the same item_id to the SAME routing_key is
+    silently dropped, but the same item_id MAY flow through different routing keys
+    (the event lifecycle reuses Item.id across item.ingested → verdict.ready).
 
     FIFO: messages are appended to a per-routing-key list and returned in order.
     """
 
     def __init__(self) -> None:
         self._queues: dict[str, list[dict]] = {}
-        self._seen: set[str] = set()
+        self._seen: set[tuple[str, str]] = set()
 
     def publish(self, routing_key: str, item_id: str, payload: dict) -> None:
-        if item_id in self._seen:
-            return                                # dedup: same item_id → no-op
-        self._seen.add(item_id)
+        key = (routing_key, item_id)
+        if key in self._seen:
+            return                                # dedup: same (routing_key, item_id) → no-op
+        self._seen.add(key)
         self._queues.setdefault(routing_key, []).append(payload)
 
     def subscribe(self, routing_key: str) -> list[dict]:
