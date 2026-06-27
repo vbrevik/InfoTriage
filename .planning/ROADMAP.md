@@ -19,7 +19,7 @@ gate = parity with today. **M2 Fusion** (Phases 8–12) layers the north-star fe
 **Phase Numbering:** Integer phases (0–12) are planned milestone work. Decimal phases (e.g. 2.1) are
 urgent insertions. The all-local-LLM rule (ADR-004) is never revisited by a phase.
 
-- [ ] **Phase 0: Concept spike** (M1) - throwaway spike gating the unproven bits before any build
+- [x] **Phase 0: Concept spike** (M1) - throwaway spike gating the unproven bits before any build — COMPLETE (R1 GO, R2/R3/R4 PARTIAL, R5 drop-WM/build-SP-COP); ADR-005..008 written, .spike/ torn down
 - [ ] **Phase 1: Contracts + monorepo skeleton** (M1) - `libs/contracts` (Item, events, codec, bus interface)
 - [ ] **Phase 2: Storage — Postgres + blobs** (M1) - canonical store behind a store interface
 - [ ] **Phase 3: Bus — RabbitMQ** (M1) - AMQP transport + bus client
@@ -56,7 +56,7 @@ before any production build. Does NOT re-spike the already-working ingest→scor
 - [x] 00-04-PLAN.md — R3: Postgres entity resolution (pgvector cosine link, NATO merge + control split) (W2) — PARTIAL: mechanism GO, 1-lang coverage (corpus date)
 - [x] 00-05-PLAN.md — R4: Wiki-LLM feasibility (cited standing page + on-demand article on qwen36) (W3) — PARTIAL: synthesis GO; cross-lang synthesis drops ru sources
 - [x] 00-06-PLAN.md — R5: COP/World Monitor adopt/build/drop vs InfoTriage CCIR brief (W2) — DROP WM; BUILD own interactive-SAB canvas/COP (SP-COP) on open globe stack w/ InfoTriage data+CCIR
-- [~] 00-07-PLAN.md — Closeout: SPIKE-FINDINGS.md + ADR-005..008 WRITTEN (5b5ab32); teardown of .spike/ pending human go (W4)
+- [x] 00-07-PLAN.md — Closeout: SPIKE-FINDINGS.md + ADR-005..008 written; .spike/ deleted + containers down (379bb7a) (W4)
 
 ### Phase 1: Contracts + monorepo skeleton
 **Goal**: One shared contract package all apps depend on; no app imports another. No behavior change
