@@ -26,11 +26,11 @@ Grouped by the **intelligence cycle** (ADR-003) so each requirement maps to a st
 | C-6 | Open GDELT + UCDP GED event-database ingestion | `[TARGET]` | docs/RESEARCH-REPORT.md §6 ("UCDP GED + open GDELT = the free event baseline"); ADR-003 names event DBs but does not endorse the pairing |
 | C-7 | BarentsWatch Live AIS + ArcticInfo APIs (PIR-2) | `[TARGET]` | docs/ARCHITECTURE.md ADR-003 |
 | C-8 | Telegram via Telethon (account-bound, sanitized path) | `[TARGET]` | docs/RESEARCH-REPORT.md §7 |
-| C-9 | YouTube channels via yt-dlp + mlx-whisper transcription | `[SPIKE]` | bridge/yt_to_atom.py (scaffolded 2026-06-23, operator-pivot); runtime pending `yt-dlp` + a transcribe backend — docs/RESEARCH-REPORT.md §9 |
+| C-9 | YouTube channels via yt-dlp + mlx-whisper transcription | `[SPIKE]` | apps/ingest/yt_to_atom.py (implemented — XML-gen + escaping verified); runtime pending `yt-dlp` + a transcribe backend — docs/RESEARCH-REPORT.md §9 |
 | C-10 | Instagram / Facebook ingestion | `[OUT]` | docs/RESEARCH-REPORT.md — hostile to automation |
 | C-11 | ACLED event DB | `[GATED]` | EULA §7 bars training/developing AI on content; conflict with ADR-004 |
 | C-12 | X / Twitter ingestion | `[GATED]` | "skip for now or self-host Nitter as separate spike — fragile" |
-| C-13 | **Multi-mailbox IMAP ingestion** (Outlook / Fastmail / ProtonMail / custom-domain); one runner, per-account provider dispatch (Gmail → `X-GM-RAW`; everything else → standard IMAP SEARCH) | `[SPIKE]` | bridge/imap_to_atom.py (scaffolded 2026-06-23, operator-pivot); runtime pending creds per mailbox |
+| C-13 | **Multi-mailbox IMAP ingestion** (Outlook / Fastmail / ProtonMail / custom-domain); one runner, per-account provider dispatch (Gmail → `X-GM-RAW`; everything else → standard IMAP SEARCH) | `[SPIKE]` | apps/ingest/imap_to_atom.py (implemented — XML-gen + escaping verified); runtime pending creds per mailbox |
 | C-14 | **Sites-via-rss-bridge** operational notes for Norwegian defense / policy sites without native RSS (Forsvarets forum, FFI, NUPI, UTSYN, High North News). Manual workflow via rss-bridge web UI; optional CLI driver deferred >5 sites | `[LIVE]` (notes) | bridge/RSS_BRIDGE_NOTES.md; cross-ref `opml/feeds.opml` no-native-RSS block |
 
 ## Processing
@@ -52,7 +52,7 @@ Grouped by the **intelligence cycle** (ADR-003) so each requirement maps to a st
 |---|---|---|---|
 | A-1 | CCIR pre-filter: cosine article↔CCIR-def embeddings before LLM scoring | `[TARGET]` | docs/ARCHITECTURE.md Phase 3 |
 | A-2 | Event clustering: same story across outlets collapses to one cluster | `[SPIKE]` | keyword-overlap cluster() in score/digest.py — fails across languages |
-| A-5 | PMESII operational domain tagging per item (Political/Military/Economic/Social/Information/Infrastructure) | `[PLANNED]` | Phase 1.5 — enriches each scored item with one primary PMESII domain for cross-cutting SAB synthesis |
+| A-5 | PMESII operational domain tagging per item (Political/Military/Economic/Social/Information/Infrastructure) | `[LIVE]` | apps/triage/ — PMESII/TESSOC enrichment shipped in Phase 1.5 (`.planning/archive/phase-1.5-pmesii-enrichment/`) |
 | A-3 | Entity / relationship knowledge graph (STIX2-flavored) | `[TARGET]` | docs/ARCHITECTURE.md ADR-003 — OpenCTI / MISP candidate |
 | A-4 | Reliability-weighted scoring (Admiralty reliability × credibility × confidence) | `[TARGET]` | docs/ARCHITECTURE.md ADR-003 |
 
