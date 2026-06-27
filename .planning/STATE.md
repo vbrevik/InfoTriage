@@ -3,13 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in-progress
-last_updated: "2026-06-27T12:00:00Z"
+stopped_at: Phase 1 context gathered
+last_updated: "2026-06-27T17:15:49.701Z"
 progress:
   total_phases: 13
-  completed_phases: 1
+  completed_phases: 0
   total_plans: 7
-  completed_plans: 7
-  percent: 100
+  completed_plans: 6
+  percent: 0
 ---
 
 # STATE — InfoTriage
@@ -25,6 +26,7 @@ progress:
   raw numbers, R4 samples pasted inline, R3/R2 divergence note) + ADR-005..008 written. Then full
   D-06 teardown: `.spike/` deleted (3.1G incl. World Monitor clone/build), pgvector + rabbitmq
   containers/volumes removed. **Phase 0 done** (1/13 phases). Commits 5b5ab32 (artifacts), 379bb7a (teardown).
+
   - ADR-005: DROP World Monitor (+ Aegis) as engine; BUILD native SP-COP interactive-SAB canvas.
   - ADR-006: entity resolution (pgvector HNSW cosine, threshold 0.85); Phase-8 risk = re-validate on mE5-large.
   - ADR-007: RabbitMQ topology (infotriage.events + 4 keys + DLX/DLQ); Phase 3 use aio-pika.
@@ -32,6 +34,7 @@ progress:
 - **SP-COP design work** (parallel, captured): R5-VERDICT holds the full vision (LOOK/HEADLINES/FOCUS
   modes, known↔unknown + ambient↔focused axes, prior-art incl. Palantir/i2/InfraNodus/Aegis). Sketch
   001 built (winner = HEADLINES: BLUF-first, delta-default, time-aware; LOOK geo half has OSINT layers
+
   + heatmap wired to timeline). Wrapped into skill `sketch-findings-infotriage`.
 
 ### Just-completed (prior — Phase 0 R1-R5)
@@ -134,3 +137,9 @@ progress:
 
 - Q1 World Monitor CCIR/SAB coverage → **R5 spike** (still open).
 - Q5 embedding model (bge-m3 vs mE5-large) → **DECIDED: mE5-large @ 0.84** (R2, PARTIAL — recalibrate Phase 5).
+
+## Session
+
+**Last session:** 2026-06-27T17:15:49.694Z
+**Stopped at:** Phase 1 context gathered
+**Resume file:** .planning/phases/01-contracts-monorepo-skeleton/01-CONTEXT.md
