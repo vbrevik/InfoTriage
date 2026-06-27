@@ -15,7 +15,7 @@ import os, email, imaplib, datetime
 from email.header import decode_header
 from _util import escape
 
-OUT = os.path.join(os.path.dirname(__file__), "..", "data", "feeds", "gmail.xml")
+OUT = os.path.join(os.path.dirname(__file__), "..", "..", "data", "feeds", "gmail.xml")
 
 def load_dotenv(path):
     if os.path.exists(path):
@@ -54,7 +54,7 @@ def body_text(msg):
         return ""
 
 def main():
-    load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+    load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
     user = os.environ.get("GMAIL_USER")
     pw = os.environ.get("GMAIL_APP_PASSWORD")
     query = os.environ.get("GMAIL_QUERY", "newer_than:7d")

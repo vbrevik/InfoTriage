@@ -16,7 +16,7 @@ import json, os, sys, argparse, urllib.request, urllib.error
 
 # The triage brain lives in ccir.md (Commander's Critical Information Requirements).
 # Edit that file to retune — not this code.
-CCIR_PATH = os.path.join(os.path.dirname(__file__), "..", "ccir.md")
+CCIR_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "ccir.md")
 
 def load_ccir():
     try:
@@ -177,7 +177,7 @@ def main():
     ap.add_argument("--file")
     ap.add_argument("--json", action="store_true", help="emit JSON not markdown")
     args = ap.parse_args()
-    load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+    load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
 
     if args.sample:
         items = SAMPLE

@@ -17,7 +17,7 @@ import os, sys, re, json, time, hashlib, argparse, urllib.parse, urllib.request
 sys.path.insert(0, os.path.dirname(__file__))
 from triage_score import llm, score_item, load_dotenv  # noqa: E402
 
-ENV = os.path.join(os.path.dirname(__file__), "..", ".env")
+ENV = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
 
 def fever_key():
     user = os.environ["FRESHRSS_FEVER_USER"]

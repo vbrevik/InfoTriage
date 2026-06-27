@@ -20,7 +20,7 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, os.path.dirname(__file__))
 from triage_score import load_dotenv, llm  # noqa: E402
 
-ROOT = os.path.join(os.path.dirname(__file__), "..")
+ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 STORE = os.path.join(ROOT, "data", "verdicts.jsonl")
 OUT = os.path.join(ROOT, "data", "digests", "sab.html")
 OSLO = ZoneInfo("Europe/Oslo")

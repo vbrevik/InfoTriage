@@ -17,16 +17,21 @@ Covers everything that arrived SINCE your last situation update (default: yester
 import os, sys, re, json, time, argparse, datetime
 from zoneinfo import ZoneInfo
 
+from contracts import Item  # D-08: proves the contract seam resolves via editable install
+
 sys.path.insert(0, os.path.dirname(__file__))
 from triage_score import score_item, load_dotenv                 # noqa: E402
 from fever_triage import fever_key, fever, strip_html             # noqa: E402
 
-ROOT = os.path.join(os.path.dirname(__file__), "..")
+ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 OUT = os.path.join(ROOT, "data", "digests")
 STORE = os.path.join(ROOT, "data", "verdicts.jsonl")
 OSLO = ZoneInfo("Europe/Oslo")
 STOP = set("the a an of to in on for and or at by with from is are as it its this that "
            "i og å en et er på til av for som med det den de har om mot ved".split())
+
+# D-08 wiring: module-level type/marker reference — proves the editable install resolves
+__contract__ = Item
 
 # CCIR display order + titles (must match the ids the model emits from ccir.md)
 CCIR_ORDER = [
