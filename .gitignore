@@ -6,3 +6,4 @@ __pycache__/
 .mailboxes.json
 .yt_channels.json
 .spike/
+*.egg-info/
