@@ -56,7 +56,7 @@ before any production build. Does NOT re-spike the already-working ingest→scor
 - [x] 00-04-PLAN.md — R3: Postgres entity resolution (pgvector cosine link, NATO merge + control split) (W2) — PARTIAL: mechanism GO, 1-lang coverage (corpus date)
 - [x] 00-05-PLAN.md — R4: Wiki-LLM feasibility (cited standing page + on-demand article on qwen36) (W3) — PARTIAL: synthesis GO; cross-lang synthesis drops ru sources
 - [x] 00-06-PLAN.md — R5: COP/World Monitor adopt/build/drop vs InfoTriage CCIR brief (W2) — DROP WM; BUILD own interactive-SAB canvas/COP (SP-COP) on open globe stack w/ InfoTriage data+CCIR
-- [ ] 00-07-PLAN.md — Closeout: SPIKE-FINDINGS.md + ADR-005..008, then delete .spike/ (W4)
+- [~] 00-07-PLAN.md — Closeout: SPIKE-FINDINGS.md + ADR-005..008 WRITTEN (5b5ab32); teardown of .spike/ pending human go (W4)
 
 ### Phase 1: Contracts + monorepo skeleton
 **Goal**: One shared contract package all apps depend on; no app imports another. No behavior change
