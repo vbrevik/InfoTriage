@@ -111,6 +111,20 @@ research. Closest references:
 - **Calm technology / ambient analytics.** Info in the attentional periphery, glanceable, pre-attentive,
   progressive disclosure ("show more only as curiosity increases") — the design language for **LOOK/ambient**
   mode. Caveat from the literature: ambient news can become an anxiety trigger; design for calm, not a feed.
+- **Aegis (`github.com/FNBIP/aegis-osint-map`, research 2026-06-27).** A World-Monitor-lineage platform
+  (same Country Instability Index DNA) pushed toward OSINT. **Same drop-as-engine conclusion** — it is
+  *more* cloud-locked than WM (intelligence core = **Valyu API** cloud + optional OpenAI, **no local-LLM
+  path**; **Mapbox GL** commercial/token-gated; Next.js 16/Vercel) → conflicts with ADR-004. But three
+  concrete **concept** borrows beyond WM:
+  - **Intel Dossiers / Deep Research exports** — ~50-page actor reports + **CSV/PPTX/PDF** on any
+    nation/militia/PMC/figure. Validates the FOCUS **launchpad** (dig-in→RAG/Wiki-LLM) AND **presentation
+    mode** — InfoTriage does this locally (qwen/oMLX) instead of Valyu.
+  - **OSINT geo-asset layers** — submarine cables (active/damaged), pipelines, military bases, live flights
+    (OpenSky), AIS vessels, satellites, nuclear sites. These map **directly onto the operator's CCIR**:
+    PIR-4 (kabler/energinett/LNG infrastructure) and PIR-2 (Arctic/nordområdene). Strong borrow for the geo half.
+  - **Command Palette (Cmd+K)** + 7-day event-density timeline bar — fast focused navigation + the scrubber.
+  - Still **no entity network / knowledge graph** (only entity *location* markers) and no CCIR doctrine —
+    InfoTriage's R3 entity-link network half + CCIR/CNR remain the differentiators vs both WM and Aegis.
 
 ### SP-COP design inspiration — Palantir Gotham / Semantica (research 2026-06-26)
 
