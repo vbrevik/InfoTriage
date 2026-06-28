@@ -1,19 +1,23 @@
 """store — InfoTriage persistence layer.
 
-Exports the public API of the store package. PostgresStore is intentionally
-not exported here — it is added by plan 03 when _postgres.py exists.
+Exports the public API of the store package:
+    Store       — @runtime_checkable typing.Protocol (R5)
+    InMemoryStore — dict-backed fake for tests (R5)
+    render_atom — pull-on-demand Atom projection, RSS/YT only (R7, D-04)
 
-render_atom is added by Task 3 of this plan when _atom.py is authored.
+PostgresStore is intentionally not exported here — it is added by plan 03
+when _postgres.py exists.
 
 Usage:
     from store import Store, InMemoryStore, render_atom
 """
+from ._atom import render_atom
 from ._inmemory import InMemoryStore
 from ._protocol import Store
 
 __all__ = [
     "Store",
     "InMemoryStore",
-    # render_atom: added by Task 3 (_atom.py)
+    "render_atom",
     # PostgresStore: added by plan 03 (_postgres.py)
 ]
