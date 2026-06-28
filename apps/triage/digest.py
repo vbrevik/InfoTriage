@@ -14,10 +14,12 @@ Covers everything that arrived SINCE your last situation update (default: yester
   python3 score/digest.py --since "2026-06-22 16:00"   # explicit cutoff (Oslo)
   python3 score/digest.py --hours 18                    # or a rolling window
 """
-import os, sys, re, json, time, argparse, datetime
+import os, sys, re, time, argparse, datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from contracts import Item  # D-08: proves the contract seam resolves via editable install
+from store import PostgresStore
 
 sys.path.insert(0, os.path.dirname(__file__))
 from triage_score import score_item, load_dotenv                 # noqa: E402
@@ -25,7 +27,6 @@ from fever_triage import fever_key, fever, strip_html             # noqa: E402
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 OUT = os.path.join(ROOT, "data", "digests")
-STORE = os.path.join(ROOT, "data", "verdicts.jsonl")
 OSLO = ZoneInfo("Europe/Oslo")
 STOP = set("the a an of to in on for and or at by with from is are as it its this that "
            "i og å en et er på til av for som med det den de har om mot ved".split())
@@ -114,11 +115,35 @@ def fetch_window(cutoff_epoch, hardcap):
             print(f"  …scored {n}/{len(items)}", file=sys.stderr, flush=True)
     return out
 
-def persist(verdicts):
-    os.makedirs(os.path.dirname(STORE), exist_ok=True)
-    with open(STORE, "a") as f:
-        for v in verdicts:
-            f.write(json.dumps(v) + "\n")
+def map_verdict_to_item(v: dict) -> Item:
+    """Map a scored verdict dict from fetch_window to a contracts.Item.
+
+    Core fields land in Item columns; all score/enrichment metadata goes into
+    Item.payload (R6, D-02). Source type is always "rss" — digest pulls from
+    FreshRSS/Fever. Language defaults to "no" (Norwegian-primary corpus).
+    """
+    ts = datetime.datetime.fromtimestamp(v.get("t", 0), tz=datetime.timezone.utc)
+    payload = {
+        "ccir": v.get("ccir"),
+        "cnr": v.get("cnr"),
+        "pmesii": v.get("pmesii"),
+        "tessoc": v.get("tessoc"),
+        "score": v.get("score"),
+        "why": v.get("why"),
+        "bucket": v.get("bucket"),
+        "fever_id": v.get("id"),
+    }
+    return Item(
+        source=v["source"],
+        source_type="rss",
+        url=v.get("url", ""),
+        title=v["title"],
+        ts=ts,
+        lang="no",
+        summary=v.get("summary"),
+        body_ref=None,
+        payload=payload,
+    )
 
 def keywords(title):
     return {w for w in re.findall(r"[a-zA-ZæøåÆØÅ0-9]{4,}", (title or "").lower()) if w not in STOP}
@@ -345,7 +370,14 @@ def main():
     print(f"window: {period}", file=sys.stderr)
 
     verdicts = fetch_window(int(cutoff.timestamp()), args.max)
-    persist(verdicts)
+
+    dsn = os.environ["INFOTRIAGE_PG_DSN"]
+    blob_root = Path(os.path.join(ROOT, "data", "blobs"))
+    with PostgresStore(dsn=dsn, blob_root=blob_root) as store:
+        store.init_schema()
+        for v in verdicts:
+            store.put_item(map_verdict_to_item(v))
+
     os.makedirs(OUT, exist_ok=True)
 
     writers = {"brief": write_brief, "cluster": write_cluster, "list": write_list, "bluf": write_bluf}
