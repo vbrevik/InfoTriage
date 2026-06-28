@@ -101,11 +101,11 @@ to the running pipeline.
   3. A single `store` interface mediates all reads/writes; existing scripts go through it.
   4. Atom-projection writer for FreshRSS lives behind the same interface.
 
-**Plans**: 4 plans
+**Plans**: 1/4 plans executed
 
 **Wave 1**
 
-- [ ] 02-01-PLAN.md — Scaffold libs/store package + versioned SQL DDL (7 tables, pgvector HNSW) + docker postgres :22000 (W1) — ADR-001
+- [x] 02-01-PLAN.md — Scaffold libs/store package + versioned SQL DDL (7 tables, pgvector HNSW) + docker postgres :22000 (W1) — ADR-001
 
 **Wave 2** *(blocked on Wave 1)*
 
