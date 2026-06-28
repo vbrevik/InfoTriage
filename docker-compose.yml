@@ -49,11 +49,11 @@ services:
     container_name: infotriage-postgres
     restart: unless-stopped
     ports:
-      - "22000:5432"        # :22000 on host → container 5432
+      - "127.0.0.1:22000:5432"   # localhost-only; host :22000 → container 5432
     environment:
       POSTGRES_DB: infotriage
       POSTGRES_USER: infotriage
-      POSTGRES_PASSWORD: infotriage_dev   # dev-only default; not a secret
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-infotriage_dev}   # dev default; override via env/.env
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
