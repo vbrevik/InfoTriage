@@ -1,3 +1,6 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["apps/triage", "apps/opml", "apps/ingest"]
+markers = [
+    "db_live: requires Postgres :22000 to be running",
+]
