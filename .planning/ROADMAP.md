@@ -101,7 +101,23 @@ to the running pipeline.
   3. A single `store` interface mediates all reads/writes; existing scripts go through it.
   4. Atom-projection writer for FreshRSS lives behind the same interface.
 
-**Plans**: TBD
+**Plans**: 4 plans
+
+**Wave 1**
+
+- [ ] 02-01-PLAN.md — Scaffold libs/store package + versioned SQL DDL (7 tables, pgvector HNSW) + docker postgres :22000 (W1) — ADR-001
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 02-02-PLAN.md — Pure-Python store core: blob store, Store Protocol, InMemoryStore, Atom projection + unit tests (W2) — ADR-001
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 02-03-PLAN.md — PostgresStore (psycopg3+pgvector) + [BLOCKING] live schema apply + integration tests (cosine threshold, 1024-dim) (W3) — ADR-001
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 02-04-PLAN.md — Retrofit digest.py persistence onto the store (no backfill) + full-suite green (W4) — ADR-001
 
 ### Phase 3: Bus — RabbitMQ
 
