@@ -91,12 +91,21 @@ def store(request, tmp_path):
         # Lazy import — PostgresStore does not exist until plan 03.
         # This branch is only reached when db_live passes (Postgres is up).
         import os as _os
+        import psycopg as _psycopg
         from store import PostgresStore  # noqa: PLC0415
 
         dsn = _os.environ.get(
             "INFOTRIAGE_PG_DSN",
             "postgresql://infotriage:infotriage_dev@localhost:22000/infotriage",
         )
+        # Truncate test-data tables before each test for isolation.
+        # CASCADE handles FK-dependent tables (entity_links, embeddings, etc.).
+        with _psycopg.connect(dsn, autocommit=True) as _setup:
+            _setup.execute(
+                "TRUNCATE infotriage.entity_links, infotriage.embeddings, "
+                "infotriage.enrichment, infotriage.ccir, infotriage.audit, "
+                "infotriage.articles, infotriage.entities RESTART IDENTITY"
+            )
         with PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs") as s:
             s.init_schema()
             yield s

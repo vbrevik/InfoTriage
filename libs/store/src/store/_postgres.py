@@ -96,10 +96,13 @@ class PostgresStore:
         """
         sql_dir = Path(__file__).parent.parent.parent / "sql"
         # Autocommit DDL connection — separate from the main transaction connection.
+        # register_vector is called AFTER the SQL files so that the vector extension
+        # exists when we register its type adapter (fails on fresh DB if called before
+        # CREATE EXTENSION runs — Rule 1 fix from PATTERNS.md ordering).
         with psycopg.connect(self._dsn, autocommit=True) as ddl_conn:
-            register_vector(ddl_conn)
             for sql_file in sorted(sql_dir.glob("*.sql")):
                 ddl_conn.execute(sql_file.read_text())
+            register_vector(ddl_conn)  # after extension is created/confirmed
 
     # -------------------------------------------------------------------------
     # Item CRUD (R5)
