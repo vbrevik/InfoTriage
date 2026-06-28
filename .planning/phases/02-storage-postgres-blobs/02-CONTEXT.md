@@ -76,6 +76,21 @@ duplicated here.
 - **D-04b:** Render Atom via **feedgen** (already the project's Atom dependency, NF-8) — reuse, do
   not hand-roll XML.
 
+### Vector-retrieval correctness (ai-integration consideration, 2026-06-28)
+- **D-05:** Phase 2 stores/queries vectors but builds **no AI behavior** (no embedding generation,
+  no LLM, no RAG — those are P5/P8). Decision: instead of a separate AI-SPEC, the plan MUST carry
+  explicit **vector-retrieval-correctness** checks as `must_haves` so the pgvector surface is
+  planned/verified as a retrieval component, not a dumb column.
+- **D-05a:** `embeddings.embedding` and `entities.embedding` are `vector(1024)`; the **1024 dim
+  MUST match the embedder contract** (mE5-large, 1024-d). A dim mismatch is a silent retrieval
+  break — a test asserts the column type/dimension.
+- **D-05b:** The entity-link / similarity query uses `1 - (embedding <=> %s) >= 0.85` (inclusive)
+  over an HNSW index (`m=16, ef_construction=64, vector_cosine_ops`) — the locked retrieval
+  contract. A smoke test inserts known vectors and asserts neighbor behavior against the
+  R3-VERDICT calibration (NATO ~0.92 pair merges; Trump/Putin ~0.72 pair does **not**).
+- **D-05c:** Embedding generation stays out of scope — tests supply vectors directly (fixtures);
+  no model is invoked in Phase 2.
+
 ### Claude's Discretion (defaults the planner/researcher may refine)
 - **DD-1:** Realize the "InfoTriage schema" as an actual Postgres `CREATE SCHEMA infotriage`
   (unquoted → lowercase) with `search_path`, rather than a name-prefix on `public` tables.
