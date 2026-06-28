@@ -4,12 +4,12 @@ milestone: v1.0
 milestone_name: milestone
 status: Ready to plan
 stopped_at: Phase 2 context gathered
-last_updated: "2026-06-28T18:44:13.500Z"
+last_updated: "2026-06-28T19:06:01.444Z"
 progress:
   total_phases: 13
   completed_phases: 1
   total_plans: 14
-  completed_plans: 11
+  completed_plans: 12
   percent: 8
 ---
 
@@ -158,7 +158,7 @@ progress:
 
 ## Session
 
-**Last session:** 2026-06-28T18:44:13.492Z
+**Last session:** 2026-06-28T19:05:56.533Z
 **Stopped at:** Phase 2 context gathered
 **Resume file:** .planning/phases/02-storage-postgres-blobs/02-CONTEXT.md
 
@@ -167,3 +167,9 @@ progress:
 | Phase | Plan | Duration | Notes |
 |-------|------|----------|-------|
 | Phase 02 P01 | 10 | 3 tasks | 10 files |
+| Phase 02 P03 | 732 | 3 tasks | 4 files |
+
+## Decisions
+
+- [Phase ?]: register_vector in init_schema must run AFTER DDL
+- [Phase ?]: postgres fixture requires TRUNCATE before each test for isolation

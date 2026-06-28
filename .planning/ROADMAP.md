@@ -101,7 +101,7 @@ to the running pipeline.
   3. A single `store` interface mediates all reads/writes; existing scripts go through it.
   4. Atom-projection writer for FreshRSS lives behind the same interface.
 
-**Plans**: 2/4 plans executed
+**Plans**: 3/4 plans executed
 
 **Wave 1**
 
@@ -113,7 +113,7 @@ to the running pipeline.
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 02-03-PLAN.md — PostgresStore (psycopg3+pgvector) + [BLOCKING] live schema apply + integration tests (cosine threshold, 1024-dim) (W3) — ADR-001
+- [x] 02-03-PLAN.md — PostgresStore (psycopg3+pgvector) + [BLOCKING] live schema apply + integration tests (cosine threshold, 1024-dim) (W3) — ADR-001
 
 **Wave 4** *(blocked on Wave 3)*
 
