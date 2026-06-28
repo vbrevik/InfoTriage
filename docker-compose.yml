@@ -41,6 +41,28 @@ services:
       - ./data/feeds:/web:ro
     networks: [infotriage]
 
+  # Postgres 16 + pgvector for Phase 2+ storage.
+  # Dev-only password here — production loads DSN from .env via INFOTRIAGE_PG_DSN (D-03, NF-6).
+  # .env is gitignored and never committed.
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: infotriage-postgres
+    restart: unless-stopped
+    ports:
+      - "22000:5432"        # :22000 on host → container 5432
+    environment:
+      POSTGRES_DB: infotriage
+      POSTGRES_USER: infotriage
+      POSTGRES_PASSWORD: infotriage_dev   # dev-only default; not a secret
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U infotriage"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [infotriage]
+
 networks:
   infotriage:
     name: infotriage
