@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to plan
-stopped_at: Phase 2 context gathered
+stopped_at: Phase 2 COMPLETE — storage shipped (Postgres+blobs, store interface live)
 last_updated: "2026-06-28T19:19:28.083Z"
 progress:
   total_phases: 13
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 14
   completed_plans: 13
-  percent: 15
+  percent: 23
 ---
 
 # STATE — InfoTriage
