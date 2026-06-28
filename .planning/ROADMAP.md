@@ -101,7 +101,7 @@ to the running pipeline.
   3. A single `store` interface mediates all reads/writes; existing scripts go through it.
   4. Atom-projection writer for FreshRSS lives behind the same interface.
 
-**Plans**: 1/4 plans executed
+**Plans**: 2/4 plans executed
 
 **Wave 1**
 
@@ -109,7 +109,7 @@ to the running pipeline.
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 02-02-PLAN.md — Pure-Python store core: blob store, Store Protocol, InMemoryStore, Atom projection + unit tests (W2) — ADR-001
+- [x] 02-02-PLAN.md — Pure-Python store core: blob store, Store Protocol, InMemoryStore, Atom projection + unit tests (W2) — ADR-001
 
 **Wave 3** *(blocked on Wave 2)*
 
