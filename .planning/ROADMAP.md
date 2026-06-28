@@ -21,7 +21,7 @@ urgent insertions. The all-local-LLM rule (ADR-004) is never revisited by a phas
 
 - [x] **Phase 0: Concept spike** (M1) - throwaway spike gating the unproven bits before any build — COMPLETE (R1 GO, R2/R3/R4 PARTIAL, R5 drop-WM/build-SP-COP); ADR-005..008 written, .spike/ torn down
 - [x] **Phase 1: Contracts + monorepo skeleton** (M1) - `libs/contracts` (Item, events, codec, bus interface) (completed 2026-06-27)
-- [ ] **Phase 2: Storage — Postgres + blobs** (M1) - canonical store behind a store interface
+- [x] **Phase 2: Storage — Postgres + blobs** (M1) - canonical store behind a store interface (completed 2026-06-28)
 - [ ] **Phase 3: Bus — RabbitMQ** (M1) - AMQP transport + bus client
 - [ ] **Phase 4: Ingest adapters + Gmail MCP** (M1) - containerize bridges + self-hosted Gmail MCP (OAuth2)
 - [ ] **Phase 5: Triage app** (M1) - event-driven scorer + pgvector dedup
@@ -101,7 +101,7 @@ to the running pipeline.
   3. A single `store` interface mediates all reads/writes; existing scripts go through it.
   4. Atom-projection writer for FreshRSS lives behind the same interface.
 
-**Plans**: 3/4 plans executed
+**Plans**: 4/4 plans complete
 
 **Wave 1**
 
@@ -117,7 +117,7 @@ to the running pipeline.
 
 **Wave 4** *(blocked on Wave 3)*
 
-- [ ] 02-04-PLAN.md — Retrofit digest.py persistence onto the store (no backfill) + full-suite green (W4) — ADR-001
+- [x] 02-04-PLAN.md — Retrofit digest.py persistence onto the store (no backfill) + full-suite green (W4) — ADR-001
 
 ### Phase 3: Bus — RabbitMQ
 
