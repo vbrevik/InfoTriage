@@ -1,7 +1,7 @@
 ---
 phase: 04-ingest-adapters-gmail-mcp
 verified: 2026-06-29T12:53:16Z
-status: human_needed
+status: passed
 score: 26/26 must-haves verified
 behavior_unverified: 0
 overrides_applied: 0
@@ -34,7 +34,7 @@ human_verification:
 
 **Phase Goal:** Containerize all four ingest adapters (IMAP, YouTube, Obsidian, Gmail-via-MCP) using a shared ingest_common library, wire them into docker-compose with a cron scheduler, and retire the legacy gmail_to_atom.py.
 **Verified:** 2026-06-29T12:53:16Z
-**Status:** human_needed
+**Status:** passed
 **Re-verification:** No — initial verification
 
 ## Goal Achievement

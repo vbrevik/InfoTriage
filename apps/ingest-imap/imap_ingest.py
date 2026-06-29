@@ -27,8 +27,9 @@ import email
 import imaplib
 import json
 import os
+import re
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.header import decode_header
 
 from contracts import Item
@@ -72,12 +73,21 @@ def connect(host: str, user: str, pw: str) -> imaplib.IMAP4_SSL:
     return imap
 
 
+def _imap_date(query: str) -> str:
+    """Expand 'since Nd' shorthand to a proper IMAP SEARCH criterion (SINCE DD-Mon-YYYY)."""
+    m = re.fullmatch(r"since\s+(\d+)d", query.strip(), re.IGNORECASE)
+    if m:
+        since = datetime.now(tz=timezone.utc) - timedelta(days=int(m.group(1)))
+        return f"SINCE {since.strftime('%d-%b-%Y')}"
+    return query
+
+
 def search_ids(imap, query: str, provider: str) -> list:
     """Provider-aware SEARCH. Gmail uses X-GM-RAW; everything else uses standard SEARCH."""
     if provider == "gmail":
         typ, data = imap.search(None, "X-GM-RAW", f'"{query}"')
     else:
-        typ, data = imap.search(None, query)
+        typ, data = imap.search(None, _imap_date(query))
     if typ != "OK" or not data or not data[0]:
         return []
     return data[0].split()
