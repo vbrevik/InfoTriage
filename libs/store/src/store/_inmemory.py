@@ -10,13 +10,34 @@ parametrized test in tests/test_store_contract.py enforces this parity.
 Blob operations delegate to the _blob helpers against a filesystem root
 (not an in-memory dict) so the actual shard path logic is exercised in tests
 (A1 assumption confirmed: we test real paths, not a memory shortcut).
+
+Phase 5 additions (D-05, D-06, D-07):
+    - _enrichments dict: item_id → 7-field enrichment dict
+    - _embeddings dict: item_id → list[float] vector
+    - _cosine_sim: stdlib cosine similarity helper for find_near_duplicate
 """
+import math
 from pathlib import Path
+from typing import Optional
 
 from contracts import Item
 
 from ._blob import get_blob as _get_blob
 from ._blob import put_blob as _put_blob
+
+
+def _cosine_sim(a: list[float], b: list[float]) -> float:
+    """Compute cosine similarity between two equal-length float vectors using stdlib math.
+
+    Returns 0.0 for zero vectors (no division by zero). Implements D-07:
+    InMemoryStore cosine loop so worker tests need no live pgvector.
+    """
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = math.sqrt(sum(x * x for x in a))
+    norm_b = math.sqrt(sum(x * x for x in b))
+    if norm_a == 0.0 or norm_b == 0.0:
+        return 0.0
+    return dot / (norm_a * norm_b)
 
 
 class InMemoryStore:
@@ -38,6 +59,9 @@ class InMemoryStore:
     def __init__(self, blob_root: Path) -> None:
         self._items: dict[str, Item] = {}
         self._blob_root = blob_root  # blobs written to disk, not kept in memory
+        # Phase 5 state: enrichment and embedding dicts (D-05, D-07)
+        self._enrichments: dict[str, dict] = {}
+        self._embeddings: dict[str, list[float]] = {}
 
     # Context manager — no-ops; implemented for Store Protocol compliance
 
@@ -96,3 +120,60 @@ class InMemoryStore:
         Delegates to _blob.get_blob (D-01a).
         """
         return _get_blob(self._blob_root, blob_hash)
+
+    # -------------------------------------------------------------------------
+    # Enrichment persistence — D-05, R1
+    # -------------------------------------------------------------------------
+
+    def put_enrichment(self, item_id: str, fields: dict) -> None:
+        """Upsert enrichment row for item_id. Last-write-wins, no duplicate error.
+
+        Mirrors ON CONFLICT DO UPDATE semantics of PostgresStore.
+        """
+        self._enrichments[item_id] = {
+            "ccir": fields.get("ccir"),
+            "cnr": fields.get("cnr"),
+            "score": fields.get("score"),
+            "bucket": fields.get("bucket"),
+            "why": fields.get("why"),
+            "pmesii": fields.get("pmesii"),
+            "tessoc": fields.get("tessoc"),
+        }
+
+    def get_enrichment(self, item_id: str) -> Optional[dict]:
+        """Return enrichment dict for item_id, or None if absent."""
+        return self._enrichments.get(item_id)
+
+    # -------------------------------------------------------------------------
+    # Embedding dedup — D-05, D-06, D-07
+    # -------------------------------------------------------------------------
+
+    def put_embedding(self, item_id: str, vector: list[float]) -> None:
+        """Upsert embedding vector for item_id. Last-write-wins, no duplicate error.
+
+        Mirrors ON CONFLICT DO UPDATE semantics of PostgresStore.
+        """
+        self._embeddings[item_id] = list(vector)
+
+    def find_near_duplicate(
+        self,
+        vector: list[float],
+        window_days: int = 7,
+        threshold: float = 0.84,
+    ) -> Optional[str]:
+        """Return item_id of nearest stored embedding with cosine_sim >= threshold, or None.
+
+        InMemoryStore implementation (D-07): iterates all stored vectors using stdlib
+        _cosine_sim helper. window_days is ignored (no timestamps in the fake).
+        Returns None when no embeddings are stored (first article is never a false positive).
+        """
+        best_id: Optional[str] = None
+        best_sim: float = -1.0
+        for stored_id, stored_vec in self._embeddings.items():
+            sim = _cosine_sim(vector, stored_vec)
+            if sim > best_sim:
+                best_sim = sim
+                best_id = stored_id
+        if best_sim >= threshold:
+            return best_id
+        return None

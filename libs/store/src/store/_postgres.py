@@ -276,3 +276,131 @@ class PostgresStore:
             FileNotFoundError: if no blob with that hash has been stored.
         """
         return _get_blob(self._blob_root, blob_hash)
+
+    # -------------------------------------------------------------------------
+    # Enrichment persistence — D-05, R1
+    # -------------------------------------------------------------------------
+
+    def put_enrichment(self, item_id: str, fields: dict) -> None:
+        """Upsert enrichment row for item_id. ON CONFLICT DO UPDATE all 7 columns.
+
+        Idempotent: ON CONFLICT (item_id) backed by enrichment_item_id_unique index
+        (006-enrichment.sql). Second write updates the same row in place.
+        Security (V5/T-05-01): all values via %s bind params — never f-string SQL.
+        """
+        assert self._conn is not None, (
+            "PostgresStore must be used as a context manager: "
+            "'with PostgresStore(...) as store:'"
+        )
+        self._conn.execute(
+            """
+            INSERT INTO infotriage.enrichment
+                (item_id, ccir, cnr, score, bucket, why, pmesii, tessoc)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (item_id) DO UPDATE SET
+                ccir   = EXCLUDED.ccir,
+                cnr    = EXCLUDED.cnr,
+                score  = EXCLUDED.score,
+                bucket = EXCLUDED.bucket,
+                why    = EXCLUDED.why,
+                pmesii = EXCLUDED.pmesii,
+                tessoc = EXCLUDED.tessoc
+            """,
+            (
+                item_id,
+                fields.get("ccir"),
+                fields.get("cnr"),
+                fields.get("score"),
+                fields.get("bucket"),
+                fields.get("why"),
+                fields.get("pmesii"),
+                fields.get("tessoc"),
+            ),
+        )
+        self._conn.commit()
+
+    def get_enrichment(self, item_id: str) -> "dict | None":
+        """Return enrichment dict for item_id, or None if absent."""
+        assert self._conn is not None, (
+            "PostgresStore must be used as a context manager"
+        )
+        row = self._conn.execute(
+            """
+            SELECT ccir, cnr, score, bucket, why, pmesii, tessoc
+            FROM infotriage.enrichment
+            WHERE item_id = %s
+            """,
+            (item_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            "ccir": row["ccir"],
+            "cnr": row["cnr"],
+            "score": row["score"],
+            "bucket": row["bucket"],
+            "why": row["why"],
+            "pmesii": row["pmesii"],
+            "tessoc": row["tessoc"],
+        }
+
+    # -------------------------------------------------------------------------
+    # Embedding dedup — D-05, D-06, R4
+    # -------------------------------------------------------------------------
+
+    def put_embedding(self, item_id: str, vector: list[float]) -> None:
+        """Upsert embedding vector for item_id into infotriage.embeddings.
+
+        Idempotent: ON CONFLICT (item_id) backed by embeddings_item_id_unique index
+        (006-enrichment.sql). Second write updates the stored vector in place.
+        Security (V5/T-05-01): all values via %s bind params; vector never interpolated.
+        """
+        assert self._conn is not None, (
+            "PostgresStore must be used as a context manager"
+        )
+        model = "intfloat/multilingual-e5-large"
+        self._conn.execute(
+            """
+            INSERT INTO infotriage.embeddings (item_id, embedding, model)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (item_id) DO UPDATE SET
+                embedding = EXCLUDED.embedding,
+                model     = EXCLUDED.model
+            """,
+            (item_id, vector, model),
+        )
+        self._conn.commit()
+
+    def find_near_duplicate(
+        self,
+        vector: list[float],
+        window_days: int = 7,
+        threshold: float = 0.84,
+    ) -> "str | None":
+        """Return item_id of nearest embedding within cosine threshold and time window.
+
+        Uses the pgvector <=> cosine distance operator (NOT <-> which is L2) against
+        the HNSW cosine index on infotriage.embeddings (003-vectors.sql, ADR-006).
+        register_vector() is already called in __enter__ so the type adapter is ready.
+        Security (V5/T-05-01): vector and interval bound as parameters — never f-string SQL.
+
+        cosine_distance = 1 - cosine_similarity, so threshold 0.84 → distance < 0.16.
+        """
+        assert self._conn is not None, (
+            "PostgresStore must be used as a context manager"
+        )
+        # INTERVAL %s is invalid Postgres syntax; CAST(%s AS interval) is the correct
+        # parameterized form. The string "7 days" is a valid interval literal.
+        row = self._conn.execute(
+            """
+            SELECT item_id, (embedding <=> %s::vector) AS dist
+            FROM infotriage.embeddings
+            WHERE created_at >= NOW() - CAST(%s AS interval)
+            ORDER BY embedding <=> %s::vector
+            LIMIT 1
+            """,
+            (vector, f"{window_days} days", vector),
+        ).fetchone()
+        if row is not None and row["dist"] < (1.0 - threshold):
+            return row["item_id"]
+        return None
