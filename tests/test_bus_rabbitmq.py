@@ -82,6 +82,33 @@ async def _fresh_bus() -> RabbitMQBus:
 
 
 # ---------------------------------------------------------------------------
+# Test 0: Publisher confirms enabled after connection (R2.AC3)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.rabbitmq
+def test_publisher_confirms_enabled() -> None:
+    """After _ensure_connection(), channel must have publisher confirms active (R2.AC3).
+
+    aio-pika enables confirms via channel.confirm_delivery(). The channel exposes
+    this via _publisher_confirms == True on the underlying channel implementation.
+    """
+    _skip_if_unavailable()
+
+    async def _check() -> None:
+        bus = await _fresh_bus()
+        try:
+            assert bus._channel is not None, "_channel is None after _ensure_connection()"
+            # aio-pika RobustChannel sets _publisher_confirms = True after confirm_delivery()
+            assert bus._channel.publisher_confirms is True, (
+                f"Publisher confirms not enabled — publisher_confirms={bus._channel.publisher_confirms!r}"
+            )
+        finally:
+            await bus.close()
+
+    asyncio.run(_check())
+
+
+# ---------------------------------------------------------------------------
 # Test 1: Connectivity + topology check (R1)
 # ---------------------------------------------------------------------------
 

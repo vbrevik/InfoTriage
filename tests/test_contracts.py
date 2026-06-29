@@ -7,7 +7,7 @@ import zoneinfo
 import pytest
 from contracts import Item, ItemIngested, VerdictReady, SabPublished, FeedUnhealthy
 from contracts import to_frontmatter, from_frontmatter
-from contracts import BusClient, InMemoryBus
+from contracts import BusClient, InMemoryBus, RabbitMQBus
 from pydantic import ValidationError
 
 TS = datetime.datetime(2026, 6, 27, 10, 0, 0, tzinfo=datetime.timezone.utc)
@@ -327,6 +327,11 @@ async def test_bus_cross_routing_key_isolation():
 def test_bus_satisfies_protocol():
     """InMemoryBus structurally satisfies BusClient Protocol."""
     assert isinstance(InMemoryBus(), BusClient)
+
+
+def test_rabbitmq_bus_protocol():
+    """RabbitMQBus structurally satisfies BusClient Protocol (ADR-007)."""
+    assert isinstance(RabbitMQBus(), BusClient)
 
 
 # ---------------------------------------------------------------------------
