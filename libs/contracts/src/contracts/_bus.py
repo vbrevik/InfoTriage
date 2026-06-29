@@ -63,3 +63,7 @@ class InMemoryBus:
 
     async def subscribe(self, routing_key: str) -> list[dict]:
         return list(self._queues.get(routing_key, []))  # empty queue → [] (no-op)
+
+    async def close(self) -> None:
+        """No-op close — completes the BusClient interface used by ingest adapters."""
+        pass
