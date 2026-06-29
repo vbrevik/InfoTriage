@@ -144,11 +144,11 @@ to the running pipeline.
   3. `ingest-gmail` is a thin MCP client → self-hosted Gmail MCP server (:22025, own OAuth2 token, headless-safe); legacy IMAP `gmail_to_atom.py` retired.
   4. Email is triage-only (no FreshRSS projection); RSS/YouTube get an Atom projection → FreshRSS (:22010).
 
-**Plans**: 6 plans
+**Plans**: 1/6 plans executed
 
 **Wave 1**
 
-- [ ] 04-01-PLAN.md — libs/ingest_common foundation: idempotent persist_and_publish (get_item pre-check), FastAPI POST /run single-instance-lock app factory, env-driven store/bus construction + idempotency (R6) & lock (D-01) tests (W1) — ADR-003, ADR-004
+- [x] 04-01-PLAN.md — libs/ingest_common foundation: idempotent persist_and_publish (get_item pre-check), FastAPI POST /run single-instance-lock app factory, env-driven store/bus construction + idempotency (R6) & lock (D-01) tests (W1) — ADR-003, ADR-004
 
 **Wave 2** *(blocked on Wave 1; parallel — no file overlap)*
 
