@@ -1,50 +1,64 @@
 ---
-status: resolved
+status: complete
 phase: 03-bus-rabbitmq
-source: [03-VERIFICATION.md]
-started: 2026-06-29T08:25:00Z
-updated: 2026-06-29T08:40:00Z
+source: [03-SUMMARY.md]
+started: 2026-06-29T10:55:00Z
+updated: 2026-06-29T10:58:00Z
 ---
 
 ## Current Test
 
-(all resolved)
+[testing complete]
 
 ## Tests
 
-### 1. Async/sync Protocol mismatch — BusClient interchangeability
-
+### 1. Cold Start Smoke Test
 expected: |
-  RabbitMQBus is a drop-in for InMemoryBus at a `bus: BusClient`-typed call site.
-  Both implementations use async def — callers always await, identical return types.
-result: resolved
+  Kill any running stack (docker compose down). Start fresh (docker compose up -d rabbitmq).
+  RabbitMQ boots without errors, healthcheck passes (rabbitmq-diagnostics -q ping returns 0),
+  and management UI loads at http://localhost:22002 (default guest/guest login).
+result: pass
 
-**Fix applied (commit 8fb94c8):** Option (c) — BusClient Protocol updated to `async def publish/subscribe`.
-InMemoryBus updated to match. All 6 InMemoryBus tests converted to `@pytest.mark.asyncio`.
-162/162 tests pass.
-
----
-
-### 2. Publisher confirms — AMQP-level ack vs fire-and-forget
-
+### 2. RabbitMQ ports accessible
 expected: |
-  `exchange.publish()` blocks until broker acks at the AMQP layer.
-  Channel opened with `publisher_confirms=True`.
-result: resolved
+  AMQP port :22001 accepts connections (localhost-only).
+  Management UI :22002 is reachable in browser. No other ports exposed.
+result: pass
 
-**Fix applied (commit 8fb94c8):** Both `channel()` calls in `_ensure_connection()` and
-`_rebuild_topology()` now pass `publisher_confirms=True`. Docstring updated to reflect
-actual mechanism (not the incorrect "implicit" claim). 162/162 tests pass.
+### 3. Publish/consume roundtrip — all 4 event types
+expected: |
+  Running: pytest tests/test_bus_rabbitmq.py -v -m rabbitmq
+  test_publish_consume_roundtrip PASSES — all 4 routing keys (item.ingested, verdict.ready,
+  sab.published, feed.unhealthy) publish and consume correctly.
+  test_rabbitmq_available PASSES — topology declared successfully.
+result: pass
 
----
+### 4. DLQ dead-lettering
+expected: |
+  test_dlq_poison PASSES — a NACK'd message with requeue=False appears in infotriage.dlq
+  within 5 seconds. Dead-letter routing is working correctly.
+result: pass
+
+### 5. Dedup behavior
+expected: |
+  test_dedup PASSES — publishing the same (routing_key, item_id) twice results in only
+  one message in the queue (dedup keyed on composite key, matching InMemoryBus behavior).
+result: pass
+
+### 6. No regressions in existing suite
+expected: |
+  pytest tests/ -q -k "not db_live and not rabbitmq" → all pass (151+ tests green,
+  no regressions from Phase 1/2 work).
+result: pass
 
 ## Summary
 
-total: 2
-passed: 2
+total: 6
+passed: 6
 issues: 0
 pending: 0
 skipped: 0
 blocked: 0
 
 ## Gaps
+
