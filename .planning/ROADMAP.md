@@ -22,7 +22,7 @@ urgent insertions. The all-local-LLM rule (ADR-004) is never revisited by a phas
 - [x] **Phase 0: Concept spike** (M1) - throwaway spike gating the unproven bits before any build — COMPLETE (R1 GO, R2/R3/R4 PARTIAL, R5 drop-WM/build-SP-COP); ADR-005..008 written, .spike/ torn down
 - [x] **Phase 1: Contracts + monorepo skeleton** (M1) - `libs/contracts` (Item, events, codec, bus interface) (completed 2026-06-27)
 - [x] **Phase 2: Storage — Postgres + blobs** (M1) - canonical store behind a store interface (completed 2026-06-28)
-- [ ] **Phase 3: Bus — RabbitMQ** (M1) - AMQP transport + bus client
+- [x] **Phase 3: Bus — RabbitMQ** (M1) - AMQP transport + bus client (completed 2026-06-29)
 - [ ] **Phase 4: Ingest adapters + Gmail MCP** (M1) - containerize bridges + self-hosted Gmail MCP (OAuth2)
 - [ ] **Phase 5: Triage app** (M1) - event-driven scorer + pgvector dedup
 - [ ] **Phase 6: Brief app** (M1) - SAB renderer + Obsidian vault-writer
@@ -130,7 +130,7 @@ to the running pipeline.
   2. The `libs/contracts` bus client implements the interface over AMQP (exchanges + routing keys for the 4 events, acks, durable queues, DLQ).
   3. A publish/consume round-trip is smoke-tested green.
 
-**Plans**: TBD
+**Plans**: 1/1 plans complete
 
 ### Phase 4: Ingest adapters + Gmail MCP
 
@@ -264,5 +264,7 @@ Likely home: enrichment stage in **Phase 5** (store translated field) or render-
 **Plans:** 4/4 plans complete
 
 Plans:
+
+- [ ] 03-PLAN.md
 
 - [ ] TBD (promote with /gsd-review-backlog when ready)

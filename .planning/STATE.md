@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to plan
-stopped_at: Phase 2 COMPLETE — storage shipped (Postgres+blobs, store interface live)
-last_updated: "2026-06-28T19:19:28.083Z"
+stopped_at: Phase 03 COMPLETE — RabbitMQ event bus shipped (aio-pika BusClient, 4 routing keys, DLX/DLQ, 4 smoke tests green)
+last_updated: "2026-06-29T08:12:43.366Z"
 progress:
   total_phases: 13
   completed_phases: 3
-  total_plans: 14
-  completed_plans: 13
+  total_plans: 15
+  completed_plans: 14
   percent: 23
 ---
 
@@ -158,8 +158,8 @@ progress:
 
 ## Session
 
-**Last session:** 2026-06-28T19:12:43.906Z
-**Stopped at:** Phase 2 context gathered
+**Last session:** 2026-06-29T08:12:43.359Z
+**Stopped at:** Phase 03 COMPLETE — RabbitMQ event bus shipped (aio-pika BusClient, 4 routing keys, DLX/DLQ, 4 smoke tests green)
 **Resume file:** .planning/phases/02-storage-postgres-blobs/02-CONTEXT.md
 
 ## Performance Metrics
@@ -168,8 +168,12 @@ progress:
 |-------|------|----------|-------|
 | Phase 02 P01 | 10 | 3 tasks | 10 files |
 | Phase 02 P03 | 732 | 3 tasks | 4 files |
+| Phase 03 P01 | 21 | 7 tasks | 5 files |
 
 ## Decisions
 
 - [Phase ?]: register_vector in init_schema must run AFTER DDL
 - [Phase ?]: postgres fixture requires TRUNCATE before each test for isolation
+- [Phase ?]: DLX infotriage.dlx declared before primary queues (prevents 406 PRECONDITION_FAILED)
+- [Phase ?]: x-dead-letter-routing-key=dead for all primary queues routes nacked messages to infotriage.dlq
+- [Phase ?]: aio-pika async transport for RabbitMQ bus with connect_robust auto-reconnect and topology migration handler
