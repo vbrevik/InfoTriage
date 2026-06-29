@@ -9,7 +9,7 @@ Nothing leaves the machine. No paid services.
  ───────                ───────────────────          ──────────────────
  RSS / YT / Reddit ───▶ FreshRSS  :8088 ──────────▶ qwen36 via oMLX/Ollama
  websites ─ rss-bridge :3000 ─▶ (subscribe in UI)    (score → read/maybe/skip,
- Gmail ─ gmail_to_atom.py ─▶ feeds:/ ─▶ FreshRSS      mark junk read)
+ Gmail ─ ingest-gmail (MCP/OAuth2) ─▶ Postgres        mark junk read)
 ```
 
 ## Status of this spike (what's verified)
@@ -18,8 +18,7 @@ Nothing leaves the machine. No paid services.
 |-------|-------|
 | FreshRSS + rss-bridge + feeds server in Docker | ✅ up, reachable (`:8088`, `:3000`) |
 | qwen36 triage scorer vs your oMLX endpoint | ✅ tested live — correct buckets, ~3s/item |
-| Internal email-feed URL `http://feeds/gmail.xml` | ✅ verified from the network |
-| Gmail→Atom bridge | ⚠️ written, **untested** — needs your Gmail app password |
+| Gmail via OAuth2 MCP (`ingest-gmail`) | ✅ MCP path proven; replaces legacy IMAP bridge (ADR-008) |
 | Scorer → FreshRSS auto-mark-read (Fever API) | ✅ wired + tested live (verified 2026-06-23) — marks junk read, unread count drops |
 | FreshRSS provisioned headless (admin user, 44 feeds, 1642 articles) | ✅ done (see creds below) |
 
@@ -35,12 +34,9 @@ docker compose up -d          # FreshRSS http://localhost:8088
    create your admin user.
 2. **Add sources** — Subscriptions ▸ add RSS feeds directly. For a site with no feed,
    build one at http://localhost:3000 (rss-bridge) and subscribe to its URL.
-3. **Email** — put your Gmail **app password** (not your real one) in `.env`, then:
-   ```bash
-   python3 apps/ingest/gmail_to_atom.py        # writes data/feeds/gmail.xml (READ-ONLY on Gmail)
-   ```
-   In FreshRSS, add subscription: `http://feeds/gmail.xml`. Schedule the bridge with
-   `cron`/launchd to refresh.
+3. **Email** — Gmail is ingested via the `ingest-gmail` container (OAuth2/MCP path, ADR-008).
+   Run `python3 scripts/provision_gmail_oauth.py` once to obtain a refresh token, then
+   `docker compose up ingest-gmail gmail-mcp-server`.
 
 ## The noise-killer (the point)
 
@@ -84,15 +80,14 @@ Polite cron (after FreshRSS refreshes at :23/:53 — run at :35):
 | `LLM_BASE_URL` | `http://127.0.0.1:8000/v1` | oMLX (fallback). Spark: `192.168.10.2:8000/v1` |
 | `LLM_API_KEY` | `omlx` | `EMPTY` for Spark (vLLM) |
 | `LLM_MODEL` | `qwen36-ud-4bit` | any model your server lists |
-| `GMAIL_APP_PASSWORD` | — | Google app password, read-only IMAP |
-| `GMAIL_QUERY` | newsletters, 7d | Gmail search syntax |
+| `GMAIL_QUERY` | `newer_than:7d` | Gmail search syntax (used by ingest-gmail MCP adapter) |
 
 ## Bridges (ingest paths)
 
 Three `apps/ingest/` scripts write Atom feeds into `data/feeds/<name>.xml`, which the `feeds` container serves to FreshRSS at `http://feeds/<name>.xml`. All are read-only of their source.
 
-- **`apps/ingest/gmail_to_atom.py`** — single-account Gmail (IMAP `imap.gmail.com`, `X-GM-RAW`, Google app-password auth). Writes `data/feeds/gmail.xml`. Run on the host (not Docker) so it can reach Gmail directly.
-- **`apps/ingest/imap_to_atom.py`** — multi-IMAP mailboxes (Gmail / Outlook / Fastmail / ProtonMail / custom-domain). One runner, per-account provider dispatch (Gmail + `googlemail.com` → `X-GM-RAW`; everyone else → standard RFC 3501 SEARCH). **Use either this OR `gmail_to_atom.py`; not both for the same Gmail account** — the default example uses `name="gmail-multi"` so the output file doesn't collide with `gmail.xml` from the legacy script.
+- **`apps/ingest-gmail/`** — Gmail via OAuth2 MCP (`ingest-gmail` container + `gmail-mcp-server`). Provision once with `scripts/provision_gmail_oauth.py`, then start containers (ADR-008).
+- **`apps/ingest/imap_to_atom.py`** — multi-IMAP mailboxes (Outlook / Fastmail / ProtonMail / custom-domain). One runner, per-account provider dispatch via standard RFC 3501 SEARCH.
 
       Env / config:
       - `MAILBOXES='[…]'` — JSON array, set as a shell env var.

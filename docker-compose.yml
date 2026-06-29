@@ -1,6 +1,5 @@
 # infotriage — local, free info-triage hub. All on the Mac, no cloud.
-# FreshRSS = aggregator/store · rss-bridge = sites→RSS · feeds = serves the
-# Gmail→Atom file produced by bridge/gmail_to_atom.py to FreshRSS.
+# FreshRSS = aggregator/store · rss-bridge = sites→RSS · feeds = static Atom feed server.
 services:
   freshrss:
     image: freshrss/freshrss:latest
