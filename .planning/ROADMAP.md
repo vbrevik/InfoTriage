@@ -173,7 +173,24 @@ to the running pipeline.
   3. Semantic dedup uses pgvector + the dedicated embedding model, replacing keyword overlap.
   4. Shadow-run vs the old path matches, then cut over; the Fever poll is removed.
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+**Wave 1** *(parallel — no file overlap)*
+
+- [ ] 05-01-PLAN.md — Store extension: 006-enrichment.sql (unique indexes + 7 columns), put_enrichment/get_enrichment/put_embedding/find_near_duplicate on Protocol+Postgres+InMemory (W1) — R1, R4
+- [ ] 05-02-PLAN.md — Worker prerequisites: RabbitMQBus.consume() persistent consumer + triage_score.py ccir.md hot-read fix (D-02) (W1) — R2, R3, ccir.md
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 05-03-PLAN.md — Triage worker.py: item.ingested consumer, mE5-large dedup, qwen36 scoring, enrichment write, verdict.ready publish, stdlib /health (W2) — R2, R3, R4, R5, R7, ADR-004, ccir.md
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 05-04-PLAN.md — Triage container: Dockerfile + requirements.txt + docker-compose triage service (:22030) + [BLOCKING] live /health + reconnect verify (W3) — R7
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 05-05-PLAN.md — Shadow-run parity (scripts/shadow_run.py) + [BLOCKING] Fever cutover gate (>=10 matching buckets) + README retire (W4) — R6
 
 ### Phase 6: Brief app
 
