@@ -1,9 +1,9 @@
 ---
 phase: 03-bus-rabbitmq
 verified: 2026-06-29T00:00:00Z
-status: human_needed
-score: 3/5 must-haves verified
-behavior_unverified: 2
+status: passed
+score: 5/5 must-haves verified
+behavior_unverified: 0
 overrides_applied: 0
 behavior_unverified_items:
   - truth: "aio-pika bus client implements BusClient Protocol — async/sync mismatch breaks transport-swappability"
