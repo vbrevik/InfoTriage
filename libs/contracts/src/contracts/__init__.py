@@ -11,6 +11,7 @@ from ._item import Item
 from ._events import ItemIngested, VerdictReady, SabPublished, FeedUnhealthy
 from ._codec import to_frontmatter, from_frontmatter
 from ._bus import BusClient, InMemoryBus
+from ._bus_rabbitmq import RabbitMQBus
 
 __all__ = [
     "Item",
@@ -22,4 +23,5 @@ __all__ = [
     "from_frontmatter",
     "BusClient",
     "InMemoryBus",
+    "RabbitMQBus",
 ]

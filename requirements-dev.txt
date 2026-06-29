@@ -1,3 +1,4 @@
 -e ./libs/contracts
 -e ./libs/store
 pytest>=8.0
+aio-pika>=9.0

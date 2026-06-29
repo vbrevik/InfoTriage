@@ -45,7 +45,6 @@ The app-split re-architecture (ADR-006, 2026-06-24) requires an event bus to dec
 - DLQ replay mechanism (deferred beyond Phase 3)
 - RabbitMQ cluster (single broker, one Mac)
 - Auth/TLS (host-only localhost access, no external exposure)
-- Monitoring/healthcheck integration (Phase 7)
 
 ## Constraints
 

@@ -63,6 +63,22 @@ services:
       retries: 5
     networks: [infotriage]
 
+  # RabbitMQ 3.13 for Phase 3 bus messaging.
+  # Dev-only credentials — production loads from .env via INFOTRIAGE_RABBITMQ_* (NF-6).
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: infotriage-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:22001:5672"   # AMQP: localhost:22001 → container:5672
+      - "127.0.0.1:22002:15672"  # Management UI: localhost:22002 → container:15672
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-infotriage}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-infotriage_rmq}
+    volumes:
+      - ./data/rabbitmq:/var/lib/rabbitmq
+    networks: [infotriage]
+
 networks:
   infotriage:
     name: infotriage
