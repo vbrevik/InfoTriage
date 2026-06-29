@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+aio-pika
+psycopg[binary]
+pgvector
+numpy
+pydantic
+PyYAML
+httpx
