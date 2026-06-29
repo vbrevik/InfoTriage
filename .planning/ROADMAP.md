@@ -144,7 +144,7 @@ to the running pipeline.
   3. `ingest-gmail` is a thin MCP client → self-hosted Gmail MCP server (:22025, own OAuth2 token, headless-safe); legacy IMAP `gmail_to_atom.py` retired.
   4. Email is triage-only (no FreshRSS projection); RSS/YouTube get an Atom projection → FreshRSS (:22010).
 
-**Plans**: 1/6 plans executed
+**Plans**: 5/6 plans executed
 
 **Wave 1**
 
@@ -152,10 +152,10 @@ to the running pipeline.
 
 **Wave 2** *(blocked on Wave 1; parallel — no file overlap)*
 
-- [ ] 04-02-PLAN.md — ingest-imap container: containerize imap fetch → Item → Postgres+bus (no Atom), read-only; R1 + empty-mailbox backstop (W2) — ADR-003, ADR-004
-- [ ] 04-03-PLAN.md — ingest-youtube container: yt-dlp → Item+blob+bus AND Atom dual output, stub transcription only; R2 + blob-dedup + empty-channel backstops (W2) — ADR-003, ADR-004
-- [ ] 04-04-PLAN.md — ingest-obsidian container: articles-inbox/*.md → Item via codec (D-09 mapping), read-only vault; R4 + missing-field fallback (W2) — ADR-003, ADR-004
-- [ ] 04-05-PLAN.md — ingest-gmail: @shinzolabs/gmail-mcp@1.7.4 server + OAuth2 provision script (readonly+metadata) + httpx JSON-RPC client adapter → Item; retire gmail_to_atom.py; R3 + R7 (W2) — ADR-003, ADR-004, ADR-008
+- [x] 04-02-PLAN.md — ingest-imap container: containerize imap fetch → Item → Postgres+bus (no Atom), read-only; R1 + empty-mailbox backstop (W2) — ADR-003, ADR-004
+- [x] 04-03-PLAN.md — ingest-youtube container: yt-dlp → Item+blob+bus AND Atom dual output, stub transcription only; R2 + blob-dedup + empty-channel backstops (W2) — ADR-003, ADR-004
+- [x] 04-04-PLAN.md — ingest-obsidian container: articles-inbox/*.md → Item via codec (D-09 mapping), read-only vault; R4 + missing-field fallback (W2) — ADR-003, ADR-004
+- [x] 04-05-PLAN.md — ingest-gmail: @shinzolabs/gmail-mcp@1.7.4 server + OAuth2 provision script (readonly+metadata) + httpx JSON-RPC client adapter → Item; retire gmail_to_atom.py; R3 + R7 (W2) — ADR-003, ADR-004, ADR-008
 
 **Wave 3** *(blocked on Wave 2)*
 
