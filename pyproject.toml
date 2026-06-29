@@ -1,6 +1,9 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = [
+    "libs/ingest_common/src",
+    "libs/contracts/src",
+    "libs/store/src",
     "apps/triage",
     "apps/opml",
     "apps/ingest",
