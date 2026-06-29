@@ -69,11 +69,13 @@ These are not defaults — they are rules. If a future change appears to violate
 5. **The CCIR is the brain.** `ccir.md` is the taxonomy. Editing it changes triage. Editing code to change triage is wrong.
 6. **Polite polling.** GDELT ≤1 req / 5 s. Compose cadence is twice an hour at `:23,:53`. Per-feed TTLs are operator-tunable in the UI. Manual "Refresh all" is discouraged in the README.
 
-## Current verified state (audited by execution, 2026-06-24)
+## Current verified state (audited by execution, 2026-06-29)
 
 | Piece | State |
 |---|---|
-| Test suite | ✅ **56 tests pass** |
+| Test suite | ✅ **162 tests pass** (Phase 3 complete) |
+| RabbitMQ bus | ✅ **aio-pika BusClient**, 4 routing keys, DLX/DLQ, publisher confirms, smoke tests green |
+| BusClient Protocol | ✅ **async-first** — InMemoryBus + RabbitMQBus interchangeable at call site |
 | Bridges `imap_to_atom` / `yt_to_atom` | ✅ **working** (not "scaffolded") — yt live-fetched a public channel; XML-gen + escaping verified |
 | `gmail_to_atom` (IMAP + app password) | ❌ **dead end** — account 2SV ON, app passwords hard-blocked. To be retired. |
 | Gmail via OAuth2/MCP | ✅ **proven** — live MCP pull produced valid `data/feeds/gmail.xml` (20 entries), no app password. Runtime = self-hosted Gmail MCP server (P4). |
