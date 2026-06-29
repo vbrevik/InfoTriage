@@ -23,7 +23,7 @@ urgent insertions. The all-local-LLM rule (ADR-004) is never revisited by a phas
 - [x] **Phase 1: Contracts + monorepo skeleton** (M1) - `libs/contracts` (Item, events, codec, bus interface) (completed 2026-06-27)
 - [x] **Phase 2: Storage — Postgres + blobs** (M1) - canonical store behind a store interface (completed 2026-06-28)
 - [x] **Phase 3: Bus — RabbitMQ** (M1) - AMQP transport + bus client (completed 2026-06-29)
-- [ ] **Phase 4: Ingest adapters + Gmail MCP** (M1) - containerize bridges + self-hosted Gmail MCP (OAuth2)
+- [x] **Phase 4: Ingest adapters + Gmail MCP** (M1) - containerize bridges + self-hosted Gmail MCP (OAuth2) (completed 2026-06-29)
 - [ ] **Phase 5: Triage app** (M1) - event-driven scorer + pgvector dedup
 - [ ] **Phase 6: Brief app** (M1) - SAB renderer + Obsidian vault-writer
 - [ ] **Phase 7: Ops + cutover** (M1) - health, DLQ, replay, retire host path
@@ -144,7 +144,7 @@ to the running pipeline.
   3. `ingest-gmail` is a thin MCP client → self-hosted Gmail MCP server (:22025, own OAuth2 token, headless-safe); legacy IMAP `gmail_to_atom.py` retired.
   4. Email is triage-only (no FreshRSS projection); RSS/YouTube get an Atom projection → FreshRSS (:22010).
 
-**Plans**: 5/6 plans executed
+**Plans**: 6/6 plans complete
 
 **Wave 1**
 
@@ -159,7 +159,7 @@ to the running pipeline.
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 04-06-PLAN.md — scheduler container (APScheduler 3.x, 409=skip) + docker-compose 6 services (D-03 ports, localhost-only Gmail :22025, env_file, :ro vault) + .env.example; R5 (W3) — ADR-003, ADR-008
+- [x] 04-06-PLAN.md — scheduler container (APScheduler 3.x, 409=skip) + docker-compose 6 services (D-03 ports, localhost-only Gmail :22025, env_file, :ro vault) + .env.example; R5 (W3) — ADR-003, ADR-008
 
 ### Phase 5: Triage app
 
