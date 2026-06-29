@@ -1,0 +1,50 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-06-29T17:29:26.550Z",
+  "phase": "04",
+  "phase_name": "ingest-adapters-gmail-mcp",
+  "phase_dir": ".planning/phases/04-ingest-adapters-gmail-mcp",
+  "plan": "all complete",
+  "task": "UAT in progress",
+  "status": "paused",
+  "completed_tasks": [
+    {"id": "04-01", "name": "ingest_common library", "status": "done", "commit": "5292a82"},
+    {"id": "04-02", "name": "ingest-imap adapter", "status": "done"},
+    {"id": "04-03", "name": "ingest-youtube adapter", "status": "done"},
+    {"id": "04-04", "name": "ingest-obsidian adapter", "status": "done"},
+    {"id": "04-05", "name": "gmail-mcp-server + ingest-gmail", "status": "done"},
+    {"id": "04-06", "name": "scheduler + docker-compose wiring", "status": "done"},
+    {"id": "UAT-1", "name": "docker compose up --build", "status": "done"},
+    {"id": "UAT-6", "name": "409 lock behavior", "status": "done"},
+    {"id": "bug-fix", "name": "feedgen dep + gmail-mcp COPY path", "status": "done", "commit": "f1d204b"}
+  ],
+  "remaining_tasks": [
+    {"id": "UAT-2", "name": "Live IMAP run", "status": "blocked", "blocker": "Gmail IMAP auth failed — verify/regenerate app password at myaccount.google.com/apppasswords. Hover password also needed in .env MAILBOXES JSON (TODO_HOVER_PASS)."},
+    {"id": "UAT-3", "name": "Live YouTube run", "status": "blocked", "blocker": "DB table mismatch: adapter writes to 'items' but schema has 'articles'. Phase 4 schema migration needed."},
+    {"id": "UAT-4", "name": "Gmail OAuth2 provision + live run", "status": "blocked", "blocker": "Needs browser: python scripts/provision_gmail_oauth.py then add GMAIL_OAUTH2_* to .env"},
+    {"id": "UAT-5", "name": "Obsidian clip ingest", "status": "blocked", "blocker": "OBSIDIAN_VAULT_PATH not set in .env"},
+    {"id": "phase-complete", "name": "Mark phase 04 complete", "status": "blocked_on_uat"}
+  ],
+  "blockers": [
+    {"description": "Gmail IMAP: imaplib.IMAP4.error: [AUTHENTICATIONFAILED] Invalid credentials", "type": "human_action", "workaround": "Regenerate app password at myaccount.google.com/apppasswords, update MAILBOXES in .env"},
+    {"description": "Hover IMAP password: TODO_HOVER_PASS still placeholder in .env", "type": "human_action", "workaround": "User is vidar@brevik.net at mail.hover.com — add password to .env MAILBOXES JSON"},
+    {"description": "YouTube adapter: 'items' table not found in DB (schema has 'articles')", "type": "technical", "workaround": "Phase 4 schema migration needed — check libs/store for items table DDL"},
+    {"description": "Gmail OAuth2 creds empty in .env", "type": "human_action", "workaround": "Run: python scripts/provision_gmail_oauth.py (browser flow)"},
+    {"description": "OBSIDIAN_VAULT_PATH not set", "type": "human_action", "workaround": "Find vault with: find ~/Library -name '.obsidian' -maxdepth 5 -type d 2>/dev/null"}
+  ],
+  "human_actions_pending": [
+    {"action": "Regenerate Gmail app password for IMAP and update .env MAILBOXES", "context": "Current metatjernobyl517 returns AUTHENTICATIONFAILED", "blocking": true},
+    {"action": "Add Hover IMAP password for vidar@brevik.net to .env MAILBOXES JSON", "context": "TODO_HOVER_PASS placeholder in MAILBOXES", "blocking": true},
+    {"action": "Run: python scripts/provision_gmail_oauth.py", "context": "Gmail OAuth2 browser consent flow — cannot be automated", "blocking": true},
+    {"action": "Set OBSIDIAN_VAULT_PATH in .env", "context": "find ~/.obsidian or check ~/Documents", "blocking": false}
+  ],
+  "decisions": [
+    {"decision": "feedgen>=0.3.1 added to store/pyproject.toml and all adapter requirements.txt", "rationale": "store/_atom.py imports feedgen but it was missing from deps; --no-deps install requires explicit transitive deps"},
+    {"decision": "gmail-mcp-server/Dockerfile COPY path fixed to gmail-mcp-server/entrypoint.sh", "rationale": "Build context is project root, not gmail-mcp-server/"},
+    {"decision": "YouTube channels chosen from CCIR/CNR topics", "rationale": "Bellingcat/ISW/NATO/NRK for PIR-1-6, Karpathy/NVIDIA for FFIR-3"},
+    {"decision": "Hover IMAP user is vidar@brevik.net at mail.hover.com", "rationale": "User confirmed during session"}
+  ],
+  "uncommitted_files": [".planning/STATE.md"],
+  "next_action": "Resolve IMAP auth (Gmail app password + Hover password), fix YouTube items/articles table mismatch, then re-trigger adapters and complete UAT 2-5",
+  "context_notes": "All 6 plans executed and committed. 195 tests pass. UAT items 1+6 verified. Blockers are all credential/config gaps, not code bugs. DB table name mismatch (items vs articles) may be the only real code issue."
+}
