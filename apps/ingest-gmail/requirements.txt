@@ -7,3 +7,4 @@ numpy
 pydantic
 PyYAML
 httpx
+feedgen>=0.3.1
