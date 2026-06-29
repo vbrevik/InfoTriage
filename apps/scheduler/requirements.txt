@@ -1,0 +1,5 @@
+# InfoTriage scheduler — APScheduler 3.x + sync httpx (D-04, RESEARCH Finding 3)
+# APScheduler 4.x is pre-release; 3.x is latest stable on PyPI.
+# httpx.Client (SYNC) only — APScheduler 3.x jobs run in threads, no event loop.
+apscheduler>=3.11,<4
+httpx>=0.27

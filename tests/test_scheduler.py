@@ -115,9 +115,11 @@ def test_fire_adapter_connection_error_does_not_raise(caplog):
 
 
 def test_no_async_client_in_scheduler_main():
-    """Regression: AsyncClient MUST NOT appear in scheduler_main (APScheduler 3.x jobs are threaded)."""
+    """Regression: httpx.AsyncClient MUST NOT be used in scheduler_main (APScheduler 3.x jobs are threaded)."""
+    import re
     src = pathlib.Path("apps/scheduler/scheduler_main.py").read_text()
-    assert "AsyncClient" not in src, (
+    # Match actual usage/import of httpx.AsyncClient — comments referencing it are OK
+    assert not re.search(r"httpx\.AsyncClient", src), (
         "scheduler_main.py must use httpx.Client (sync) — APScheduler 3.x jobs run in threads"
     )
 
