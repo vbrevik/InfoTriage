@@ -59,8 +59,8 @@ class RabbitMQBus:
     Reconnect: connect_robust() auto-reconnects on connection loss (exponential backoff, max 30s).
     Dead-lettering: primary queues declare x-dead-letter-exchange=infotriage.dlx,
         x-dead-letter-routing-key=dead. Nacked messages (requeue=False) route to infotriage.dlq.
-    Publisher confirms: implicit in aio-pika's async exchange.publish() — awaiting the coroutine
-        blocks until the broker acks; NackError/UnroutableError raised on rejection.
+    Publisher confirms: channel opened with publisher_confirms=True. exchange.publish() blocks
+        until broker acks; NackError/UnroutableError raised on rejection.
     """
 
     def __init__(self, amqp_url: str = RABBITMQ_DEFAULT_URL) -> None:
@@ -86,7 +86,7 @@ class RabbitMQBus:
         while True:
             try:
                 self._connection = await aio_pika.connect_robust(self.amqp_url)
-                self._channel = await self._connection.channel()
+                self._channel = await self._connection.channel(publisher_confirms=True)
                 await self._channel.set_qos(prefetch_count=10)
                 await self._declare_topology()
                 break
@@ -121,7 +121,7 @@ class RabbitMQBus:
                 log.debug("Could not delete queue %s (may not exist): %s", q_name, e)
         await ch.close()
         # Now open the real channel and declare fresh
-        self._channel = await self._connection.channel()
+        self._channel = await self._connection.channel(publisher_confirms=True)
         await self._channel.set_qos(prefetch_count=10)
         await self._declare_topology()
 
@@ -171,8 +171,8 @@ class RabbitMQBus:
     async def publish(self, routing_key: str, item_id: str, payload: dict) -> None:
         """Publish payload to routing_key. Idempotent: same (routing_key, item_id) → no-op.
 
-        Publisher confirms: aio-pika's async exchange.publish() awaits broker ack.
-        NackError/UnroutableError raised on rejection.
+        Publisher confirms active (publisher_confirms=True on channel).
+        NackError/UnroutableError raised on broker rejection.
         Security: payload is JSON-serialized; DSN never logged (T-03-01).
         """
         await self._ensure_connection()

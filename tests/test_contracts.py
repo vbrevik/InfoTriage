@@ -284,40 +284,44 @@ def test_codec_empty_frontmatter_returns_empty_dict():
 # ---------------------------------------------------------------------------
 
 
-def test_bus_dedup():
+@pytest.mark.asyncio
+async def test_bus_dedup():
     """Re-publishing same item_id is a no-op (second publish not delivered)."""
     bus = InMemoryBus()
-    bus.publish("item.ingested", item_id="abc123", payload={"n": 1})
-    bus.publish("item.ingested", item_id="abc123", payload={"n": 2})  # ignored
-    msgs = bus.subscribe("item.ingested")
+    await bus.publish("item.ingested", item_id="abc123", payload={"n": 1})
+    await bus.publish("item.ingested", item_id="abc123", payload={"n": 2})  # ignored
+    msgs = await bus.subscribe("item.ingested")
     assert len(msgs) == 1
     assert msgs[0]["n"] == 1
 
 
-def test_bus_fifo():
+@pytest.mark.asyncio
+async def test_bus_fifo():
     """Messages delivered in publish order (FIFO per routing_key)."""
     bus = InMemoryBus()
-    bus.publish("item.ingested", item_id="id1", payload={"n": 1})
-    bus.publish("item.ingested", item_id="id2", payload={"n": 2})
-    bus.publish("item.ingested", item_id="id3", payload={"n": 3})
-    msgs = bus.subscribe("item.ingested")
+    await bus.publish("item.ingested", item_id="id1", payload={"n": 1})
+    await bus.publish("item.ingested", item_id="id2", payload={"n": 2})
+    await bus.publish("item.ingested", item_id="id3", payload={"n": 3})
+    msgs = await bus.subscribe("item.ingested")
     assert [m["n"] for m in msgs] == [1, 2, 3]
 
 
-def test_bus_empty_subscribe_no_op():
+@pytest.mark.asyncio
+async def test_bus_empty_subscribe_no_op():
     """Subscribe on empty/unused queue returns [] (non-blocking no-op)."""
     bus = InMemoryBus()
-    assert bus.subscribe("item.ingested") == []
-    assert bus.subscribe("verdict.ready") == []
+    assert await bus.subscribe("item.ingested") == []
+    assert await bus.subscribe("verdict.ready") == []
 
 
-def test_bus_cross_routing_key_isolation():
+@pytest.mark.asyncio
+async def test_bus_cross_routing_key_isolation():
     """Messages on different routing keys don't mix."""
     bus = InMemoryBus()
-    bus.publish("item.ingested", item_id="id1", payload={"event": "ingested"})
-    bus.publish("verdict.ready", item_id="id2", payload={"event": "verdict"})
-    assert bus.subscribe("item.ingested")[0]["event"] == "ingested"
-    assert bus.subscribe("verdict.ready")[0]["event"] == "verdict"
+    await bus.publish("item.ingested", item_id="id1", payload={"event": "ingested"})
+    await bus.publish("verdict.ready", item_id="id2", payload={"event": "verdict"})
+    assert (await bus.subscribe("item.ingested"))[0]["event"] == "ingested"
+    assert (await bus.subscribe("verdict.ready"))[0]["event"] == "verdict"
 
 
 def test_bus_satisfies_protocol():
@@ -330,17 +334,18 @@ def test_bus_satisfies_protocol():
 # ---------------------------------------------------------------------------
 
 
-def test_bus_same_item_id_across_routing_keys_not_deduped():
+@pytest.mark.asyncio
+async def test_bus_same_item_id_across_routing_keys_not_deduped():
     """Same item_id on different routing keys must both deliver (WR-01).
 
     The event lifecycle reuses Item.id across item.ingested -> verdict.ready,
     so dedup must be per (routing_key, item_id), not a global item_id set.
     """
     bus = InMemoryBus()
-    bus.publish("item.ingested", item_id="id1", payload={"event": "ingested"})
-    bus.publish("verdict.ready", item_id="id1", payload={"event": "verdict"})  # same id, different key
-    assert bus.subscribe("item.ingested")[0]["event"] == "ingested"
-    assert bus.subscribe("verdict.ready")[0]["event"] == "verdict"
+    await bus.publish("item.ingested", item_id="id1", payload={"event": "ingested"})
+    await bus.publish("verdict.ready", item_id="id1", payload={"event": "verdict"})  # same id, different key
+    assert (await bus.subscribe("item.ingested"))[0]["event"] == "ingested"
+    assert (await bus.subscribe("verdict.ready"))[0]["event"] == "verdict"
 
 
 def test_codec_value_containing_triple_dash_round_trips():
