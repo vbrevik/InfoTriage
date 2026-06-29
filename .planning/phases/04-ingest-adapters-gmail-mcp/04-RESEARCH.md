@@ -644,17 +644,17 @@ def _infer_lang(text: str) -> str:
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED in planning — Plan 04-05 Task 1)
 
 1. **What MCP endpoint path does `@shinzolabs/gmail-mcp` expose for HTTP transport?**
    - What we know: Streamable HTTP transport is supported; `PORT` env var configures the port
    - What's unclear: Whether the endpoint is `/mcp`, `/`, or something else
-   - Recommendation: Add a Wave 0 task to inspect the package source (`node_modules/@shinzolabs/gmail-mcp/`) after install, or test with `curl -X POST http://localhost:3000/mcp -H 'Content-Type: application/json' -d '...'`
+   - **Resolution:** Plan 04-05 Task 1 resolves this at execution time — build container, confirm endpoint path via `curl`, record result in SUMMARY before Task 2 consumes it. Default `/mcp` used as fallback.
 
 2. **Does `@shinzolabs/gmail-mcp` start in HTTP transport mode without additional flags?**
    - What we know: README confirms `PORT` env var activates Streamable HTTP
    - What's unclear: Whether the server needs a `--transport http` flag or if `PORT` alone is sufficient
-   - Recommendation: Wave 0 spike: `PORT=3000 npx @shinzolabs/gmail-mcp` and confirm HTTP listener
+   - **Resolution:** Plan 04-05 Task 1 spike: `PORT=3000 npx @shinzolabs/gmail-mcp` — confirmed or corrected at execution time.
 
 ---
 
