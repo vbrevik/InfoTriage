@@ -77,6 +77,11 @@ services:
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-infotriage_rmq}
     volumes:
       - ./data/rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks: [infotriage]
 
 networks:
