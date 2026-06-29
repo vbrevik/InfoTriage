@@ -529,27 +529,31 @@ Note: `infotriage.enrichment` must have a `UNIQUE(item_id)` constraint for `ON C
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **UNIQUE constraint on `infotriage.enrichment.item_id`**
    - What we know: 005-stubs.sql creates `enrichment(id SERIAL PK, item_id TEXT NOT NULL, created_at TIMESTAMPTZ)` — no unique constraint on `item_id`.
    - What's unclear: Whether there's already a unique constraint from a migration between 005 and now, or from Phase 2 init.
    - Recommendation: Planner should verify by running `\d infotriage.enrichment` on dev Postgres; 006-enrichment.sql must add `UNIQUE (item_id)` if absent.
+   - RESOLVED (05-01 Task 2): `006-enrichment.sql` adds `CREATE UNIQUE INDEX IF NOT EXISTS enrichment_item_id_unique ON infotriage.enrichment (item_id)` — no constraint existed in 005-stubs.sql.
 
 2. **RabbitMQBus.consume() vs direct aio-pika connection**
    - What we know: The existing `BusClient` Protocol has only `publish()` and `subscribe()` (drain-only). `subscribe()` is not suitable for a persistent consumer loop.
    - What's unclear: Whether to add `consume(routing_key, handler, prefetch_count)` to `RabbitMQBus` (cleanly extends the class without changing the Protocol), or to open a direct aio-pika connection in `worker.py`.
    - Recommendation: Add `consume()` to `RabbitMQBus` (not to the Protocol). Worker calls `await bus.consume("item.ingested", on_message, prefetch_count=1)`. This avoids duplicating topology declaration and follows the CONTEXT.md D-01 intent of "using the bus client".
+   - RESOLVED (05-02 Task 1): `RabbitMQBus.consume(routing_key, handler, prefetch_count=1)` added as a new non-Protocol method on `RabbitMQBus` in `libs/bus/_bus_rabbitmq.py`.
 
 3. **put_embedding: upsert or insert-only?**
    - What we know: D-05 says `put_embedding` uses "ON CONFLICT DO UPDATE (upsert, same idempotency pattern as `put_enrichment`)". The existing `infotriage.embeddings` table has `item_id FK` but may not have a unique constraint on `item_id`.
    - What's unclear: Whether 003-vectors.sql includes a unique constraint on `item_id` in `infotriage.embeddings`.
    - Recommendation: Add `UNIQUE(item_id)` to `infotriage.embeddings` in a sub-migration or confirm it already exists before writing the upsert.
+   - RESOLVED (05-01 Task 2): `006-enrichment.sql` also adds `CREATE UNIQUE INDEX IF NOT EXISTS embeddings_item_id_unique ON infotriage.embeddings (item_id)` to enable the `ON CONFLICT DO UPDATE` upsert in `put_embedding`.
 
 4. **Shadow-run "old bucket" source**
    - What we know: D-09 says "Old bucket source = `infotriage.enrichment.bucket` (the new event-driven scorer's output)". The comparison is: does re-running `score_item()` standalone produce the same bucket as the event-driven worker?
    - What's unclear: The "old path" (fever_triage.py) has never written to `infotriage.enrichment`. So for the shadow-run to work, the NEW event-driven worker must have scored ≥10 articles first, THEN the shadow_run.py compares those enrichment-stored buckets vs. re-running standalone.
    - Recommendation: Shadow-run plan step: (1) run triage worker against 111 live articles, (2) once ≥10 enrichment rows exist, run `scripts/shadow_run.py`, (3) confirm ≥10 matching buckets.
+   - RESOLVED (05-05 Task 1): `shadow_run.py` fetches enrichment rows from `infotriage.enrichment`, re-runs `score_item()` on each item_id, and compares raw `bucket` values. The parity gate requires ≥10 matching rows before the Fever cutover proceeds.
 
 ---
 
