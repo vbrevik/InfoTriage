@@ -1,6 +1,15 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["apps/triage", "apps/opml", "apps/ingest"]
+pythonpath = [
+    "apps/triage",
+    "apps/opml",
+    "apps/ingest",
+    "apps/ingest-imap",
+    "apps/ingest-youtube",
+    "apps/ingest-gmail",
+    "apps/ingest-obsidian",
+    "apps/scheduler",
+]
 markers = [
     "db_live: requires Postgres :22000 to be running",
     "rabbitmq: requires RabbitMQ :22001 to be running",
