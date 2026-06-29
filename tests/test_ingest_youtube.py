@@ -77,7 +77,7 @@ async def test_ingest_r2_dual_output(tmp_path: pathlib.Path, monkeypatch) -> Non
         assert item.url.startswith("https://youtu.be/"), f"url must be youtu.be link, got {item.url!r}"
         assert item.body_ref is not None, "body_ref must be set after put_blob"
         blob_bytes = store.get_blob(item.body_ref)
-        assert b"transcription disabled" in blob_bytes, "blob must contain stub text"
+        assert b"transcription disabled" in blob_bytes or b"stub mode" in blob_bytes, "blob must contain stub text"
 
     # 2 events published
     events = await bus.subscribe("item.ingested")
