@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: In progress
-stopped_at: "Phase 5 Wave 1 — 05-02 closed out, next: 05-03"
-last_updated: "2026-06-30T21:26:47.890Z"
+stopped_at: "Phase 5 Wave 2 — 05-03 closed out, next: 05-04"
+last_updated: "2026-06-30T21:49:07.704Z"
 progress:
-  total_phases: 13
+  total_phases: 14
   completed_phases: 4
   total_plans: 26
-  completed_plans: 22
-  percent: 31
+  completed_plans: 23
+  percent: 29
 ---
 
 # STATE — InfoTriage
@@ -185,11 +185,32 @@ progress:
   `e049a71`, `1d3b2db`; GREEN commits `a1e05e1`, `260d7b5`). 210+7 tests green project-wide, no
   regressions. Both Wave-1 worker prerequisites (05-03 depends on) now in place.
 
+## Session: 2026-06-30 — Phase 5 Wave 2 complete (05-03 closed out)
+
+### Just-completed
+
+- **05-03-PLAN.md (Triage worker)**: Built `apps/triage/worker.py`, the D-01 event-driven
+  entry point. `process_item(item_id, store, bus, *, embed, score)` is the async testable
+  core: `get_item` → mE5-large embed + `find_near_duplicate` dedup check (LLM call skipped
+  entirely on a hit, `bucket=skip`/`why="duplicate of <id>"`) → `score_item()` against
+  `ccir.md` (non-dup path) → `clamp_score` to `[0,10]` → `put_enrichment` (raw vocabulary)
+  → `put_embedding` (always, dup or not) → `VerdictReady` (mapped vocabulary via
+  `map_cnr`/`map_bucket`) → `bus.publish("verdict.ready", ...)`. Enrichment write commits
+  before publish in every path; a `put_enrichment` failure propagates so `on_message`'s
+  `message.process()` nacks instead of acking (R2/R5 prohibition). Each blocking call runs
+  via `asyncio.to_thread` individually (not the whole pipeline as one block) so
+  `bus.publish` always executes on the consumer's own event loop — avoids an aio-pika
+  cross-event-loop bug that a naive "wrap process_item in one to_thread" reading of the
+  plan would have introduced. `_handle_health`/`run_health_server` (D-04) serve a
+  liveness-only `/health` alongside the consumer under `asyncio.gather` (D-03). TDD
+  throughout (RED commit `519ea87`; GREEN commit `30d1baa`; health test `db3d714`). 9/9 new
+  tests green, 219 project-wide, no regressions.
+
 ## Session
 
-**Last session:** 2026-06-30T21:26:47.882Z
-**Stopped at:** Phase 5 Wave 1 — 05-02 closed out, next: 05-03
-**Resume file:** .planning/phases/05-triage-app/05-03-PLAN.md
+**Last session:** 2026-06-30T21:49:07.695Z
+**Stopped at:** Phase 5 Wave 2 — 05-03 closed out, next: 05-04
+**Resume file:** .planning/phases/05-triage-app/05-04-PLAN.md
 
 ## Performance Metrics
 
@@ -199,6 +220,7 @@ progress:
 | Phase 02 P03 | 732 | 3 tasks | 4 files |
 | Phase 03 P01 | 21 | 7 tasks | 5 files |
 | Phase 05 P02 | 12min | 2 tasks | 4 files |
+| Phase 05 P03 | 22min | 3 tasks | 3 files |
 
 ## Decisions
 
@@ -208,3 +230,4 @@ progress:
 - [Phase ?]: x-dead-letter-routing-key=dead for all primary queues routes nacked messages to infotriage.dlq
 - [Phase ?]: aio-pika async transport for RabbitMQ bus with connect_robust auto-reconnect and topology migration handler
 - [Phase ?]: consume() added as a sibling method on RabbitMQBus only (not BusClient Protocol) per RESEARCH Open Q2; subscribe() untouched
+- [Phase 05]: 05-03: process_item runs async with per-call asyncio.to_thread (not a sync function run as a whole via asyncio.to_thread) so bus.publish always executes on the consumer's event loop, avoiding aio-pika cross-event-loop bugs

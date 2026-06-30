@@ -173,7 +173,7 @@ to the running pipeline.
   3. Semantic dedup uses pgvector + the dedicated embedding model, replacing keyword overlap.
   4. Shadow-run vs the old path matches, then cut over; the Fever poll is removed.
 
-**Plans**: 2/5 plans executed
+**Plans**: 3/5 plans executed
 
 **Wave 1** *(parallel — no file overlap)*
 
@@ -182,7 +182,7 @@ to the running pipeline.
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 05-03-PLAN.md — Triage worker.py: item.ingested consumer, mE5-large dedup, qwen36 scoring, enrichment write, verdict.ready publish, stdlib /health (W2) — R2, R3, R4, R5, R7, ADR-004, ccir.md
+- [x] 05-03-PLAN.md — Triage worker.py: item.ingested consumer, mE5-large dedup, qwen36 scoring, enrichment write, verdict.ready publish, stdlib /health (W2) — R2, R3, R4, R5, R7, ADR-004, ccir.md
 
 **Wave 3** *(blocked on Wave 2)*
 
