@@ -173,7 +173,7 @@ to the running pipeline.
   3. Semantic dedup uses pgvector + the dedicated embedding model, replacing keyword overlap.
   4. Shadow-run vs the old path matches, then cut over; the Fever poll is removed.
 
-**Plans**: 3/5 plans executed
+**Plans**: 4/5 plans executed
 
 **Wave 1** *(parallel — no file overlap)*
 
@@ -186,7 +186,7 @@ to the running pipeline.
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 05-04-PLAN.md — Triage container: Dockerfile + requirements.txt + docker-compose triage service (:22030) + [BLOCKING] live /health + reconnect verify (W3) — R7
+- [x] 05-04-PLAN.md — Triage container: Dockerfile + requirements.txt + docker-compose triage service (:22030) + [BLOCKING] live /health + reconnect verify (W3) — R7
 
 **Wave 4** *(blocked on Wave 3)*
 

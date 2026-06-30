@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: In progress
 stopped_at: "Phase 5 Wave 2 — 05-03 closed out, next: 05-04"
-last_updated: "2026-06-30T21:49:07.704Z"
+last_updated: "2026-06-30T22:07:09.996Z"
 progress:
-  total_phases: 14
+  total_phases: 13
   completed_phases: 4
   total_plans: 26
-  completed_plans: 23
-  percent: 29
+  completed_plans: 24
+  percent: 31
 ---
 
 # STATE — InfoTriage
@@ -206,11 +206,37 @@ progress:
   throughout (RED commit `519ea87`; GREEN commit `30d1baa`; health test `db3d714`). 9/9 new
   tests green, 219 project-wide, no regressions.
 
+## Session: 2026-07-01 — Phase 5 Wave 3 complete (05-04 closed out)
+
+### Just-completed
+
+- **05-04-PLAN.md (Triage container)**: Containerized `apps/triage/worker.py` as the
+  `infotriage-triage` service on `127.0.0.1:22030`. `apps/triage/Dockerfile` mirrors
+  `apps/ingest-imap`'s local-lib install pattern (`COPY libs/contracts`/`libs/store` →
+  `pip install --no-deps` → app `requirements.txt` → app source → non-root `USER triage`
+  → `CMD ["python", "worker.py"]`), no credential ARG/ENV baked in. `docker-compose.yml`
+  triage stanza adds a python-urllib healthcheck (no curl in `python:3.12-slim`),
+  `extra_hosts host.docker.internal:host-gateway` for the host oMLX endpoint (ADR-004 —
+  local only), and `depends_on` postgres+rabbitmq with `condition: service_healthy`.
+  Task 3's blocking live-verify checkpoint confirmed `/health` → 200, non-root user,
+  no DSN leak in logs, and `connect_robust` auto-reconnect surviving a RabbitMQ
+  stop/start (re-confirmed independently in this continuation session via
+  `rabbitmqctl list_connections`/`list_queues` showing the worker's connection still
+  `running` and `q.triage` with an active consumer, days after the original test).
+  Operator approved. Commits `aff9373` (Dockerfile/requirements.txt), `9910278`
+  (docker-compose.yml).
+  - Deviation (Rule 3): `requirements.txt` needed `feedgen`/`pydantic`/`PyYAML` beyond
+    the plan's literal `aio-pika`/`psycopg[binary]`/`pgvector` — `libs/store` and
+    `libs/contracts` are installed `--no-deps` and import these at module level.
+  - Known gap (non-blocking): `intfloat/multilingual-e5-large` is not yet registered
+    on the host oMLX instance — `worker.py`'s `get_embedding()` will 404 on a real
+    end-to-end run until that model is set up. Tracked as a Phase 5 follow-up.
+
 ## Session
 
-**Last session:** 2026-06-30T21:49:07.695Z
-**Stopped at:** Phase 5 Wave 2 — 05-03 closed out, next: 05-04
-**Resume file:** .planning/phases/05-triage-app/05-04-PLAN.md
+**Last session:** 2026-07-01T00:00:00.000Z
+**Stopped at:** Phase 5 Wave 3 — 05-04 closed out, next: 05-05
+**Resume file:** .planning/phases/05-triage-app/05-05-PLAN.md
 
 ## Performance Metrics
 
@@ -221,6 +247,7 @@ progress:
 | Phase 03 P01 | 21 | 7 tasks | 5 files |
 | Phase 05 P02 | 12min | 2 tasks | 4 files |
 | Phase 05 P03 | 22min | 3 tasks | 3 files |
+| Phase 05 P04 | continuation | 3 tasks | 3 files |
 
 ## Decisions
 
@@ -231,3 +258,5 @@ progress:
 - [Phase ?]: aio-pika async transport for RabbitMQ bus with connect_robust auto-reconnect and topology migration handler
 - [Phase ?]: consume() added as a sibling method on RabbitMQBus only (not BusClient Protocol) per RESEARCH Open Q2; subscribe() untouched
 - [Phase 05]: 05-03: process_item runs async with per-call asyncio.to_thread (not a sync function run as a whole via asyncio.to_thread) so bus.publish always executes on the consumer's event loop, avoiding aio-pika cross-event-loop bugs
+- [Phase 05]: 05-04: requirements.txt needs feedgen/pydantic/PyYAML beyond aio-pika/psycopg/pgvector — libs/store and libs/contracts are installed --no-deps and import these at module level
+- [Phase 05]: 05-04: intfloat/multilingual-e5-large not yet registered on host oMLX — worker.py's get_embedding() will 404 until set up; tracked as a Phase 5 follow-up, non-blocking for 05-04
