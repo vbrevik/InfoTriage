@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: In progress
-stopped_at: Phase 5 Wave 1 — 05-01 closed out, 05-02 next
-last_updated: "2026-06-30T21:18:45.636Z"
+stopped_at: "Phase 5 Wave 1 — 05-02 closed out, next: 05-03"
+last_updated: "2026-06-30T21:26:47.890Z"
 progress:
   total_phases: 13
   completed_phases: 4
-  total_plans: 21
-  completed_plans: 20
+  total_plans: 26
+  completed_plans: 22
   percent: 31
 ---
 
@@ -168,11 +168,28 @@ progress:
   006-enrichment.sql + put_enrichment/get_enrichment/put_embedding/find_near_duplicate now live on
   Protocol+Postgres+InMemory.
 
+## Session: 2026-06-30 — Phase 5 Wave 1 complete (05-02 closed out)
+
+### Just-completed
+
+- **05-02-PLAN.md (Worker prerequisites)**: Added `RabbitMQBus.consume(routing_key, handler,
+  prefetch_count=1)` — a persistent callback consumer (sibling to drain-only `subscribe()`,
+  reuses `self._queues` keyed by routing_key and the existing topology; raises `ValueError` on
+  an unknown routing key). Verified end-to-end against live RabbitMQ `:22001`
+  (`tests/test_bus_consume.py -m rabbitmq`, 2/2 passed; existing `test_bus_rabbitmq.py` 5/5
+  still green). Also applied D-02: `apps/triage/triage_score.py` no longer caches `ccir.md` at
+  import time — `score_item()` now calls `load_ccir()` as its first statement and the prompt
+  f-string reads the local `{ccir}`, so operator edits to `ccir.md` take effect on the very
+  next scoring call (D-5). Regression test `tests/test_triage_score_hotread.py` proves this via
+  monkeypatched `CCIR_PATH` + a prompt-capturing `llm` stub. TDD throughout (RED commits
+  `e049a71`, `1d3b2db`; GREEN commits `a1e05e1`, `260d7b5`). 210+7 tests green project-wide, no
+  regressions. Both Wave-1 worker prerequisites (05-03 depends on) now in place.
+
 ## Session
 
-**Last session:** 2026-06-30T21:18:45.636Z
-**Stopped at:** Phase 5 Wave 1 — 05-01 closed out, continuing to 05-02
-**Resume file:** .planning/phases/05-triage-app/05-02-PLAN.md
+**Last session:** 2026-06-30T21:26:47.882Z
+**Stopped at:** Phase 5 Wave 1 — 05-02 closed out, next: 05-03
+**Resume file:** .planning/phases/05-triage-app/05-03-PLAN.md
 
 ## Performance Metrics
 
@@ -181,6 +198,7 @@ progress:
 | Phase 02 P01 | 10 | 3 tasks | 10 files |
 | Phase 02 P03 | 732 | 3 tasks | 4 files |
 | Phase 03 P01 | 21 | 7 tasks | 5 files |
+| Phase 05 P02 | 12min | 2 tasks | 4 files |
 
 ## Decisions
 
@@ -189,3 +207,4 @@ progress:
 - [Phase ?]: DLX infotriage.dlx declared before primary queues (prevents 406 PRECONDITION_FAILED)
 - [Phase ?]: x-dead-letter-routing-key=dead for all primary queues routes nacked messages to infotriage.dlq
 - [Phase ?]: aio-pika async transport for RabbitMQ bus with connect_robust auto-reconnect and topology migration handler
+- [Phase ?]: consume() added as a sibling method on RabbitMQBus only (not BusClient Protocol) per RESEARCH Open Q2; subscribe() untouched
