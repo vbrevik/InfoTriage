@@ -186,25 +186,32 @@ async def run_consumer(bus, store) -> None:
 # run_health_server — stdlib liveness-only /health (D-04, filled in Task 3)
 # ---------------------------------------------------------------------------
 
+async def _handle_health(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    """Connection handler for the liveness-only /health endpoint (D-04).
+
+    Module-level (not nested) so tests can drive it directly via
+    asyncio.start_server(_handle_health, ...) on an ephemeral port — see
+    tests/test_triage_health.py. Does NOT touch the bus or DB: liveness only.
+    """
+    await reader.read(1024)
+    body = b"OK"
+    response = (
+        b"HTTP/1.1 200 OK\r\n"
+        b"Content-Length: " + str(len(body)).encode() + b"\r\n"
+        b"Connection: close\r\n\r\n" + body
+    )
+    writer.write(response)
+    await writer.drain()
+    writer.close()
+
+
 async def run_health_server(host: str = HEALTH_HOST, port: int = HEALTH_PORT) -> None:
     """Serve a liveness-only GET /health -> 200 forever (D-04).
 
     Does NOT depend on bus or DB state — connect_robust handles AMQP reconnect
-    on its own. Implemented in full in Task 3.
+    on its own.
     """
-    async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
-        await reader.read(1024)
-        body = b"OK"
-        response = (
-            b"HTTP/1.1 200 OK\r\n"
-            b"Content-Length: " + str(len(body)).encode() + b"\r\n"
-            b"Connection: close\r\n\r\n" + body
-        )
-        writer.write(response)
-        await writer.drain()
-        writer.close()
-
-    server = await asyncio.start_server(handle, host, port)
+    server = await asyncio.start_server(_handle_health, host, port)
     async with server:
         await server.serve_forever()
 
