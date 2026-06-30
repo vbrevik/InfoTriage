@@ -112,6 +112,45 @@ services:
         condition: service_healthy
     networks: [infotriage]
 
+  # ── Phase 5: Triage worker ─────────────────────────────────────────────
+  # Consumes item.ingested, dedups via mE5-large embeddings, scores against
+  # ccir.md with the local LLM (qwen36/qwen80b, ADR-004), persists
+  # enrichment, publishes verdict.ready. Health port 22030 maps 1:1.
+  triage:
+    build:
+      context: .
+      dockerfile: apps/triage/Dockerfile
+    container_name: infotriage-triage
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:22030:22030"   # health: localhost:22030 → container:22030
+    env_file:
+      - path: .env
+        required: false   # .env is gitignored; present on host, not in repo
+    environment:
+      INFOTRIAGE_PG_DSN: ${INFOTRIAGE_PG_DSN:-postgresql://infotriage:infotriage_dev@postgres:5432/infotriage}
+      INFOTRIAGE_AMQP_DSN: ${INFOTRIAGE_AMQP_DSN:-amqp://infotriage:infotriage_rmq@rabbitmq:5672}
+      INFOTRIAGE_BLOB_ROOT: /data/blobs
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:8000/v1}   # host oMLX — ADR-004, local only
+      LLM_API_KEY: ${LLM_API_KEY:-omlx}
+      LLM_MODEL: ${LLM_MODEL:-qwen36-ud-4bit}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # resolves the host oMLX endpoint on non-Docker-Desktop engines
+    volumes:
+      - ./data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:22030/health', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks: [infotriage]
+
   ingest-youtube:
     build:
       context: .
