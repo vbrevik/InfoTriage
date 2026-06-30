@@ -24,9 +24,6 @@ def load_ccir():
     except FileNotFoundError:
         return "(no ccir.md found — keep only clearly defense/geopolitics/Norway/tech items)"
 
-CCIR = load_ccir()
-
-
 def load_dotenv(path):
     if not os.path.exists(path):
         return
@@ -52,10 +49,11 @@ def llm(messages, max_tokens=400):
         return json.load(r)["choices"][0]["message"]["content"]
 
 def score_item(it):
+    ccir = load_ccir()
     prompt = f"""You are an intelligence analyst triaging news against the commander's
 CCIR below. Decide which single CCIR (if any) this item answers, and its CNR level.
 
-{CCIR}
+{ccir}
 
 Tier quick-reference (full descriptions in ccir.md above):
 - PIR-1 Russland/Ukraina — krig, frontlinjer, våpenstøtte, sanksjoner
