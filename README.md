@@ -49,22 +49,26 @@ Scores each item 0–10 against your interest profile (local LLMs/Mac, Claude Co
 self-hosting, security, Rust, dev tooling) and buckets 🔥read / 🤔maybe / 🗑️skip —
 all on qwen36, ~$0. Edit `ccir.md` to tune the dial — it's the triage brain.
 
-### Fever-wired triage (the auto-hide-junk loop) — ✅ working
+### Event-driven triage (the scoring path) — ✅ working
 
 ```bash
-python3 apps/triage/fever_triage.py --dry-run --max 20   # score real unread, change nothing
-python3 apps/triage/fever_triage.py --max 80             # also mark junk read
+docker compose up -d triage   # consumes item.ingested, writes infotriage.enrichment, publishes verdict.ready
+curl http://localhost:22030/health
 ```
 
-Pulls unread from FreshRSS (Fever API), scores each with qwen36, marks score≤3 read,
-prints a digest of the keepers. **Tune `ccir.md`** — it now covers
-tech + defense/geopolitics + Norway + world news. Too narrow a profile = it nukes
-everything (learned that the hard way).
+The `triage` container scores each incoming item against `ccir.md` with qwen36,
+dedups via mE5-large embedding similarity, and persists the result to
+`infotriage.enrichment` — no manual cron step required. **Tune `ccir.md`** to
+retune what gets kept; it covers tech + defense/geopolitics + Norway + world news.
+Too narrow a profile = it nukes everything (learned that the hard way).
 
-Polite cron (after FreshRSS refreshes at :23/:53 — run at :35):
-```cron
-35 * * * * cd ~/projects/InfoTriage && /usr/bin/python3 apps/triage/fever_triage.py --max 120 >> data/triage.log 2>&1
-```
+**Retired:** `apps/triage/fever_triage.py` was the production scoring path
+(FreshRSS Fever-API polling + host crontab) before the event-driven triage
+container existed. It is **no longer invoked** as a scoring path — the crontab
+entry that ran it has been removed (R6, shadow-run parity confirmed via
+`scripts/shadow_run.py`). The file itself is preserved because
+`apps/triage/digest.py` still imports `fever_key`/`fever`/`strip_html` from it;
+do not delete it.
 
 ### This FreshRSS instance (local throwaway)
 
