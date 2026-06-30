@@ -220,6 +220,26 @@ class RabbitMQBus:
         await queue.cancel(consumer_tag)
         return messages
 
+    async def consume(self, routing_key: str, handler, prefetch_count: int = 1) -> None:
+        """Register a persistent consumer on routing_key's queue. Does not block.
+
+        Reuses the topology declared by _ensure_connection/_declare_topology — does
+        not redeclare exchanges/queues. self._queues is keyed by routing_key (NOT
+        queue name); looking it up by queue name is a bug (see subscribe()'s
+        ROUTING_KEY_TO_QUEUE lookup, which is a different, unrelated mapping).
+
+        Raises ValueError if routing_key has no declared queue.
+        """
+        await self._ensure_connection()
+        assert self._channel is not None
+
+        queue = self._queues.get(routing_key)
+        if queue is None:
+            raise ValueError(f"Unknown routing key: {routing_key}")
+
+        await self._channel.set_qos(prefetch_count=prefetch_count)
+        await queue.consume(handler)
+
     async def close(self) -> None:
         """Close AMQP connection gracefully."""
         if self._connection and not self._connection.is_closed:
