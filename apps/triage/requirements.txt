@@ -1,0 +1,14 @@
+# triage worker third-party runtime dependencies
+# Transitive deps of the local libs (contracts, store) are listed here because
+# those libs are installed with --no-deps in the Dockerfile.
+aio-pika>=9.6
+psycopg[binary]>=3.3
+pgvector>=0.4.2
+# store/__init__.py imports _atom.render_atom at module level, which imports
+# feedgen.feed.FeedGenerator — required even though worker.py never calls
+# render_atom itself (Rule 3 fix: already a vetted dep, see apps/ingest-imap).
+feedgen>=0.3.1
+# contracts (pydantic models) and store (yaml-based config) import these at
+# module level too — both already vetted deps, see apps/ingest-imap (Rule 3 fix).
+pydantic>=2.0
+PyYAML>=6.0
