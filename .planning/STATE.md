@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Phase 5 context gathered
-last_updated: "2026-06-29T18:36:01.119Z"
+status: In progress
+stopped_at: Phase 5 Wave 1 — 05-01 closed out, 05-02 next
+last_updated: "2026-06-30T21:18:45.636Z"
 progress:
   total_phases: 13
   completed_phases: 4
@@ -156,11 +156,23 @@ progress:
 - Q1 World Monitor CCIR/SAB coverage → **R5 spike** (still open).
 - Q5 embedding model (bge-m3 vs mE5-large) → **DECIDED: mE5-large @ 0.84** (R2, PARTIAL — recalibrate Phase 5).
 
+## Session: 2026-06-30 — Phase 5 Wave 1 in progress (05-01 closed out)
+
+### Just-completed
+
+- **05-01-PLAN.md (Store extension)**: Commits (`0837fb0` test, `a98a5e0` migration, `eafc031`
+  implement) landed in a prior session that ended before SUMMARY.md was written — execute-phase
+  safe-resume gate caught the gap on resume. Verified green (12/12 tests, inmemory+db_live
+  postgres; grep clean for forbidden `ADD CONSTRAINT IF NOT EXISTS`/f-string SQL) and closed out
+  manually: wrote 05-01-SUMMARY.md, flipped ROADMAP.md checkbox via `roadmap.update-plan-progress`.
+  006-enrichment.sql + put_enrichment/get_enrichment/put_embedding/find_near_duplicate now live on
+  Protocol+Postgres+InMemory.
+
 ## Session
 
-**Last session:** 2026-06-29T18:36:01.112Z
-**Stopped at:** Phase 5 context gathered
-**Resume file:** .planning/phases/05-triage-app/05-CONTEXT.md
+**Last session:** 2026-06-30T21:18:45.636Z
+**Stopped at:** Phase 5 Wave 1 — 05-01 closed out, continuing to 05-02
+**Resume file:** .planning/phases/05-triage-app/05-02-PLAN.md
 
 ## Performance Metrics
 

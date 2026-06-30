@@ -173,11 +173,11 @@ to the running pipeline.
   3. Semantic dedup uses pgvector + the dedicated embedding model, replacing keyword overlap.
   4. Shadow-run vs the old path matches, then cut over; the Fever poll is removed.
 
-**Plans**: 5 plans
+**Plans**: 1/5 plans executed
 
 **Wave 1** *(parallel — no file overlap)*
 
-- [ ] 05-01-PLAN.md — Store extension: 006-enrichment.sql (unique indexes + 7 columns), put_enrichment/get_enrichment/put_embedding/find_near_duplicate on Protocol+Postgres+InMemory (W1) — R1, R4
+- [x] 05-01-PLAN.md — Store extension: 006-enrichment.sql (unique indexes + 7 columns), put_enrichment/get_enrichment/put_embedding/find_near_duplicate on Protocol+Postgres+InMemory (W1) — R1, R4
 - [ ] 05-02-PLAN.md — Worker prerequisites: RabbitMQBus.consume() persistent consumer + triage_score.py ccir.md hot-read fix (D-02) (W1) — R2, R3, ccir.md
 
 **Wave 2** *(blocked on Wave 1)*
