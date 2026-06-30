@@ -189,3 +189,9 @@ None - no external service configuration required. Worker requires `INFOTRIAGE_P
 ---
 *Phase: 05-triage-app*
 *Completed: 2026-06-30*
+
+## Self-Check: PASSED
+
+All created files (apps/triage/worker.py, tests/test_triage_worker.py,
+tests/test_triage_health.py, this SUMMARY.md) and all 4 commit hashes
+(519ea87, 30d1baa, db3d714, 1d294ce) verified present in working tree / git log.
