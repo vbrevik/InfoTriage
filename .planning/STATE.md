@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: In progress
-stopped_at: "Phase 5 Wave 2 — 05-03 closed out, next: 05-04"
-last_updated: "2026-06-30T22:07:09.996Z"
+stopped_at: "Phase 5 Wave 4 — 05-05 Tasks 1-2 done, Task 3 BLOCKED (embedder gap + empty infotriage.articles)"
+last_updated: "2026-07-01T11:42:57.387Z"
 progress:
   total_phases: 13
   completed_phases: 4
@@ -232,10 +232,45 @@ progress:
     on the host oMLX instance — `worker.py`'s `get_embedding()` will 404 on a real
     end-to-end run until that model is set up. Tracked as a Phase 5 follow-up.
 
+## Session: 2026-07-01 — Phase 5 Wave 4 (05-05) BLOCKED on Task 3
+
+### Just-completed
+
+- **05-05-PLAN.md Tasks 1-2**: `scripts/shadow_run.py` built (reads `infotriage.enrichment`
+  joined to `infotriage.articles`, re-runs `score_item()` standalone, prints side-by-side
+  bucket parity table + `>= 10` verdict — commit `49f1822`). README.md updated to document
+  the triage container (`docker compose up -d triage`, port 22030) as the scoring path;
+  fever_triage.py run-commands/crontab line marked retired, file itself preserved for
+  `digest.py` imports (commit `e846d94`).
+
+### Blocked — Task 3 (shadow-run parity checkpoint + Fever cutover)
+
+Two independent, pre-existing blockers, confirmed live (not guessed):
+
+1. **Embedder gap (already known, from 05-04)**: `intfloat/multilingual-e5-large` is not
+   registered on the host oMLX instance. Reproduced directly: `POST host.docker.internal:8000/v1/embeddings`
+   from inside the `infotriage-triage` container → clean `404`. Docker networking itself is
+   fine (`host.docker.internal` resolves and `/health` returns 200) — this is purely a
+   missing-model-registration issue on the host, not a bug in 05-04's compose config.
+2. **New finding — `infotriage.articles` has 0 rows.** This contradicts this STATE.md's
+   earlier note about "111 existing articles" (stale — likely referred to the old `.spike/`
+   corpus from Phase 0, torn down before Phase 5). `infotriage-postgres` has a persistent
+   volume (`./data/postgres`) and has been up ~14h; `ingest-youtube`/`ingest-imap` have been
+   up ~41-42h and `ingest-youtube` shows multiple successful `POST /run` (200 OK) calls from
+   the scheduler in that window, yet zero rows landed in `infotriage.articles`. Root cause
+   NOT diagnosed — could be no-new-content-found each run, a silent `persist_and_publish`
+   failure, or a Postgres data reset independent of Phase 5. Needs separate investigation
+   (not attempted this session — operator chose to defer and investigate later).
+
+Even if the embedder were fixed today, Task 3 still can't proceed with zero source articles.
+Both must be resolved before `/gsd-execute-phase 5` can complete Task 3 (or `--gaps-only`/manual
+close-out once resolved). Task 3 is NOT committed, no SUMMARY.md was written, ROADMAP.md still
+shows 05-05 incomplete — this is intentional, do not mark it done.
+
 ## Session
 
-**Last session:** 2026-07-01T00:00:00.000Z
-**Stopped at:** Phase 5 Wave 3 — 05-04 closed out, next: 05-05
+**Last session:** 2026-07-01T11:42:57.387Z
+**Stopped at:** Phase 5 Wave 4 — 05-05 Tasks 1-2 done, Task 3 BLOCKED (embedder gap + empty infotriage.articles)
 **Resume file:** .planning/phases/05-triage-app/05-05-PLAN.md
 
 ## Performance Metrics
