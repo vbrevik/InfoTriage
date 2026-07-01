@@ -154,11 +154,13 @@ async def on_message(message, store, bus) -> None:
 
     message.process() acks on clean return, and nacks (requeue=False -> DLQ) if
     process_item raises — e.g. on an enrichment-write failure (R2 prohibition).
+    RabbitMQBus.publish() puts item_id in the AMQP message headers, not the JSON
+    body (the body is only the {source, source_type, ts} payload) — read it from
+    message.headers, not from the decoded body.
     Logs only item_id/event names — never the DSN (T-05-02).
     """
     async with message.process():
-        body = json.loads(message.body.decode())
-        item_id = body["item_id"]
+        item_id = message.headers["item_id"]
         log.info("item.ingested item_id=%s", item_id)
         await process_item(item_id, store, bus)
 

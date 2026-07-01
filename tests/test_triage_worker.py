@@ -12,12 +12,13 @@ tests/test_bus_consume.py (no pytest-asyncio marker dependency).
 """
 import asyncio
 import datetime
+import json
 
 import pytest
 
 from contracts import Item
 from store import InMemoryStore
-from worker import process_item
+from worker import on_message, process_item
 
 # ---------------------------------------------------------------------------
 # Fixtures + helpers
@@ -35,6 +36,26 @@ class FakeBus:
 
     async def publish(self, routing_key: str, item_id: str, payload: dict) -> None:
         self.published.append({"routing_key": routing_key, "item_id": item_id, "payload": payload})
+
+
+class FakeMessage:
+    """Minimal aio_pika.IncomingMessage fake — mirrors what RabbitMQBus.publish()
+    actually produces: item_id lives in AMQP headers, body is only the
+    {source, source_type, ts} payload (no item_id key in the body)."""
+
+    def __init__(self, item_id: str, payload: dict) -> None:
+        self.headers = {"routing_key": "item.ingested", "item_id": item_id}
+        self.body = json.dumps(payload).encode()
+
+    def process(self):
+        return self._Ack()
+
+    class _Ack:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
 
 
 def _ts() -> datetime.datetime:
@@ -246,3 +267,30 @@ def test_verdict_ready_fields(store, bus):
     assert payload["bucket"] in {"keep", "maybe", "skip"}
     assert "why" in payload
     assert "ts" in payload
+
+
+def test_on_message_reads_item_id_from_headers_not_body(store, bus, monkeypatch):
+    """on_message must extract item_id from message.headers — RabbitMQBus.publish()
+    puts item_id only in AMQP headers, never in the JSON body. A regression here
+    means every real item.ingested message dead-letters with KeyError('item_id')."""
+    item = _item("Header Routed Item")
+    store.put_item(item)
+
+    calls = []
+
+    async def fake_process_item(item_id, s, b):
+        calls.append(item_id)
+
+    monkeypatch.setattr("worker.process_item", fake_process_item)
+
+    message = FakeMessage(
+        item.id,
+        {"source": item.source, "source_type": item.source_type, "ts": item.ts.isoformat()},
+    )
+    assert "item_id" not in json.loads(message.body.decode()), (
+        "test fixture must match publish()'s real wire format: no item_id in body"
+    )
+
+    asyncio.run(on_message(message, store, bus))
+
+    assert calls == [item.id]
