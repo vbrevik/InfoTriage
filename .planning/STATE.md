@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: In progress
-stopped_at: "Phase 5 Wave 4 — 05-05 Tasks 1-2 done, Task 3 BLOCKED (embedder gap + empty infotriage.articles)"
-last_updated: "2026-07-01T11:42:57.387Z"
+stopped_at: "Phase 5 Wave 4 — embedder gap fixed; 05-05 Task 3 still BLOCKED (empty infotriage.articles)"
+last_updated: "2026-07-01T12:18:09.444Z"
 progress:
   total_phases: 13
   completed_phases: 4
@@ -267,10 +267,35 @@ Both must be resolved before `/gsd-execute-phase 5` can complete Task 3 (or `--g
 close-out once resolved). Task 3 is NOT committed, no SUMMARY.md was written, ROADMAP.md still
 shows 05-05 incomplete — this is intentional, do not mark it done.
 
+### Follow-up — embedder gap RESOLVED (host-only change, no repo commit)
+
+Registered `intfloat/multilingual-e5-large` on the local oMLX instance (standard HF safetensors —
+oMLX's `mlx-embeddings` backend natively supports the `XLMRobertaModel` architecture, no MLX
+conversion needed). Steps: `hf download intfloat/multilingual-e5-large --local-dir
+~/.omlx/models/multilingual-e5-large`, stripped the redundant `onnx/`/`openvino/`/`pytorch_model.bin`
+export formats oMLX doesn't use (8.9GB → 2.1GB), killed the running server (PID tracked in
+`~/.omlx/claude-mlx.serve.pid`; `omlx-cli restart` doesn't recognize servers it didn't launch
+itself, so used the same kill+`omlx-ensure-server` path the Mac already relies on), let it come
+back and rescan `~/.omlx/models`.
+
+**Model-id resolution note:** the directory is named `multilingual-e5-large` (no `intfloat/`
+prefix — oMLX's model-dir discovery uses the bare leaf directory name as the model_id). This
+still works with `worker.py`'s literal `"model": "intfloat/multilingual-e5-large"` request
+because oMLX's `resolve_model_id()` strips an `org/` prefix and matches the remainder against
+registered entries (`engine_pool.py` line ~343) — confirmed working, not just directory-inferred.
+
+Verified live: `POST /v1/embeddings` with the exact body `worker.py`'s `get_embedding()` sends
+returns `200`, 1024-dim vector — reproduced both from the host (4.7s cold) and from inside
+`infotriage-triage` via `host.docker.internal:8000` (0.5s warm). Existing models
+(`qwen36-ud-4bit`, `gpt-oss-20b`, etc.) confirmed still registered post-restart — no regression.
+
+**Remaining blocker for 05-05 Task 3:** `infotriage.articles` still has 0 rows (see above) —
+untouched this session, still needs separate investigation.
+
 ## Session
 
-**Last session:** 2026-07-01T11:42:57.387Z
-**Stopped at:** Phase 5 Wave 4 — 05-05 Tasks 1-2 done, Task 3 BLOCKED (embedder gap + empty infotriage.articles)
+**Last session:** 2026-07-01T12:18:09.444Z
+**Stopped at:** Phase 5 Wave 4 — embedder gap fixed; 05-05 Task 3 still BLOCKED (empty infotriage.articles)
 **Resume file:** .planning/phases/05-triage-app/05-05-PLAN.md
 
 ## Performance Metrics
@@ -294,4 +319,4 @@ shows 05-05 incomplete — this is intentional, do not mark it done.
 - [Phase ?]: consume() added as a sibling method on RabbitMQBus only (not BusClient Protocol) per RESEARCH Open Q2; subscribe() untouched
 - [Phase 05]: 05-03: process_item runs async with per-call asyncio.to_thread (not a sync function run as a whole via asyncio.to_thread) so bus.publish always executes on the consumer's event loop, avoiding aio-pika cross-event-loop bugs
 - [Phase 05]: 05-04: requirements.txt needs feedgen/pydantic/PyYAML beyond aio-pika/psycopg/pgvector — libs/store and libs/contracts are installed --no-deps and import these at module level
-- [Phase 05]: 05-04: intfloat/multilingual-e5-large not yet registered on host oMLX — worker.py's get_embedding() will 404 until set up; tracked as a Phase 5 follow-up, non-blocking for 05-04
+- [Phase 05]: 05-04: intfloat/multilingual-e5-large not yet registered on host oMLX — worker.py's get_embedding() will 404 until set up; tracked as a Phase 5 follow-up, non-blocking for 05-04. **RESOLVED 2026-07-01**: registered at ~/.omlx/models/multilingual-e5-large (standard HF safetensors via mlx-embeddings' native XLMRobertaModel support), verified 200/1024-dim from host and from inside infotriage-triage.
