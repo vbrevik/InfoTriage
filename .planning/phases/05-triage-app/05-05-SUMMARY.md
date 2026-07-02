@@ -38,7 +38,7 @@ coverage:
     description: "scripts/shadow_run.py reads enrichment+articles, re-runs score_item(), prints side-by-side table with match column"
     requirement: "R6"
     verification:
-      - kind: manual
+      - kind: manual_procedural
         ref: "python3 scripts/shadow_run.py run against 43 live enrichment rows; table + totals printed correctly, dedup rows labeled DEDUP (excluded)"
         status: pass
     human_judgment: false
@@ -46,7 +46,7 @@ coverage:
     description: "Parity = matching bucket (not exact score), >= 10 matching buckets required before cutover"
     requirement: "R6"
     verification:
-      - kind: manual
+      - kind: manual_procedural
         ref: "Parity verdict: MET (14 >= 10 matching buckets) printed by the corrected script"
         status: pass
     human_judgment: true
@@ -55,7 +55,7 @@ coverage:
     description: "After operator confirmation, fever_triage.py retired from production path (crontab + README)"
     requirement: "R6"
     verification:
-      - kind: manual
+      - kind: manual_procedural
         ref: "README.md already documents retirement (commit e846d94, prior session); crontab -l confirms no fever entry exists"
         status: pass
     human_judgment: true

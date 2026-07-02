@@ -38,7 +38,7 @@ coverage:
     description: "docker compose build triage produces an image whose CMD runs python worker.py"
     requirement: "R7"
     verification:
-      - kind: manual
+      - kind: manual_procedural
         ref: "docker build -f apps/triage/Dockerfile -t infotriage-triage:plancheck . (Task 1); docker compose up -d --build triage (Task 3)"
         status: pass
     human_judgment: false
@@ -46,7 +46,7 @@ coverage:
     description: "docker compose up -d triage reaches running state; GET http://localhost:22030/health returns 200"
     requirement: "R7"
     verification:
-      - kind: manual
+      - kind: manual_procedural
         ref: "docker compose ps triage -> running (healthy); curl -s -o /dev/null -w '%{http_code}' http://localhost:22030/health -> 200 (re-confirmed independently in this continuation session)"
         status: pass
     human_judgment: true
@@ -55,7 +55,7 @@ coverage:
     description: "The container survives a temporary RabbitMQ outage and reconnects via connect_robust — /health stays 200 and the process does not crash"
     requirement: "R7"
     verification:
-      - kind: manual
+      - kind: manual_procedural
         ref: "Prior session: docker compose stop rabbitmq -> wait 10s -> curl /health still 200 -> docker compose start rabbitmq -> aio_pika.robust_connection reconnect log lines + rabbitmqctl list_connections confirms a live `infotriage` connection"
         status: pass
     human_judgment: true
@@ -64,7 +64,7 @@ coverage:
     description: "The container runs as a non-root user (least privilege, T-05-04)"
     requirement: "R7"
     verification:
-      - kind: manual
+      - kind: manual_procedural
         ref: "docker exec infotriage-triage whoami -> triage (not root)"
         status: pass
     human_judgment: false
@@ -72,7 +72,7 @@ coverage:
     description: "No DSN appears in plaintext in container logs (T-05-02)"
     requirement: "R7"
     verification:
-      - kind: manual
+      - kind: manual_procedural
         ref: "docker compose logs triage | grep -iE DSN/amqp/postgresql patterns -> all aio-pika log lines show amqp://infotriage:******@rabbitmq:5672 (password masked by aio-pika itself, not by app code)"
         status: pass
     human_judgment: false
