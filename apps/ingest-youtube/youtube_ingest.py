@@ -58,12 +58,31 @@ def load_channels() -> list[dict]:
     return json.loads(raw)
 
 
+_TAB_SUFFIXES = ("/videos", "/shorts", "/streams", "/playlists")
+
+
+def _videos_tab_url(channel: str) -> str:
+    """Pin a bare channel URL to its Videos tab.
+
+    A channel-root URL (e.g. https://www.youtube.com/@NATO) is expanded by
+    yt-dlp into up to three tab playlists (Videos, Shorts, Live), and
+    `-I 1:N` applies PER TAB — so a limit of 3 returned up to 9 entries.
+    Appending /videos restricts the listing to the Videos tab only.
+    URLs that already name a tab are left untouched.
+    """
+    base = channel.rstrip("/")
+    if base.endswith(_TAB_SUFFIXES):
+        return base
+    return base + "/videos"
+
+
 def yt_dlp_list(channel: str, max_n: int) -> list[tuple[str, str]]:
     """Return list of (video_id, title) via yt-dlp flat-playlist (no downloads).
 
     Uses yt-dlp in flat-playlist mode: fetches public-channel metadata only,
     no audio download, no YouTube credentials (ADR-004 / T-04-07).
     Returns [] on yt-dlp absence, subprocess timeout, or empty channel.
+    yt-dlp failures (non-zero exit) are reported to stderr, not swallowed.
     """
     import shutil
 
@@ -80,13 +99,20 @@ def yt_dlp_list(channel: str, max_n: int) -> list[tuple[str, str]]:
         "%(id)s|||%(title)s",
         "-I",
         f"1:{max_n}",
-        channel,
+        _videos_tab_url(channel),
     ]
     try:
         out = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     except subprocess.TimeoutExpired:
         print(f"yt-dlp timed out on {channel}", file=sys.stderr)
         return []
+    if out.returncode != 0:
+        tail = out.stderr.strip().splitlines()[-3:]
+        print(
+            f"yt-dlp failed on {channel} (exit {out.returncode}): "
+            + " / ".join(tail),
+            file=sys.stderr,
+        )
     return [
         tuple(line.split("|||", 1))
         for line in out.stdout.splitlines()
@@ -163,7 +189,7 @@ async def ingest() -> None:
         with store:
             for c in channels:
                 url = c["channel"]
-                max_n = int(c.get("max_per_run", 3))
+                max_n = int(c.get("max_n", 3))
                 name = c.get("name") or url.rstrip("/").split("/")[-1] or "channel"
                 vids = yt_dlp_list(url, max_n)
 

@@ -32,7 +32,7 @@ class _ClosableInMemoryBus(InMemoryBus):
 
 
 def _test_channels(url: str = "https://youtube.com/@test") -> list[dict]:
-    return [{"channel": url, "max_per_run": 5, "name": "TestChannel"}]
+    return [{"channel": url, "max_n": 5, "name": "TestChannel"}]
 
 
 # ---------------------------------------------------------------------------
@@ -132,6 +132,66 @@ async def test_ingest_r2_idempotent_rerun(tmp_path: pathlib.Path, monkeypatch) -
     # InMemoryBus deduplicates by (routing_key, item_id); persist_and_publish
     # also skips publish when item already exists — double protection
     assert len(events_after_second) == 1, "no second event published for duplicate item"
+
+
+# ---------------------------------------------------------------------------
+# yt-dlp URL pinning: bare channel roots get /videos appended (regression:
+# channel root expands to 3 tab playlists and -I 1:N applies per tab → 3N)
+# ---------------------------------------------------------------------------
+
+
+def test_videos_tab_url_pins_bare_channel_root() -> None:
+    import youtube_ingest
+
+    assert (
+        youtube_ingest._videos_tab_url("https://www.youtube.com/@NATO")
+        == "https://www.youtube.com/@NATO/videos"
+    )
+    assert (
+        youtube_ingest._videos_tab_url("https://www.youtube.com/@NATO/")
+        == "https://www.youtube.com/@NATO/videos"
+    )
+    # Already tab-pinned URLs are left untouched
+    assert (
+        youtube_ingest._videos_tab_url("https://www.youtube.com/@NATO/videos")
+        == "https://www.youtube.com/@NATO/videos"
+    )
+    assert (
+        youtube_ingest._videos_tab_url("https://www.youtube.com/@NATO/shorts")
+        == "https://www.youtube.com/@NATO/shorts"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Config: per-channel max_n reaches yt_dlp_list (regression: was read as
+# "max_per_run", silently falling back to the default of 3)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_ingest_max_n_config_reaches_yt_dlp_list(
+    tmp_path: pathlib.Path, monkeypatch
+) -> None:
+    import youtube_ingest
+
+    store = InMemoryStore(blob_root=tmp_path / "blobs")
+    bus = _ClosableInMemoryBus()
+    captured: list[int] = []
+
+    def fake_yt_dlp_list(ch, max_n):
+        captured.append(max_n)
+        return []
+
+    channels = [{"channel": "https://youtube.com/@test", "max_n": 7, "name": "T"}]
+    monkeypatch.setattr(youtube_ingest, "load_channels", lambda: channels)
+    monkeypatch.setattr(youtube_ingest, "build_store", lambda: store)
+    monkeypatch.setattr(youtube_ingest, "build_bus", lambda: bus)
+    monkeypatch.setattr(youtube_ingest, "yt_dlp_list", fake_yt_dlp_list)
+    monkeypatch.setattr(youtube_ingest, "OUT_DIR", str(tmp_path / "feeds"))
+
+    await youtube_ingest.ingest()
+
+    assert captured == [7], "max_n from YT_CHANNELS config must reach yt_dlp_list"
 
 
 # ---------------------------------------------------------------------------
