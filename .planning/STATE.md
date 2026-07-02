@@ -3,20 +3,53 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: In progress
-stopped_at: "Phase 5 Wave 4 — embedder gap fixed; 05-05 Task 3 still BLOCKED (empty infotriage.articles)"
-last_updated: "2026-07-01T12:18:09.444Z"
+stopped_at: "Phase 5 COMPLETE — 05-05 Task 3 parity gate MET (14/14), Fever cutover confirmed. Ready to plan Phase 6."
+last_updated: "2026-07-02T06:38:50.000Z"
 progress:
   total_phases: 13
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 26
-  completed_plans: 24
-  percent: 31
+  completed_plans: 25
+  percent: 38
 ---
 
 # STATE — InfoTriage
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-07-02 — Phase 5 COMPLETE (05-05 Task 3 closed out)
+
+### Just-completed
+
+- **05-05-PLAN.md Task 3 (Shadow-run parity gate + Fever cutover, R6)**: Redeployed the
+  05-03 `on_message` header fix (`89d6496`, committed but not yet deployed at session start —
+  the prior session's HANDOFF.json/.continue-here.md were stale on this point). Found and fixed
+  a second real bug: `docker-compose.yml`'s `LLM_BASE_URL` was silently reading the host `.env`'s
+  `127.0.0.1:8000` value via Compose's automatic `.env` substitution instead of the intended
+  `host.docker.internal` container default — every embed call failed with `Connection refused`.
+  Hardcoded the container-only URL (commit `d9714fc`). Populated enrichment rows by republishing
+  `item.ingested` via `rabbitmqadmin` for existing `infotriage.articles` rows (43 total, 0 DLQ
+  failures). First `shadow_run.py` run showed 6/15 matching — diagnosed as a methodology bug, not
+  a scoring bug: 9-29 of the rows were dedup short-circuits (D-01, `bucket=skip`, `why="duplicate
+  of <id>"`, no LLM call) that a naive rescore always disagrees with. Fixed `shadow_run.py` to
+  exclude dedup rows from the parity count (commit `f7430ef`). Corrected run: **14/14 genuinely-
+  scored buckets matched (100%)** — parity verdict MET. Verified the host crontab fever entry was
+  already absent (`crontab -l` → "no crontab for vidarbrevik") — R6's cutover end-state already
+  satisfied, no removal action needed. **Phase 5 (Triage app) now 5/5 plans complete.**
+  Commits: `d9714fc`, `f7430ef`, `1849f2a` (SUMMARY + ROADMAP + HANDOFF/continue-here cleanup).
+
+### Decisions recorded
+
+- **docker-compose.yml container env vars must never use `${VAR:-default}` for a var name that
+  also exists in host `.env`** — Compose auto-loads the project `.env` for substitution, so a
+  host-scoped value (e.g. `LLM_BASE_URL=127.0.0.1` for host scripts) silently overrides the
+  container-appropriate default. Hardcode container-only values instead of relying on the
+  fallback pattern when the var name collides with a host-side config need.
+- **shadow_run.py / any future parity-style comparison must account for dedup short-circuits** —
+  comparing a dedup-skip (no LLM call) against an independent rescore (which has no dedup
+  awareness) measures dedup coverage, not scoring agreement. Exclude those rows from parity
+  counts and report them separately.
 
 ## Session: 2026-06-27 — Phase 1 COMPLETE (01-03 stale doc fixes, SPEC R6)
 
