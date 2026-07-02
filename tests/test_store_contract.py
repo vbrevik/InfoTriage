@@ -40,9 +40,16 @@ def _pg_reachable() -> bool:
         return False
 
 
-db_live = pytest.mark.skipif(
-    not _pg_reachable(),
-    reason="Postgres :22000 unreachable — integration test skipped",
+# db_live + skipif marks: the registered 'db_live' marker (so `pytest -m "not db_live"`
+# actually deselects this fixture's postgres variant — a plain skipif-only mark here
+# would NOT carry the db_live marker, since skipif and db_live are two independent
+# marks, not one) plus auto-skip when PG is unreachable.
+db_live = (
+    pytest.mark.db_live,
+    pytest.mark.skipif(
+        not _pg_reachable(),
+        reason="Postgres :22000 unreachable — integration test skipped",
+    ),
 )
 
 
