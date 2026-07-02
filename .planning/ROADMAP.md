@@ -24,7 +24,7 @@ urgent insertions. The all-local-LLM rule (ADR-004) is never revisited by a phas
 - [x] **Phase 2: Storage — Postgres + blobs** (M1) - canonical store behind a store interface (completed 2026-06-28)
 - [x] **Phase 3: Bus — RabbitMQ** (M1) - AMQP transport + bus client (completed 2026-06-29)
 - [x] **Phase 4: Ingest adapters + Gmail MCP** (M1) - containerize bridges + self-hosted Gmail MCP (OAuth2) (completed 2026-06-29)
-- [ ] **Phase 5: Triage app** (M1) - event-driven scorer + pgvector dedup
+- [x] **Phase 5: Triage app** (M1) - event-driven scorer + pgvector dedup (completed 2026-07-02)
 - [ ] **Phase 6: Brief app** (M1) - SAB renderer + Obsidian vault-writer
 - [ ] **Phase 7: Ops + cutover** (M1) - health, DLQ, replay, retire host path
 - [ ] **Phase 8: Entity resolution** (M2) - Postgres + pgvector → Obsidian projection
@@ -173,7 +173,7 @@ to the running pipeline.
   3. Semantic dedup uses pgvector + the dedicated embedding model, replacing keyword overlap.
   4. Shadow-run vs the old path matches, then cut over; the Fever poll is removed.
 
-**Plans**: 4/5 plans executed
+**Plans**: 5/5 plans complete
 
 **Wave 1** *(parallel — no file overlap)*
 
@@ -190,7 +190,7 @@ to the running pipeline.
 
 **Wave 4** *(blocked on Wave 3)*
 
-- [ ] 05-05-PLAN.md — Shadow-run parity (scripts/shadow_run.py) + [BLOCKING] Fever cutover gate (>=10 matching buckets) + README retire (W4) — R6
+- [x] 05-05-PLAN.md — Shadow-run parity (scripts/shadow_run.py) + [BLOCKING] Fever cutover gate (>=10 matching buckets) + README retire (W4) — R6
 
 ### Phase 6: Brief app
 
