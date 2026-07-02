@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: In progress
-stopped_at: "Phase 5 COMPLETE — 05-05 Task 3 parity gate MET (14/14), Fever cutover confirmed. Ready to plan Phase 6."
-last_updated: "2026-07-02T06:38:50.000Z"
+status: Ready to plan
+stopped_at: "Phase 5 verified (27/27 must-haves, VERIFICATION.md passed). Ready to plan Phase 6 (Brief app)."
+last_updated: "2026-07-02T07:14:04.649Z"
 progress:
   total_phases: 13
   completed_phases: 5
@@ -46,6 +46,7 @@ progress:
   host-scoped value (e.g. `LLM_BASE_URL=127.0.0.1` for host scripts) silently overrides the
   container-appropriate default. Hardcode container-only values instead of relying on the
   fallback pattern when the var name collides with a host-side config need.
+
 - **shadow_run.py / any future parity-style comparison must account for dedup short-circuits** —
   comparing a dedup-skip (no LLM call) against an independent rescore (which has no dedup
   awareness) measures dedup coverage, not scoring agreement. Exclude those rows from parity
@@ -258,9 +259,11 @@ progress:
   `running` and `q.triage` with an active consumer, days after the original test).
   Operator approved. Commits `aff9373` (Dockerfile/requirements.txt), `9910278`
   (docker-compose.yml).
+
   - Deviation (Rule 3): `requirements.txt` needed `feedgen`/`pydantic`/`PyYAML` beyond
     the plan's literal `aio-pika`/`psycopg[binary]`/`pgvector` — `libs/store` and
     `libs/contracts` are installed `--no-deps` and import these at module level.
+
   - Known gap (non-blocking): `intfloat/multilingual-e5-large` is not yet registered
     on the host oMLX instance — `worker.py`'s `get_embedding()` will 404 on a real
     end-to-end run until that model is set up. Tracked as a Phase 5 follow-up.
@@ -285,6 +288,7 @@ Two independent, pre-existing blockers, confirmed live (not guessed):
    from inside the `infotriage-triage` container → clean `404`. Docker networking itself is
    fine (`host.docker.internal` resolves and `/health` returns 200) — this is purely a
    missing-model-registration issue on the host, not a bug in 05-04's compose config.
+
 2. **New finding — `infotriage.articles` has 0 rows.** This contradicts this STATE.md's
    earlier note about "111 existing articles" (stale — likely referred to the old `.spike/`
    corpus from Phase 0, torn down before Phase 5). `infotriage-postgres` has a persistent
