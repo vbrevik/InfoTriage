@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to plan
-stopped_at: "Resumed from pause; fixed youtube ingest max_n + tab over-fetch (0c6d75e, deployed). Ready to plan Phase 6 (Brief app). Open: 3 dead YT_CHANNELS handles (user decision), CR-01, Postgres reconnect."
+stopped_at: "Resumed from pause; fixed youtube ingest max_n + tab over-fetch (0c6d75e, deployed). YT_CHANNELS updated per user: @BellingcatOfficial in, @theisw/@NRKnyheter dropped — verified live, exact counts. Ready to plan Phase 6 (Brief app). Open: CR-01, Postgres reconnect."
 last_updated: "2026-07-02T09:55:00.000Z"
 progress:
   total_phases: 13
