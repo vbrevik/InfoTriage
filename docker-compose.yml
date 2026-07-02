@@ -131,7 +131,10 @@ services:
       INFOTRIAGE_PG_DSN: ${INFOTRIAGE_PG_DSN:-postgresql://infotriage:infotriage_dev@postgres:5432/infotriage}
       INFOTRIAGE_AMQP_DSN: ${INFOTRIAGE_AMQP_DSN:-amqp://infotriage:infotriage_rmq@rabbitmq:5672}
       INFOTRIAGE_BLOB_ROOT: /data/blobs
-      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:8000/v1}   # host oMLX — ADR-004, local only
+      # NOT ${LLM_BASE_URL:-...}: .env's LLM_BASE_URL=127.0.0.1 is for host-side scripts
+      # (e.g. triage_score.py run on the Mac); 127.0.0.1 inside this container is the
+      # container itself, not the host, so that value must never leak in here.
+      LLM_BASE_URL: http://host.docker.internal:8000/v1   # host oMLX — ADR-004, local only
       LLM_API_KEY: ${LLM_API_KEY:-omlx}
       LLM_MODEL: ${LLM_MODEL:-qwen36-ud-4bit}
     extra_hosts:
