@@ -37,7 +37,7 @@ DEV_DSN = "postgresql://infotriage:infotriage_dev@localhost:22000/infotriage"
 PARITY_BAR = 10  # D-09: >= 10 matching buckets required before Fever cutover
 
 QUERY = """
-    SELECT e.item_id, a.title, a.summary, a.source, e.bucket
+    SELECT e.item_id, a.title, a.summary, a.source, e.bucket, e.why
     FROM infotriage.enrichment e
     JOIN infotriage.articles a ON a.id = e.item_id
     WHERE e.bucket IS NOT NULL
@@ -64,10 +64,24 @@ def main() -> None:
     print("-" * len(header))
 
     matches = 0
+    dedup_skipped = 0
+    compared = 0
     for row in rows:
         item_id = str(row["item_id"])
         title = row["title"] or ""
         stored_bucket = row["bucket"]
+
+        # Dedup short-circuits (D-01) never call the LLM — the worker stores
+        # bucket=skip with why="duplicate of <id>" and no score. A fresh
+        # standalone rescore has no notion of "duplicate of X" and will
+        # naturally disagree; comparing them measures dedup logic, not
+        # scoring parity, so these rows are excluded from the parity count.
+        if (row["why"] or "").startswith("duplicate of"):
+            dedup_skipped += 1
+            print(f"{item_id[:8]:<10} {title[:40]:<42} {stored_bucket or '':<10} {'—':<10} DEDUP (excluded)")
+            continue
+
+        compared += 1
         rescored = score_item(
             {
                 "title": title,
@@ -87,7 +101,7 @@ def main() -> None:
 
     total = len(rows)
     print("-" * len(header))
-    print(f"Compared: {total}  Matching buckets: {matches}")
+    print(f"Total rows: {total}  Dedup (excluded): {dedup_skipped}  Compared: {compared}  Matching buckets: {matches}")
     if matches >= PARITY_BAR:
         print(f"Parity verdict: MET ({matches} >= {PARITY_BAR} matching buckets).")
     else:
