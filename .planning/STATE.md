@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to plan
-stopped_at: "Phase 5 verified (27/27 must-haves, VERIFICATION.md passed). Ready to plan Phase 6 (Brief app)."
-last_updated: "2026-07-02T07:14:04.649Z"
+stopped_at: "Resumed from pause; fixed youtube ingest max_n + tab over-fetch (0c6d75e, deployed). Ready to plan Phase 6 (Brief app). Open: 3 dead YT_CHANNELS handles (user decision), CR-01, Postgres reconnect."
+last_updated: "2026-07-02T09:55:00.000Z"
 progress:
   total_phases: 13
   completed_phases: 5
@@ -17,6 +17,28 @@ progress:
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-07-02 (resume) — youtube ingest fixes (max_n + tab over-fetch)
+
+### Just-completed
+
+- Resumed from HANDOFF.json (between-phases pause, Phase 5 closed). User AFK at the
+  pending question, so proceeded with the recommended small fix.
+- **Fixed `youtube_ingest.py` max_n key mismatch** (HANDOFF task 11): `ingest()` read
+  `c.get("max_per_run", 3)` but `YT_CHANNELS` uses `"max_n"` — per-channel limits were
+  silently ignored. Added regression test (verified it fails on pre-fix code via stash).
+- **Root-caused + fixed the yt-dlp over-fetch** (HANDOFF task 12): bare channel-root URLs
+  expand to up to 3 tab playlists (Videos/Shorts/Live) and `-I 1:N` applies PER TAB —
+  NATO returned 15 for max_n=5 (3 per tab × 3 tabs, confirmed via `%(playlist_title)s`).
+  Fixed by pinning URLs to `/videos` unless a tab is already named. Also surfaced yt-dlp
+  non-zero exits to stderr (were swallowed as "empty channel"). Commit `0c6d75e`,
+  redeployed, verified live: NATO now returns exactly 5.
+- **Found 3 dead/broken channels in `.env` `YT_CHANNELS`** (not fixed — editorial/user
+  decision): `@bellingcat` → 404 (real channel now at `@BellingcatOfficial`, verified),
+  `@NRKnyheter` → 404 (`@NRK` exists but is general NRK, not Nyheter), `@theisw` → 200
+  on curl but yt-dlp lists NO tabs/videos at all (channel appears contentless via API).
+- Legacy `apps/ingest/yt_to_atom.py` still uses `max_per_run` internally — left alone
+  (not deployed in docker-compose, internally consistent).
 
 ## Session: 2026-07-02 — Phase 5 COMPLETE (05-05 Task 3 closed out)
 
