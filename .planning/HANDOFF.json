@@ -1,0 +1,47 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-07-02T11:36:31.815Z",
+  "phase": null,
+  "phase_name": null,
+  "phase_dir": null,
+  "plan": null,
+  "task": null,
+  "total_tasks": null,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "Fixed youtube_ingest.py max_n config key mismatch (was reading max_per_run, config uses max_n — per-channel limits silently ignored)", "status": "done", "commit": "0c6d75e"},
+    {"id": 2, "name": "Root-caused + fixed yt-dlp over-fetch: bare channel-root URLs expand to up to 3 tab playlists (Videos/Shorts/Live) and -I 1:N applies PER TAB (NATO: 15 for max_n=5). Fixed by pinning URLs to /videos via _videos_tab_url()", "status": "done", "commit": "0c6d75e"},
+    {"id": 3, "name": "Surfaced yt-dlp non-zero exits to stderr (were silently parsed as 'empty channel')", "status": "done", "commit": "0c6d75e"},
+    {"id": 4, "name": "Added 2 regression tests (max_n reaches yt_dlp_list — verified fails on pre-fix code via stash; _videos_tab_url pinning). Suite: 7/7 pass", "status": "done", "commit": "0c6d75e"},
+    {"id": 5, "name": "Rebuilt + redeployed ingest-youtube container, live-verified: NATO returns exactly 5 for max_n=5", "status": "done", "commit": "0c6d75e"},
+    {"id": 6, "name": "Updated .env YT_CHANNELS per user: @bellingcat → @BellingcatOfficial (verified real channel), dropped @theisw (contentless via yt-dlp API) and @NRKnyheter (404). Container recreated, fresh run: zero errors, every feed exactly max_n (Bellingcat 10, NATO 5, Karpathy 5, NVIDIA 5). Postgres: 45 yt articles", "status": "done", "progress": ".env not git-tracked; backup at .env.bak-channels"},
+    {"id": 7, "name": "Consumed prior HANDOFF.json/.continue-here.md, updated STATE.md", "status": "done", "commit": "fe59b49"}
+  ],
+  "remaining_tasks": [
+    {"id": 8, "name": "Fix CR-01 (05-REVIEW.md): RabbitMQBus._rebuild_topology() deletes all 5 production queues on any AMQP 406, no dev/prod gate", "status": "not_started"},
+    {"id": 9, "name": "Give triage worker's PostgresStore reconnect-on-SQL-error logic (mirrors RabbitMQ connect_robust) — poisoned-connection incident recurs otherwise", "status": "not_started"},
+    {"id": 10, "name": "Architectural: point DEV_DSN at a genuinely separate test DB (shared dev/test Postgres footgun)", "status": "not_started"},
+    {"id": 11, "name": "Decide cleanup of stale feed XMLs for dropped channels (youtube-isw.xml, youtube-nrk-nyheter.xml, youtube-youtubeofficial.xml) + corresponding FreshRSS subscriptions", "status": "not_started"},
+    {"id": 12, "name": "Delete .env.bak-channels once user confirms channel list is right", "status": "not_started"},
+    {"id": 13, "name": "Phase 6 (Brief app) — not started, no CONTEXT.md/PLAN.md. /gsd-discuss-phase 6 is the entry point", "status": "not_started"}
+  ],
+  "blockers": [
+    {"description": "CR-01: RabbitMQBus._rebuild_topology() deletes all 5 production queues (not just the mismatched one) on any AMQP 406, no dev/prod gate. A routine redeploy changing any queue argument could silently drop every in-flight message.", "type": "technical", "workaround": "None applied — advisory per code-review gate design, does not block Phase 6."},
+    {"description": "Shared dev/test Postgres: DEV_DSN (test fixtures) IS the live Postgres the docker-compose stack uses. Marker bugs fixed (7fd0023) but the architecture is unchanged.", "type": "technical", "workaround": "Before running any Postgres-touching test file, verify its postgres-param variants carry the real pytest.mark.db_live marker; prefer -m 'not db_live'."}
+  ],
+  "async_jobs": [],
+  "human_actions_pending": [
+    {"action": "Confirm final YT_CHANNELS list — @theisw and @NRKnyheter were BOTH dropped on best judgment (user message was mangled by a path autocomplete; AskUserQuestion timed out). Re-add either from .env.bak-channels if only one was meant", "context": "Both handles were broken (404 / contentless), so dropping both was safe, but the user's exact intent was never confirmed.", "blocking": false},
+    {"action": "Decide whether ISW and NRK Nyheter need replacement sources (no working YouTube handle found for either; @NRK is general NRK, not Nyheter)", "context": "ISW and NRK news coverage is now absent from youtube ingest.", "blocking": false},
+    {"action": "Start Phase 6 (Brief app) whenever ready — /gsd-discuss-phase 6", "context": "Phase 5 fully closed; Phase 6 has no CONTEXT.md yet.", "blocking": false}
+  ],
+  "decisions": [
+    {"decision": "Pinned yt-dlp channel URLs to the /videos tab (skip Shorts/Live) rather than truncating the merged list to max_n", "rationale": "Root cause was per-tab application of -I 1:N; /videos gives deterministic, shorts-free results appropriate for triage. URLs already naming a tab are left untouched.", "phase": null},
+    {"decision": "Dropped BOTH @theisw and @NRKnyheter when the user's 'drop @…' message was mangled and the clarifying question timed out", "rationale": "Both were verifiably broken (NRKnyheter 404s; theisw lists no tabs/videos via yt-dlp), so keeping either only produced silent-empty ingests. Old line preserved in .env.bak-channels for trivial rollback.", "phase": null},
+    {"decision": "Left legacy apps/ingest/yt_to_atom.py using max_per_run", "rationale": "Not deployed in docker-compose, internally consistent (its own docstring documents max_per_run). Surgical-changes rule: not part of the request.", "phase": null},
+    {"decision": "Did not edit FreshRSS subscriptions or delete stale feed XMLs for dropped channels", "rationale": "Separate user-facing decision; removing the XMLs would 404 existing FreshRSS subscriptions.", "phase": null}
+  ],
+  "uncommitted_files": [".env (modified, not git-tracked)", ".env.bak-channels (untracked backup)", ".planning/research/ (pre-existing untracked, not mine)"],
+  "next_action": "Either start Phase 6 (/gsd-discuss-phase 6 — no CONTEXT.md yet) or pick up one of the two carried advisories (CR-01 topology-rebuild fix, PostgresStore reconnect-on-error). Confirm the YT_CHANNELS list with the user first if they're present.",
+  "context_notes": "Short operational session between phases: resumed from prior pause, knocked out both pending youtube-ingest bugs (max_n key + per-tab over-fetch, one commit 0c6d75e, deployed and live-verified with exact counts), then updated the channel list per a partially-mangled user request. Phase 5 remains fully closed; Phase 6 untouched. Full docker-compose stack up and healthy — nothing needs restarting on resume. 45 yt articles in Postgres, DLQ empty."
+}
