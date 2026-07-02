@@ -84,6 +84,12 @@ These are not defaults — they are rules. If a future change appears to violate
 | qwen36 triage vs oMLX endpoint | ✅ correct buckets, ~3 s/item |
 | `.env.example` | ✅ **exists** (README/PROJECT previously said missing) |
 
+**Phase 5 complete (2026-07-02):** `apps/triage/worker.py` is the live production scoring path —
+event-driven (`item.ingested` → mE5-large dedup → qwen36 scoring against `ccir.md` →
+`infotriage.enrichment` → `verdict.ready`), containerized at `:22030`. `fever_triage.py` retired
+from production (file preserved for `digest.py` imports); host crontab has no fever entry.
+Shadow-run parity confirmed 14/14 (100%) before cutover (R6). VERIFICATION.md: 27/27 must-haves.
+
 ## North-star benchmark (ADR-003)
 
 | Capability | North star | InfoTriage's personal-scale shadow |
