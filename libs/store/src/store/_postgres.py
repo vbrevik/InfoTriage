@@ -84,6 +84,24 @@ class PostgresStore:
             self._conn = None
 
     # -------------------------------------------------------------------------
+    # Raw read cursor (Phase 6: brief consumer/server ad-hoc SELECTs)
+    # -------------------------------------------------------------------------
+
+    def cursor(self, row_factory=None):
+        """Return a cursor on the open connection for ad-hoc SELECTs.
+
+        row_factory=None inherits the connection's dict_row. psycopg3
+        connections serialize access internally, so cursors from multiple
+        threads (asyncio.to_thread callers) are safe.
+        """
+        assert self._conn is not None, (
+            "PostgresStore used outside 'with' block — connection not open"
+        )
+        if row_factory is None:
+            return self._conn.cursor()
+        return self._conn.cursor(row_factory=row_factory)
+
+    # -------------------------------------------------------------------------
     # Schema bootstrap (R1, DD-2)
     # -------------------------------------------------------------------------
 
