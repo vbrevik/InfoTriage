@@ -2,21 +2,56 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: "Resumed from pause; fixed youtube ingest max_n + tab over-fetch (0c6d75e, deployed). YT_CHANNELS updated per user: @BellingcatOfficial in, @theisw/@NRKnyheter dropped — verified live, exact counts. Ready to plan Phase 6 (Brief app). Open: CR-01, Postgres reconnect."
-last_updated: "2026-07-02T09:55:00.000Z"
+status: Phase 6 in progress — plan 06-01 + Wave 2 done, plan 06-02 (clustering/window) next
+stopped_at: "Resumed from false-SUMMARY handoff; corrected SUMMARY, delivered + live-verified Wave 2 (main.py :22040, html_renderer, Dockerfile, compose 'brief'). Fixed 4 latent Wave 1 consumer bugs + added PostgresStore.cursor(). E2E: verdict.ready → 4 digests → sab.published in q.notify. Next: /gsd-plan-phase 6 for 06-02 (pgvector clustering.py + window.py incremental BLUF). Open: CR-01, Postgres reconnect."
+last_updated: "2026-07-05T17:05:00.000Z"
 progress:
   total_phases: 13
   completed_phases: 5
-  total_plans: 26
-  completed_plans: 25
-  percent: 38
+  total_plans: 27
+  completed_plans: 27
+  percent: 40
 ---
 
 # STATE — InfoTriage
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-07-05 (resume) — Phase 6 recovery: false SUMMARY fixed, Wave 2 delivered
+
+### Just-completed
+
+- Resumed from HANDOFF.json + .continue-here.md (phase 6 paused at task 3/3 after a
+  prior run wrote a SUMMARY with false Wave 2 completion claims — stalled bg executor).
+- **Corrected 06-01-SUMMARY.md** to verified disk state; committed Wave 1 (renderer,
+  consumer, tests) which was sitting untracked (`eec345d`).
+- **Added SabPublished YAML-codec roundtrip test** (plan Task 1 residual; note: repo
+  convention is `tests/test_contracts.py`, plan's `libs/contracts/tests/` never existed).
+- **Wave 2 delivered + live-verified** (`316a20f`, `01ed73c`, `af9dcac`): main.py FastAPI
+  (:22040, staleness gate D-01, ?window D-10, ?mode=list), html_renderer.py (delegates to
+  sab_html.build_html — template imported not copied, D-12), Dockerfile (ships ccir.md for
+  digest.py's import-time sync guard), compose service `brief` (127.0.0.1:22040, D-14).
+- **Found + fixed 4 latent Wave 1 consumer bugs during live verify** (consumer had never
+  run against real infra): enrichment SQL missing JOIN to articles (title/summary/source/
+  url live there — UndefinedColumn crash); `_fetch`/`_render_bluf_all_sections` were
+  `async def` run via `to_thread` → returned coroutines (bluf.md write TypeError); no
+  rollback after failed statements (poisoned the shared psycopg conn); digests dir
+  split-brain (consumer wrote $BLOB_ROOT/digests, server served $DIGESTS_DIR).
+- **Added `PostgresStore.cursor()`** — store had no read-cursor API at all.
+- **E2E verified**: republished verdict.ready via rabbitmqadmin → all 4 digests
+  atomically rewritten (incl. bluf.md) → sab.published event landed in q.notify.
+  Container healthy, /sab 200, cached serve <2ms.
+
+### Decisions recorded
+
+- **Never write SUMMARY.md before verifying claimed artifacts exist on disk** — run
+  `git status` + `ls` first. The false 06-01-SUMMARY came from a run that trusted plan
+  frontmatter over reality.
+- **`asyncio.to_thread(fn)` requires plain `def`** — an `async def` passed to to_thread
+  returns an un-awaited coroutine that silently flows into downstream code.
+- **Phase 6 remaining scope → plan 06-02**: pgvector clustering.py + window.py
+  incremental BLUF (D-05/D-06/D-08/D-11). Do NOT mark phase 6 complete.
 
 ## Session: 2026-07-02 (resume) — youtube ingest fixes (max_n + tab over-fetch)
 
