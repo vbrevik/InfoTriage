@@ -1,0 +1,11 @@
+# brief app third-party runtime dependencies
+# Transitive deps of the local libs (contracts, store) are listed here because
+# those libs are installed with --no-deps in the Dockerfile (same as apps/triage).
+aio-pika>=9.6
+psycopg[binary]>=3.3
+pgvector>=0.4.2
+feedgen>=0.3.1
+pydantic>=2.0
+PyYAML>=6.0
+fastapi>=0.115
+uvicorn>=0.30
