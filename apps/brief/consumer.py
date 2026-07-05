@@ -27,8 +27,8 @@ from apps.brief.renderer import (  # noqa: E402
 
 log = logging.getLogger(__name__)
 
-OUT_ROOT = Path(os.environ.get("INFOTRIAGE_BLOB_ROOT", "/data/blobs"))
-DATA_DIR = OUT_ROOT / "digests"
+# Same env + default as main.py — consumer writes where the HTTP server serves (D-03)
+DATA_DIR = Path(os.environ.get("INFOTRIAGE_DIGESTS_DIR", "data/digests"))
 
 
 # ---------------------------------------------------------------------------
@@ -51,15 +51,26 @@ async def process_verdict(
     R2: Renders brief.md, cluster.md, list.md, bluf.md from Postgres enrichment rows
     R5: Publishes SabPublished with topic BLUFs and item refs
     """
-    # Fetch enrichment row from Postgres
-    async def _fetch():
+    # Fetch enrichment row from Postgres.
+    # title/summary/source/url live on infotriage.articles — enrichment holds
+    # only scoring columns (005-stubs + 006-enrichment), hence the JOIN.
+    _SELECT = (
+        "SELECT e.item_id, e.ccir, e.cnr, e.score, e.bucket, e.why, e.pmesii, e.tessoc, "
+        "a.title, a.summary, a.source, a.url, a.ts "
+        "FROM infotriage.enrichment e "
+        "JOIN infotriage.articles a ON a.id = e.item_id "
+    )
+
+    def _fetch():  # plain def — runs inside asyncio.to_thread
         with store.cursor() as cur:
-            cur.execute(
-                "SELECT item_id, ccir, cnr, score, bucket, why, pmesii, tessoc, "
-                "title, summary, source FROM infotriage.enrichment WHERE item_id = %s",
-                (item_id,),
-            )
-            return cur.fetchone()
+            try:
+                cur.execute(_SELECT + "WHERE e.item_id = %s", (item_id,))
+                row = cur.fetchone()
+                cur.connection.commit()  # end read txn
+                return row
+            except Exception:
+                cur.connection.rollback()  # un-poison shared connection for next message
+                raise
 
     row = await asyncio.to_thread(_fetch)
     if row is None:
@@ -71,11 +82,14 @@ async def process_verdict(
     
     def _fetch_all():
         with store.cursor(row_factory=dict_row) as cur:
-            cur.execute(
-                "SELECT item_id, ccir, cnr, score, bucket, why, pmesii, tessoc, "
-                "title, summary, source FROM infotriage.enrichment ORDER BY score DESC"
-            )
-            return cur.fetchall()
+            try:
+                cur.execute(_SELECT + "ORDER BY e.score DESC")
+                rows = cur.fetchall()
+                cur.connection.commit()  # end read txn
+                return rows
+            except Exception:
+                cur.connection.rollback()
+                raise
 
     enrichment_rows = await asyncio.to_thread(_fetch_all)
 
@@ -127,8 +141,8 @@ async def process_verdict(
             "n": r.get("score", 0),
             "title": r.get("title", ""),
             "source": r.get("source", ""),
-            "url": "",
-            "ts": "",
+            "url": r.get("url", ""),
+            "ts": r.get("ts", ""),
         }
         for r in enrichment_rows[:50]  # top 50 refs
     ]
@@ -152,7 +166,9 @@ async def process_verdict(
     return event
 
 
-async def _render_bluf_all_sections(enrichment_rows: list[dict]) -> str:
+def _render_bluf_all_sections(enrichment_rows: list[dict]) -> str:
+    # plain def — runs inside asyncio.to_thread; async def here returned an
+    # un-awaited coroutine to write_text (TypeError: data must be str)
     """Render BLUF for all CCIR sections with items score >= 8."""
     from apps.brief.renderer import CCIR_ORDER, render_bluf  # noqa: E402
     
