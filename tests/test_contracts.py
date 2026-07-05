@@ -185,6 +185,26 @@ def test_sab_published_missing_required_raises():
         )  # missing total_keep
 
 
+def test_sab_published_roundtrip():
+    """SabPublished survives a full YAML-codec round-trip (model → frontmatter → model)."""
+    ev = SabPublished(
+        event="sab.published",
+        pub_ts=TS,
+        snapshot_day="2026-06-27",
+        ccir_topics=["PIR-1", "PIR-2"],
+        bluf_by_topic={"PIR-1": "Russland angrep [1] infrastruktur — Åse Ø-test."},
+        item_refs=[{"item_id": "abc", "ccir": "PIR-1", "cnr": "I", "n": 1, "title": "Test", "source": "NRK", "url": "https://nrk.no/1", "ts": TS}],
+        total_keep=5,
+        since_ts=None,
+    )
+    text = to_frontmatter(ev.model_dump())
+    restored = SabPublished(**from_frontmatter(text))
+    assert restored == ev
+    assert restored.pub_ts == TS                        # tz-aware datetime value preserved
+    assert "[1]" in restored.bluf_by_topic["PIR-1"]     # citation markers preserved
+    assert restored.item_refs[0]["ts"] == TS            # nested datetime preserved
+
+
 def test_feed_unhealthy_valid():
     """FeedUnhealthy validates a well-formed payload."""
     ev = FeedUnhealthy(
