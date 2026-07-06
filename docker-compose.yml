@@ -15,6 +15,12 @@ services:
       CRON_MIN: "23,53"      # twice an hour (not on the :00 stampede)
     volumes:
       - ./data/freshrss:/var/www/FreshRSS/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:80/ | grep -q '<title>' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks: [infotriage]
 
   rssbridge:
@@ -25,6 +31,12 @@ services:
       - "3000:80"            # http://localhost:3000  (turn any site into RSS)
     volumes:
       - ./data/rssbridge:/config
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:80/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     networks: [infotriage]
 
   # Static server so FreshRSS can subscribe to the locally-generated email feed
@@ -38,6 +50,11 @@ services:
       PORT: "80"
     volumes:
       - ./data/feeds:/web:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:80/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks: [infotriage]
 
   # Postgres 16 + pgvector for Phase 2+ storage.
@@ -105,6 +122,12 @@ services:
       INFOTRIAGE_BLOB_ROOT: /data/blobs
     volumes:
       - ./data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     depends_on:
       postgres:
         condition: service_healthy
@@ -212,6 +235,12 @@ services:
     volumes:
       - ./data:/data
       - ./data/feeds:/app/data/feeds   # writable: ingest-youtube writes Atom XML for FreshRSS
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     depends_on:
       postgres:
         condition: service_healthy
@@ -238,6 +267,12 @@ services:
       CLIENT_ID: ${GMAIL_OAUTH2_CLIENT_ID}
       CLIENT_SECRET: ${GMAIL_OAUTH2_CLIENT_SECRET}
       REFRESH_TOKEN: ${GMAIL_OAUTH2_REFRESH_TOKEN}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks: [infotriage]
 
   ingest-gmail:
@@ -259,6 +294,12 @@ services:
       GMAIL_QUERY: ${GMAIL_QUERY:-newer_than:7d}
     volumes:
       - ./data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     depends_on:
       postgres:
         condition: service_healthy
@@ -287,6 +328,12 @@ services:
     volumes:
       - ./data:/data
       - ${OBSIDIAN_VAULT_PATH}/articles-inbox:/vault/articles-inbox:ro   # READ-ONLY vault (T-04-17)
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     depends_on:
       postgres:
         condition: service_healthy
@@ -312,6 +359,12 @@ services:
       SCHEDULE_YOUTUBE: ${SCHEDULE_YOUTUBE:-0 */4 * * *}
       SCHEDULE_GMAIL: ${SCHEDULE_GMAIL:-0 */2 * * *}
       SCHEDULE_OBSIDIAN: ${SCHEDULE_OBSIDIAN:-*/30 * * * *}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     depends_on:
       - ingest-imap
       - ingest-youtube
