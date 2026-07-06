@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 6 in progress — plan 06-01 + Wave 2 done, plan 06-02 (clustering/window) next
-stopped_at: "Resumed from false-SUMMARY handoff; corrected SUMMARY, delivered + live-verified Wave 2 (main.py :22040, html_renderer, Dockerfile, compose 'brief'). Fixed 4 latent Wave 1 consumer bugs + added PostgresStore.cursor(). E2E: verdict.ready → 4 digests → sab.published in q.notify. Next: /gsd-plan-phase 6 for 06-02 (pgvector clustering.py + window.py incremental BLUF). Open: CR-01, Postgres reconnect."
-last_updated: "2026-07-05T17:05:00.000Z"
+status: Phase 6 executed (06-01 + 06-02 done) — VERIFICATION.md pending
+stopped_at: null
+last_updated: "2026-07-06T14:00:00.000Z"
 progress:
   total_phases: 13
-  completed_phases: 5
-  total_plans: 27
-  completed_plans: 27
-  percent: 40
+  completed_phases: 7
+  total_plans: 28
+  completed_plans: 28
+  percent: 54
 ---
 
 # STATE — InfoTriage
@@ -18,26 +18,45 @@ progress:
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
 
+## Session: 2026-07-06 — Integrity fix: stranded 06-02 work committed
+
+### Just-completed
+
+- **Committed stranded 06-02 implementation.** Commit `3047116` ("plan 06-02 complete")
+  contained only PLAN.md — the actual code (apps/brief/clustering.py, main.py/renderer.py
+  wiring, tests/test_brief_clustering.py) plus 06-02-SUMMARY.md and 00-07-SUMMARY.md sat
+  uncommitted in the working tree after a session death. Verified tests green before
+  committing.
+- Left untracked on purpose: `.env.bak-channels` (env backup — never commit),
+  `apps/opml-health/` (orphan side work, no plan/summary claims it — needs triage),
+  `.planning/research/` (only a .cache dir).
+- Phase 6 has no VERIFICATION.md — running verification next (Route V.missing).
+
 ## Session: 2026-07-05 (resume) — Phase 6 recovery: false SUMMARY fixed, Wave 2 delivered
 
 ### Just-completed
 
 - Resumed from HANDOFF.json + .continue-here.md (phase 6 paused at task 3/3 after a
   prior run wrote a SUMMARY with false Wave 2 completion claims — stalled bg executor).
+
 - **Corrected 06-01-SUMMARY.md** to verified disk state; committed Wave 1 (renderer,
   consumer, tests) which was sitting untracked (`eec345d`).
+
 - **Added SabPublished YAML-codec roundtrip test** (plan Task 1 residual; note: repo
   convention is `tests/test_contracts.py`, plan's `libs/contracts/tests/` never existed).
+
 - **Wave 2 delivered + live-verified** (`316a20f`, `01ed73c`, `af9dcac`): main.py FastAPI
   (:22040, staleness gate D-01, ?window D-10, ?mode=list), html_renderer.py (delegates to
   sab_html.build_html — template imported not copied, D-12), Dockerfile (ships ccir.md for
   digest.py's import-time sync guard), compose service `brief` (127.0.0.1:22040, D-14).
+
 - **Found + fixed 4 latent Wave 1 consumer bugs during live verify** (consumer had never
   run against real infra): enrichment SQL missing JOIN to articles (title/summary/source/
   url live there — UndefinedColumn crash); `_fetch`/`_render_bluf_all_sections` were
   `async def` run via `to_thread` → returned coroutines (bluf.md write TypeError); no
   rollback after failed statements (poisoned the shared psycopg conn); digests dir
   split-brain (consumer wrote $BLOB_ROOT/digests, server served $DIGESTS_DIR).
+
 - **Added `PostgresStore.cursor()`** — store had no read-cursor API at all.
 - **E2E verified**: republished verdict.ready via rabbitmqadmin → all 4 digests
   atomically rewritten (incl. bluf.md) → sab.published event landed in q.notify.
@@ -48,8 +67,10 @@ progress:
 - **Never write SUMMARY.md before verifying claimed artifacts exist on disk** — run
   `git status` + `ls` first. The false 06-01-SUMMARY came from a run that trusted plan
   frontmatter over reality.
+
 - **`asyncio.to_thread(fn)` requires plain `def`** — an `async def` passed to to_thread
   returns an un-awaited coroutine that silently flows into downstream code.
+
 - **Phase 6 remaining scope → plan 06-02**: pgvector clustering.py + window.py
   incremental BLUF (D-05/D-06/D-08/D-11). Do NOT mark phase 6 complete.
 
@@ -59,19 +80,23 @@ progress:
 
 - Resumed from HANDOFF.json (between-phases pause, Phase 5 closed). User AFK at the
   pending question, so proceeded with the recommended small fix.
+
 - **Fixed `youtube_ingest.py` max_n key mismatch** (HANDOFF task 11): `ingest()` read
   `c.get("max_per_run", 3)` but `YT_CHANNELS` uses `"max_n"` — per-channel limits were
   silently ignored. Added regression test (verified it fails on pre-fix code via stash).
+
 - **Root-caused + fixed the yt-dlp over-fetch** (HANDOFF task 12): bare channel-root URLs
   expand to up to 3 tab playlists (Videos/Shorts/Live) and `-I 1:N` applies PER TAB —
   NATO returned 15 for max_n=5 (3 per tab × 3 tabs, confirmed via `%(playlist_title)s`).
   Fixed by pinning URLs to `/videos` unless a tab is already named. Also surfaced yt-dlp
   non-zero exits to stderr (were swallowed as "empty channel"). Commit `0c6d75e`,
   redeployed, verified live: NATO now returns exactly 5.
+
 - **Found 3 dead/broken channels in `.env` `YT_CHANNELS`** (not fixed — editorial/user
   decision): `@bellingcat` → 404 (real channel now at `@BellingcatOfficial`, verified),
   `@NRKnyheter` → 404 (`@NRK` exists but is general NRK, not Nyheter), `@theisw` → 200
   on curl but yt-dlp lists NO tabs/videos at all (channel appears contentless via API).
+
 - Legacy `apps/ingest/yt_to_atom.py` still uses `max_per_run` internally — left alone
   (not deployed in docker-compose, internally consistent).
 
@@ -388,8 +413,8 @@ untouched this session, still needs separate investigation.
 
 ## Session
 
-**Last session:** 2026-07-01T12:18:09.444Z
-**Stopped at:** Phase 5 Wave 4 — embedder gap fixed; 05-05 Task 3 still BLOCKED (empty infotriage.articles)
+**Last session:** 2026-07-05T17:36:24.673Z
+**Stopped at:** context exhaustion at 81% (2026-07-05)
 **Resume file:** .planning/phases/05-triage-app/05-05-PLAN.md
 
 ## Performance Metrics
