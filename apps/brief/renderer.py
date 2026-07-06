@@ -25,7 +25,8 @@ from typing import Optional
 
 # Import CCIR_ORDER from digest.py — never redefine here
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "triage"))
-from digest import CCIR_ORDER, cluster as _digest_cluster, line as _digest_line  # noqa: E402
+from digest import CCIR_ORDER, line as _digest_line  # noqa: E402
+from apps.brief.clustering import cluster_items_in_memory, EnrichedItem  # noqa: E402
 
 # LLM import for BLUF synthesis
 try:
@@ -46,22 +47,6 @@ _CNR_PRIORITY = {
     "I": 0,     # CAT I first
     "II": 1,    # CAT II second
 }
-
-# STOP words for keyword clustering
-_STOP = set(
-    "the a an of to in on for and or at by with from is are as it its this "
-    "that i og å en et er på til av for som med det den de har om mot ved "
-    "en the of and to in on for or at by with from is are as it its this that "
-    "was are was were be been being have has had do does did will would shall "
-    "should may might can could not no nor but if then than too very just "
-    "about above after again all am an are as at back be because became being "
-    "below between both but by come could did for found her here how i into "
-    "is it just me might more most my myself new no now of off often on only "
-    "or other our out over own same she should so some still such than that "
-    "the their them themselves then there these though through to under until "
-    "up us very was we were what when where which while who whom why will "
-    "with you your yours yourself yourselves".split()
-)
 
 
 def _parse_ccir_display(title_map: dict[str, str], ccir: Optional[str]) -> str:
@@ -115,6 +100,56 @@ def _group_by_ccir(rows: list[dict], ccir_order: list[tuple[str, str]]) -> dict[
                     [by_ccir[cid] for cid in by_ccir if cid not in dict(ccir_order)]))
 
 
+def _rows_to_enriched_items(rows: list[dict]) -> list[EnrichedItem]:
+    """Convert enrichment row dicts to EnrichedItem objects for clustering."""
+    return [
+        EnrichedItem(
+            item_id=r.get("item_id", f"tmp-{i}"),
+            title=r.get("title", ""),
+            source=r.get("source", ""),
+            url=r.get("url", ""),
+            summary=r.get("summary", ""),
+            ccir=r.get("ccir", ""),
+            cnr=r.get("cnr", ""),
+            score=r.get("score", 0),
+            bucket=r.get("bucket", ""),
+            why=r.get("why", ""),
+            pmesii=r.get("pmesii"),
+            tessoc=r.get("tessoc"),
+            embedding=r.get("embedding", [0.0] * 4),
+        )
+        for i, r in enumerate(rows)
+    ]
+
+
+def _enriched_to_dicts(items: list[EnrichedItem]) -> list[dict]:
+    """Convert EnrichedItem objects back to dicts for rendering."""
+    return [{
+        "item_id": i.item_id,
+        "title": i.title,
+        "source": i.source,
+        "url": i.url,
+        "summary": i.summary,
+        "ccir": i.ccir,
+        "cnr": i.cnr,
+        "score": i.score,
+        "bucket": i.bucket,
+        "why": i.why,
+        "pmesii": i.pmesii,
+        "tessoc": i.tessoc,
+        "embedding": i.embedding,
+    } for i in items]
+
+
+def _cluster_rows(rows: list[dict]) -> list[dict]:
+    """Cluster enrichment rows using pgvector. Returns same format as _digest_cluster.
+    
+    Returns list of dicts: [{"items": [dict, dict, ...]}, ...]
+    """
+    items = _rows_to_enriched_items(rows)
+    clusters_raw = cluster_items_in_memory(items, threshold=0.75)
+    return [{"items": _enriched_to_dicts(cl)} for cl in clusters_raw]
+
 def render_brief(
     enrichment_rows: list[dict],
     ccir_order: list[tuple[str, str]] | None = None,
@@ -148,7 +183,7 @@ def render_brief(
     if cat_i:
         lines.append("## 🚩 CNR — varsle straks")
         # Cluster items
-        clusters = _digest_cluster(cat_i)
+        clusters = _cluster_rows(cat_i)
         for cl in clusters:
             lead = max(cl["items"], key=lambda i: i.get("score", 0))
             srcs = sorted({i.get("source", "") for i in cl["items"]})
@@ -176,7 +211,7 @@ def render_brief(
                 continue
             lines.append(f"## {cid} · {title}")
             cs = sorted(
-                _digest_cluster(items),
+                _cluster_rows(items),
                 key=lambda c: -max(i.get("score", 0) for i in c["items"]),
             )
             for cl in cs[:6]:
@@ -321,8 +356,7 @@ def render_cluster(
 ) -> str:
     """Produce cluster markdown grouped by CCIR section.
     
-    Uses keyword-overlap clustering as fallback (pgvector semantic clustering
-    is added in Wave 2).
+    Uses pgvector HNSW semantic clustering per CCIR section.
     
     Args:
         enrichment_rows: list of enrichment row dicts
@@ -354,7 +388,7 @@ def render_cluster(
         if not items:
             continue
         lines.append(f"## {cid} · {title}")
-        clusters = _digest_cluster(items)
+        clusters = _cluster_rows(items)
         for cl in clusters:
             lead = max(cl["items"], key=lambda i: i.get("score", 0))
             srcs = sorted({i.get("source", "") for i in cl["items"]})
@@ -370,7 +404,7 @@ def render_cluster(
     no_ccir = [r for r in enrichment_rows if (r.get("ccir") or "none").lower() == "none"]
     if no_ccir:
         lines.append("## Uten CCIR")
-        for cl in _digest_cluster(no_ccir):
+        for cl in _cluster_rows(no_ccir):
             lead = max(cl["items"], key=lambda i: i.get("score", 0))
             lines.append(
                 f"- **[{lead.get('score')}] {lead.get('title','')}**"

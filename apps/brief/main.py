@@ -40,6 +40,11 @@ SAB_HTML = DATA_DIR / "sab.html"
 STALE_AFTER_S = 24 * 3600  # D-01
 WINDOW_RE = re.compile(r"^(\d{1,3})h$")
 
+# Clustering threshold (0.0–1.0, default 0.75)
+CLUSTER_THRESHOLD = float(os.getenv("CLUSTER_THRESHOLD", "0.75"))
+if not (0.0 <= CLUSTER_THRESHOLD <= 1.0):
+    raise ValueError(f"CLUSTER_THRESHOLD must be 0.0–1.0, got {CLUSTER_THRESHOLD}")
+
 _ENRICHMENT_SQL = (
     "SELECT e.item_id, e.ccir, e.cnr, e.score, e.bucket, e.why, e.pmesii, e.tessoc, "
     "a.title, a.summary, a.source, a.url "
