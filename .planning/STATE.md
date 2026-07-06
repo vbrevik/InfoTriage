@@ -2,7 +2,7 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 6 executed (06-01 + 06-02 done) — VERIFICATION.md pending
+status: Phase 6 verification ran — gaps_found (3 gaps), fix plans needed via plan-phase --gaps
 stopped_at: null
 last_updated: "2026-07-06T14:00:00.000Z"
 progress:
@@ -31,6 +31,15 @@ progress:
   `apps/opml-health/` (orphan side work, no plan/summary claims it — needs triage),
   `.planning/research/` (only a .cache dir).
 - Phase 6 has no VERIFICATION.md — running verification next (Route V.missing).
+- **Verification result: gaps_found (1/3 success criteria).** 06-VERIFICATION.md written.
+  Gap 1 (real bug): production path never joins `infotriage.embeddings` — renderer.py
+  defaults embedding to `[0.0]*4`, cosine distance always 1.0, clustering never merges;
+  pgvector `cluster_items()` is dead code; `CLUSTER_THRESHOLD` validated in main.py but
+  hardcoded 0.75 used in renderer.py. Gap 2: Obsidian vault-writer does not exist —
+  06-SPEC.md descoped it without amending ROADMAP success criteria (commit d0ab4ac's
+  "Obsidian vault-writer" claim is false). Gap 3: SC3 Obsidian half blocked by gap 2.
+  Known test-infra issue: rabbitmq-marker tests need triage/brief containers stopped
+  (live consumers on q.triage/q.brief eat test messages) — contention, not code defect.
 
 ## Session: 2026-07-05 (resume) — Phase 6 recovery: false SUMMARY fixed, Wave 2 delivered
 
