@@ -174,11 +174,20 @@ Downstream agents MUST read `06-SPEC.md` before planning or implementing. Requir
 <deferred>
 ## Deferred Ideas
 
-- Obsidian vault-writer (SAB + Obsidian projection) — belongs in a separate phase (noted in SPEC.md out of scope)
+- ~~Obsidian vault-writer~~ — REVERSED 2026-07-06, see amendment below
 - CNR real-time push notification lane — Phase 12 (CNR alerting / dissemination)
 - `ingest-web` (direct HTTP scraper) — Phase 4 already deferred this; remains deferred
 
 </deferred>
+
+<gap_closure_amendment>
+## Gap-Closure Amendment (2026-07-06)
+
+**Supersedes:** The "Out of scope" vault-writer line in `<spec_lock>` above and the matching (now struck) `<deferred>` entry.
+
+`06-VERIFICATION.md` (2026-07-06) found that ROADMAP.md's Phase 6 Success Criterion #2 (vault-writer) was never amended when this phase's SPEC descoped it during the original discuss-phase interview — no later phase (7–12) claims it either. Per explicit user decision during `/gsd-plan-phase 6 --gaps`: **build the vault-writer now**, added as R6 in `06-SPEC.md`. Since Phase 8 (entity resolution) has not run yet, `[[entity]]` wikilinks use a lightweight interim heuristic — the formal entity-resolution-as-Postgres-truth system remains Phase 8's job.
+
+</gap_closure_amendment>
 
 ---
 

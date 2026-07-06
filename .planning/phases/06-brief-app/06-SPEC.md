@@ -1,10 +1,10 @@
 # Phase 06: Brief app — Specification
 
 **Created:** 2026-07-04
-**Updated:** 2026-07-05 — reconciled against Wave 1+2 delivery (commits `eec345d`, `316a20f`, `01ed73c`, `af9dcac`, `17af030`)
+**Updated:** 2026-07-06 — gap-closure amendment: added R6 (Obsidian vault-writer), reversing the earlier out-of-scope call per VERIFICATION.md finding + explicit user decision (ROADMAP SC2 was never amended when this phase descoped it)
 **Ambiguity score:** 0.14 (gate: ≤ 0.20)
-**Requirements:** 5 locked (4 delivered, 1 remaining)
-**Mode:** Update — Socratic decisions confirmed via AskUserQuestion (2026-07-05), reusing 2026-07-04 interview for unchanged scope
+**Requirements:** 6 locked (4 delivered, 2 remaining — R4 wiring bug, R6 new)
+**Mode:** Update — Socratic decisions confirmed via AskUserQuestion (2026-07-05), reusing 2026-07-04 interview for unchanged scope; R6 added 2026-07-06 via `/gsd-plan-phase 6 --gaps`
 
 ## Goal
 
@@ -66,6 +66,11 @@ keyword fallback.
    - Target: (met, schema corrected in this update)
    - Acceptance: ✅ Verified live — `GET /health` returns 200 regardless of bus/DB state (no dependency in the handler); `GET /sab` returns cached SAB in <2ms; `GET /sab?window=168h` and `?mode=list` exercised and return correct HTTP codes (200 / 422 on malformed window); `sab.published` observed on the bus with the schema above after the E2E consumer test.
 
+6. **Obsidian vault-writer** (added 2026-07-06 — gap-closure amendment, see below): A vault-writer projects high-value enrichment items plus the SAB into Obsidian `.md` files.
+   - Current: ❌ **Not built.** No `vault_writer.py` or equivalent exists anywhere in `apps/brief/`. `apps/ingest-obsidian/` is a Phase-4 read-only ingestion adapter (articles-inbox → Item), the opposite data direction.
+   - Target: A new module (e.g. `apps/brief/vault_writer.py`) emits one Obsidian `.md` file per high-value item (front-matter via the existing codec pattern in `libs/contracts/src/contracts/_codec.py`, body = item summary) plus a projection of the SAB itself. `[[entity]]` wikilinks are generated via a lightweight interim heuristic (e.g. proper-noun / known-topic extraction) — the full entity-resolution-as-Postgres-truth system is Phase 8's job; this is a real, working interim, not a stub.
+   - Acceptance: Given a high-value enrichment item, a corresponding `.md` file appears in the configured vault path with valid front-matter parseable by the existing codec, a body summary, and at least one `[[entity]]` wikilink where the source text contains an extractable entity. Email-sourced items (imap://) must appear here per ROADMAP SC3.
+
 ## Boundaries
 
 **In scope:**
@@ -79,14 +84,14 @@ keyword fallback.
 - HTTP serving: `GET /sab` (SAB HTML), `GET /health` (200 OK), `GET /sab?window=Nh` (custom window), `GET /sab?mode=list` — **delivered**
 - `sab.published` event publish to RabbitMQ after SAB generation — **delivered**
 - Docker Compose service definition for the brief container — **delivered**
+- Obsidian vault-writer (front-matter via codec, body summary, interim `[[entity]]` wikilinks) — **remaining (R6, gap-closure amendment 2026-07-06)**
 
 **Out of scope:**
-- Obsidian vault-writer — a separate plan item; this phase only writes to `data/digests/` (same as today)
 - Email notification / push alerts — Phase 12 (CNR alerting / dissemination)
 - FreshRSS/Fever API integration — fully retired; brief reads from Postgres only (verified: no `fever()`/`fever_key()` imports in `apps/brief/`)
 - `cluster.md` and `list.md` as separate disk files were reconsidered during Wave 2: `cluster.md` and `list.md` ARE written to disk by the consumer alongside `brief.md`/`bluf.md` (broader than the original spec's disk-file boundary); `?mode=list` on the HTTP endpoint is additionally available for ad-hoc windows
 - **Incremental BLUF regeneration** (06-CONTEXT.md D-05/D-06/D-08 — skip LLM calls for CCIR sections with no new items) — **deferred by decision on this update (2026-07-05).** Full-regen-on-every-render is accepted as sufficient for now; `window.py` and `_last_update.json`/`_last_render.json` tracking are NOT built and are not required to close Phase 6. Revisit if LLM cost/latency becomes a problem.
-- Entity resolution / wikilinks (`[[entity]]` notation) — Phase 8
+- Entity resolution as Postgres system-of-record / cross-modality entity graph — Phase 8 (R6's `[[entity]]` wikilinks are a lightweight interim heuristic only, not the formal entity-resolution system)
 - RAG recall / thematic search — Phase 9
 - Wiki-LLM standing auto-wiki — Phase 10
 - Container health checks, restart policies, DLQ management, structured logging — Phase 7 (ops) — **note: a basic Docker healthcheck was added in Wave 2 as a container-readiness gate, not the full ops scope Phase 7 owns**
@@ -122,6 +127,9 @@ keyword fallback.
 - [x] If the LLM endpoint is down, the SAB still renders (BLUF sections show placeholder, items not dropped)
 - [x] If an enrichment row has no matching article, the item does not appear in the SAB (JOIN semantics; no crash)
 - [x] Docker Compose service definition exists for the brief container on port 22040 — healthcheck confirmed `healthy` in <10s
+- [ ] A vault-writer emits one Obsidian `.md` file per high-value item, front-matter parseable by the existing codec pattern, body = item summary — **remaining, R6 (added 2026-07-06)**
+- [ ] Emitted `.md` files contain at least one `[[entity]]` wikilink where the source text has an extractable entity (interim heuristic, not full entity resolution) — **remaining, R6**
+- [ ] Email-sourced (imap://) items appear in the Obsidian projection, not just the SAB — **remaining, R6** (closes ROADMAP SC3's Obsidian half)
 
 ## Edge Coverage
 
