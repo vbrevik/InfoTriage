@@ -1,0 +1,24 @@
+# docker-compose.test.yml — throwaway test Postgres for db_live tests.
+#
+# Usage:
+#   docker compose -f docker-compose.test.yml up -d
+#   export INFOTRIAGE_TEST_DSN=postgresql://test:test@localhost:22062/infotriage_test
+#   python3 -m pytest -m db_live
+#
+# The db_live fixtures call init_schema() themselves, so the fresh container
+# needs no manual schema setup. Data lives on tmpfs — destroyed when the
+# container stops — and shares NO volume or path with production
+# ./data/postgres. Host port 22062 is the distinct, non-prod port used for
+# throwaway infra.
+services:
+  postgres-test:
+    image: pgvector/pgvector:pg16
+    container_name: infotriage-postgres-test
+    ports:
+      - "22062:5432"
+    environment:
+      POSTGRES_DB: infotriage_test
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+    tmpfs:
+      - /var/lib/postgresql/data
