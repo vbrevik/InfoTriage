@@ -2,7 +2,8 @@
 """tests/test_store_contract.py — shared parametrized contract tests for Store impls.
 
 Tests run against both InMemoryStore and PostgresStore. The postgres param is
-auto-skipped when :22000 is unreachable (db_live marker). Import of PostgresStore
+auto-skipped when INFOTRIAGE_TEST_DSN is unset or the test DB is unreachable
+(db_live marker). Import of PostgresStore
 is lazy (inside the postgres fixture branch) so this file collects cleanly before
 plan 03 creates _postgres.py.
 
@@ -28,13 +29,31 @@ from store import InMemoryStore, Store
 
 
 # ---------------------------------------------------------------------------
-# db_live marker — skip postgres param when :22000 is unreachable
+# db_live marker — skip postgres param when INFOTRIAGE_TEST_DSN is unavailable
 # ---------------------------------------------------------------------------
 
-def _pg_reachable() -> bool:
-    """Return True if Postgres :22000 accepts a TCP connection within 1 second."""
+TEST_DSN_ENV = "INFOTRIAGE_TEST_DSN"  # the ONLY DSN source for db_live tests
+
+
+def _test_db_reachable() -> bool:
+    """Return True if the INFOTRIAGE_TEST_DSN test DB accepts a TCP connection within 1s.
+
+    Returns False when INFOTRIAGE_TEST_DSN is unset/empty, so db_live tests
+    auto-skip when no isolated test DB is configured (R8). Host/port are parsed
+    from the DSN itself — never hardcoded.
+    """
+    import psycopg
+    dsn = os.environ.get(TEST_DSN_ENV)
+    if not dsn:
+        return False
     try:
-        with socket.create_connection(("localhost", 22000), timeout=1.0):
+        info = psycopg.conninfo.conninfo_to_dict(dsn)
+    except psycopg.Error:
+        return False
+    host = info.get("host") or "localhost"
+    port = int(info.get("port") or 5432)
+    try:
+        with socket.create_connection((host, port), timeout=1.0):
             return True
     except OSError:
         return False
@@ -47,8 +66,8 @@ def _pg_reachable() -> bool:
 db_live = (
     pytest.mark.db_live,
     pytest.mark.skipif(
-        not _pg_reachable(),
-        reason="Postgres :22000 unreachable — integration test skipped",
+        not _test_db_reachable(),
+        reason="INFOTRIAGE_TEST_DSN unset or test DB unreachable — db_live test skipped",
     ),
 )
 
@@ -96,15 +115,14 @@ def store(request, tmp_path):
         yield InMemoryStore(blob_root=tmp_path / "blobs")
     else:
         # Lazy import — PostgresStore does not exist until plan 03.
-        # This branch is only reached when db_live passes (Postgres is up).
+        # This branch is only reached when db_live passes (test DB is up),
+        # so INFOTRIAGE_TEST_DSN is set here. NO fallback — a pytest run can
+        # never touch the production database.
         import os as _os
         import psycopg as _psycopg
         from store import PostgresStore  # noqa: PLC0415
 
-        dsn = _os.environ.get(
-            "INFOTRIAGE_PG_DSN",
-            "postgresql://infotriage:infotriage_dev@localhost:22000/infotriage",
-        )
+        dsn = _os.environ.get(TEST_DSN_ENV)
         # Truncate test-data tables before each test for isolation.
         # CASCADE handles FK-dependent tables (entity_links, embeddings, etc.).
         with _psycopg.connect(dsn, autocommit=True) as _setup:

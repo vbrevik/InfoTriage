@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""tests/test_store_integration.py — live integration tests against Postgres :22000.
+"""tests/test_store_integration.py — live integration tests against an isolated test Postgres.
 
-All tests are marked @db_live and auto-skipped when :22000 is unreachable (R8).
+All tests are marked @db_live and auto-skipped when INFOTRIAGE_TEST_DSN is unset
+or the test DB is unreachable (R8).
 
 Requirements covered:
   R1  — init_schema() is idempotent: two calls, no error, schema unchanged
@@ -12,7 +13,9 @@ Requirements covered:
   D-05b — cosine query uses inclusive threshold >= 0.85 over the HNSW index
   D-05c — vectors are deterministic fixtures (seed=42) — no embedding model invoked
 
-Construct PostgresStore from INFOTRIAGE_PG_DSN env var (falls back to dev DSN).
+Construct PostgresStore from the INFOTRIAGE_TEST_DSN env var only — there is
+deliberately NO fallback to INFOTRIAGE_PG_DSN or any hardcoded DSN, so a pytest
+run can never touch the production database.
 """
 import datetime
 import os
@@ -30,30 +33,44 @@ from store import PostgresStore
 # Constants
 # ---------------------------------------------------------------------------
 
-DEV_DSN = "postgresql://infotriage:infotriage_dev@localhost:22000/infotriage"
+TEST_DSN_ENV = "INFOTRIAGE_TEST_DSN"  # the ONLY DSN source for db_live tests
 DIM = 1024           # locked embedding dimension (D-05a)
 THRESHOLD = 0.85     # inclusive cosine link threshold (D-05b)
 
 
 # ---------------------------------------------------------------------------
-# db_live marker — skip when :22000 is unreachable
+# db_live marker — skip when INFOTRIAGE_TEST_DSN is unset or unreachable
 # ---------------------------------------------------------------------------
 
 
-def _pg_reachable() -> bool:
-    """Return True if Postgres :22000 accepts a TCP connection within 1 second."""
+def _test_db_reachable() -> bool:
+    """Return True if the INFOTRIAGE_TEST_DSN test DB accepts a TCP connection within 1s.
+
+    Returns False when INFOTRIAGE_TEST_DSN is unset/empty, so db_live tests
+    auto-skip when no isolated test DB is configured (R8). Host/port are parsed
+    from the DSN itself — never hardcoded.
+    """
+    dsn = os.environ.get(TEST_DSN_ENV)
+    if not dsn:
+        return False
     try:
-        with socket.create_connection(("localhost", 22000), timeout=1.0):
+        info = psycopg.conninfo.conninfo_to_dict(dsn)
+    except psycopg.Error:
+        return False
+    host = info.get("host") or "localhost"
+    port = int(info.get("port") or 5432)
+    try:
+        with socket.create_connection((host, port), timeout=1.0):
             return True
     except OSError:
         return False
 
 
-_PG_UP = _pg_reachable()  # evaluated once at collection time
+_PG_UP = _test_db_reachable()  # evaluated once at collection time
 
 
 def db_live(fn):
-    """Decorator: apply @pytest.mark.db_live AND @pytest.mark.skipif when :22000 is unreachable.
+    """Decorator: apply @pytest.mark.db_live AND @pytest.mark.skipif when the test DB is unavailable.
 
     Applying both marks so that:
     - `pytest -m db_live` selects these tests (the db_live marker)
@@ -66,7 +83,7 @@ def db_live(fn):
     fn = pytest.mark.db_live(fn)
     fn = pytest.mark.skipif(
         not _PG_UP,
-        reason="Postgres :22000 unreachable — integration test skipped",
+        reason="INFOTRIAGE_TEST_DSN unset or test DB unreachable — db_live test skipped",
     )(fn)
     return fn
 
@@ -76,8 +93,12 @@ def db_live(fn):
 # ---------------------------------------------------------------------------
 
 
-def _get_dsn() -> str:
-    return os.environ.get("INFOTRIAGE_PG_DSN", DEV_DSN)
+def _get_dsn() -> str | None:
+    """Return the isolated test-DB DSN from INFOTRIAGE_TEST_DSN — NO fallback.
+
+    Only called from db_live-guarded fixtures/tests, so it is non-None there.
+    """
+    return os.environ.get(TEST_DSN_ENV)
 
 
 def _ts(offset_seconds: int = 0) -> datetime.datetime:
@@ -156,7 +177,7 @@ def _make_cosine_fixture_vectors(dim: int = DIM):
 
 @pytest.fixture
 def pg_store(tmp_path):
-    """Open a PostgresStore against the live :22000 DB, truncated for test isolation."""
+    """Open a PostgresStore against the INFOTRIAGE_TEST_DSN test DB, truncated for isolation."""
     dsn = _get_dsn()
     _truncate_all(dsn)
     with PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs") as s:

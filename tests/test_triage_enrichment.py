@@ -2,7 +2,8 @@
 """tests/test_triage_enrichment.py — contract tests for enrichment + embedding store methods.
 
 Tests run against both InMemoryStore and PostgresStore. The postgres param is
-auto-skipped when :22000 is unreachable (via skipif mark on the fixture param).
+auto-skipped when INFOTRIAGE_TEST_DSN is unset or the test DB is unreachable
+(via skipif mark on the fixture param).
 Standalone postgres-only tests (test_enrichment_schema, test_enrichment_score_check)
 carry the registered db_live marker so `pytest -m db_live` selects them.
 
@@ -28,16 +29,34 @@ from store import InMemoryStore, Store
 # db_live marker helpers
 # ---------------------------------------------------------------------------
 
-def _pg_reachable() -> bool:
-    """Return True if Postgres :22000 accepts a TCP connection within 1 second."""
+TEST_DSN_ENV = "INFOTRIAGE_TEST_DSN"  # the ONLY DSN source for db_live tests
+
+
+def _test_db_reachable() -> bool:
+    """Return True if the INFOTRIAGE_TEST_DSN test DB accepts a TCP connection within 1s.
+
+    Returns False when INFOTRIAGE_TEST_DSN is unset/empty, so db_live tests
+    auto-skip when no isolated test DB is configured (R8). Host/port are parsed
+    from the DSN itself — never hardcoded.
+    """
+    import psycopg
+    dsn = os.environ.get(TEST_DSN_ENV)
+    if not dsn:
+        return False
     try:
-        with socket.create_connection(("localhost", 22000), timeout=1.0):
+        info = psycopg.conninfo.conninfo_to_dict(dsn)
+    except psycopg.Error:
+        return False
+    host = info.get("host") or "localhost"
+    port = int(info.get("port") or 5432)
+    try:
+        with socket.create_connection((host, port), timeout=1.0):
             return True
     except OSError:
         return False
 
 
-_PG_UP = _pg_reachable()  # evaluated once at collection time
+_PG_UP = _test_db_reachable()  # evaluated once at collection time
 
 # db_live + skipif marks for fixture parametrization: the registered 'db_live' marker
 # (so `pytest -m "not db_live"` actually deselects this fixture's postgres variant —
@@ -47,7 +66,7 @@ _pg_live_skipif = (
     pytest.mark.db_live,
     pytest.mark.skipif(
         not _PG_UP,
-        reason="Postgres :22000 unreachable — integration test skipped",
+        reason="INFOTRIAGE_TEST_DSN unset or test DB unreachable — db_live test skipped",
     ),
 )
 
@@ -56,13 +75,13 @@ def db_live(fn):
     """Decorator for standalone postgres-only test functions.
 
     Applies both the registered 'db_live' named marker (for -m db_live selection)
-    and a skipif mark (for auto-skip when :22000 is unreachable).
-    Mirrors the pattern in tests/test_store_integration.py.
+    and a skipif mark (for auto-skip when INFOTRIAGE_TEST_DSN is unset or the
+    test DB is unreachable). Mirrors the pattern in tests/test_store_integration.py.
     """
     fn = pytest.mark.db_live(fn)
     fn = pytest.mark.skipif(
         not _PG_UP,
-        reason="Postgres :22000 unreachable — integration test skipped",
+        reason="INFOTRIAGE_TEST_DSN unset or test DB unreachable — db_live test skipped",
     )(fn)
     return fn
 
@@ -71,7 +90,6 @@ def db_live(fn):
 # Constants
 # ---------------------------------------------------------------------------
 
-DEV_DSN = "postgresql://infotriage:infotriage_dev@localhost:22000/infotriage"
 DIM = 1024  # locked embedding dimension (D-05a, mE5-large)
 
 
@@ -103,8 +121,12 @@ def _vec_far() -> list[float]:
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _get_dsn() -> str:
-    return os.environ.get("INFOTRIAGE_PG_DSN", DEV_DSN)
+def _get_dsn() -> str | None:
+    """Return the isolated test-DB DSN from INFOTRIAGE_TEST_DSN — NO fallback.
+
+    Only called from db_live-guarded fixtures/tests, so it is non-None there.
+    """
+    return os.environ.get(TEST_DSN_ENV)
 
 
 def _truncate_all(dsn: str) -> None:
