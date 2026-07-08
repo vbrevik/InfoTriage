@@ -30,6 +30,7 @@ CCIR_ORDER = [
     ("PIR-3", "NATO & europeisk sikkerhet"), ("PIR-4", "Hybrid- & cybertrusler"),
     ("PIR-5", "Stormaktsrivalisering"),     ("PIR-6", "OSINT & etterforskning"),
     ("SIR-1", "Midtøsten & US-Iran"),       ("SIR-2", "Sport — VM 2026 (FIFA)"),
+    ("SIR-3", "NATO-toppmøtet i Ankara"),
     ("FFIR-1", "Norsk forsvar & sikkerhetspolitikk"), ("FFIR-2", "Norsk politikk & samfunn"),
     ("FFIR-3", "Egen teknologikapabilitet"),
 ]

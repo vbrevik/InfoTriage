@@ -84,6 +84,16 @@ hardkodet parser mot denne filen. Edit freely — add/remove/retune.
   scorer-promptens regel + eksempler i `triage_score.py:score_item`. Kildegruppe:
   BBC Sport Football, ESPN FC, Reuters Sports, Google News WC2026.
   `PMESII: Political, Social, Infrastructure` · `TESSOC: Organization, Space, Communications`
+- **SIR-3 NATO-toppmøtet i Ankara (Tyrkia)** — alt om toppmøtet: agenda, vedtak
+  og kommunikeer; deltakelse/fravær av stats- og regjeringssjefer; Tyrkias
+  vertskapsrolle og posisjonering (Sverige/Finland-relasjoner, S-400/F-35,
+  Bosporos/Svartehavet); sikkerhetsopplegg, protester eller trusler rundt
+  møtet; utfall som berører Norge, nordflanken eller Arktis. Overlapper PIR-3
+  (alliansevedtak) — bruk SIR-3 for saker spesifikt om Ankara-toppmøtet,
+  PIR-3 for generell NATO-utvikling. Tidsavgrenset: aktiv til toppmøtet er
+  avsluttet og oppfølgingsvedtak er rapportert.
+  Kildegruppe: NATO.int, Reuters, Anadolu/AA, Al-Monitor, Hurriyet Daily News.
+  `PMESII: Political, Military` · `TESSOC: Organization, Time, Space`
 
 ## CNR — Commander's Notification Requirements (varslingsterskler)
 
