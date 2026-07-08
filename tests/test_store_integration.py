@@ -179,9 +179,12 @@ def _make_cosine_fixture_vectors(dim: int = DIM):
 def pg_store(tmp_path):
     """Open a PostgresStore against the INFOTRIAGE_TEST_DSN test DB, truncated for isolation."""
     dsn = _get_dsn()
+    # Bootstrap first: on a fresh test DB (docker-compose.test.yml) the infotriage
+    # schema/extension don't exist yet — init_schema() must run before TRUNCATE and
+    # before __enter__ (which registers the pgvector type adapter).
+    PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs").init_schema()
     _truncate_all(dsn)
     with PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs") as s:
-        s.init_schema()
         yield s
 
 

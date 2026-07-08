@@ -123,6 +123,10 @@ def store(request, tmp_path):
         from store import PostgresStore  # noqa: PLC0415
 
         dsn = _os.environ.get(TEST_DSN_ENV)
+        # Bootstrap first: on a fresh test DB (docker-compose.test.yml) the
+        # infotriage schema/extension don't exist yet — init_schema() must run
+        # before TRUNCATE and before __enter__ (pgvector adapter registration).
+        PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs").init_schema()
         # Truncate test-data tables before each test for isolation.
         # CASCADE handles FK-dependent tables (entity_links, embeddings, etc.).
         with _psycopg.connect(dsn, autocommit=True) as _setup:
@@ -132,7 +136,6 @@ def store(request, tmp_path):
                 "infotriage.articles, infotriage.entities RESTART IDENTITY"
             )
         with PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs") as s:
-            s.init_schema()
             yield s
 
 

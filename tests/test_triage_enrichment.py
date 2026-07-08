@@ -178,9 +178,12 @@ def store(request, tmp_path):
     else:
         from store import PostgresStore
         dsn = _get_dsn()
+        # Bootstrap first: on a fresh test DB (docker-compose.test.yml) the
+        # infotriage schema/extension don't exist yet — init_schema() must run
+        # before TRUNCATE and before __enter__ (pgvector adapter registration).
+        PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs").init_schema()
         _truncate_all(dsn)
         with PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs") as s:
-            s.init_schema()
             yield s
 
 
@@ -256,9 +259,10 @@ def test_enrichment_score_check(tmp_path):
     """
     from store import PostgresStore
     dsn = _get_dsn()
+    # Bootstrap before TRUNCATE — see the store fixture for rationale.
+    PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs").init_schema()
     _truncate_all(dsn)
     with PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs") as s:
-        s.init_schema()
         item = _make_item()
         s.put_item(item)
         with pytest.raises(Exception):
@@ -332,9 +336,10 @@ def test_enrichment_schema(tmp_path):
     """
     from store import PostgresStore
     dsn = _get_dsn()
+    # Bootstrap before TRUNCATE — see the store fixture for rationale.
+    PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs").init_schema()
     _truncate_all(dsn)
     with PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs") as s:
-        s.init_schema()
         rows = s._conn.execute(
             "SELECT column_name FROM information_schema.columns "
             "WHERE table_schema = 'infotriage' AND table_name = 'enrichment' "

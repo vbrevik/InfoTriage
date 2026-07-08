@@ -4,4 +4,8 @@
 -- Idempotent: both statements use IF NOT EXISTS.
 CREATE SCHEMA IF NOT EXISTS infotriage;
 SET search_path = infotriage, public;
-CREATE EXTENSION IF NOT EXISTS vector;
+-- WITH SCHEMA public: without it, the extension installs into the first
+-- search_path schema (infotriage), and connections using the default
+-- search_path ("$user", public) cannot resolve the vector type —
+-- register_vector() then fails on any freshly-bootstrapped database.
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
