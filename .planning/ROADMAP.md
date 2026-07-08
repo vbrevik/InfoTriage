@@ -308,3 +308,68 @@ Plans:
 - [x] 03-PLAN.md
 
 - [ ] TBD (promote with /gsd-review-backlog when ready)
+
+### Phase 999.2: Dedup threshold calibration on larger corpus (BACKLOG)
+
+**Goal:** Calibrate the semantic dedup threshold on a larger, held-out corpus with genuinely off-topic controls so that both acceptance bars are cleared (`collapse_rate >= 0.8` AND `control_overmerge == 0`).
+
+**Context:** Phase 00 concept spike (R2) found PARTIAL: mE5-large @ 0.84 threshold got 78.3% collapse rate with 1 control overmerge on a single-day (2026-06-25) corpus from NRK + BBC + TASS. Root cause: same-topic/different-event control pairs (e.g. three distinct Trump articles) have embedding similarity overlapping with same-event cross-language pairs. The control set was too topically narrow. Cross-date generalization was never verified.
+
+**Carry-forward from spike:**
+- Model: mE5-large (locked)
+- Starting threshold: 0.84 (must re-tune)
+- Input: `title + summary[:512]` only (never full body)
+- mE5-large prefixes: `passage: ` for corpus docs, `query: ` for queries
+- Phase 5 must use stricter evaluation protocol with genuinely off-topic controls
+
+**Source:** SPIKE-FINDINGS.md §R2, R2-VERDICT.md, Phase 00 VERIFICATION.md
+
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd-review-backlog when ready)
+
+### Phase 999.3: Entity resolution cross-language coverage and mE5-large re-validation (BACKLOG)
+
+**Goal:** Ensure Phase 8 entity resolution meets the cross-language bar (entities merged across >=2 languages) and validates entity linking on the chosen embedding model (mE5-large).
+
+**Context:** Phase 00 concept spike (R3) found PARTIAL: pgvector cosine linking mechanism proven (NATO merged across 5 items, HNSW index validated at threshold 0.85), but the cross-language bar was not met because the test date's NRK/BBC feeds had zero NATO mentions — all 5 NATO extractions came from TASS (single language). This is a corpus coverage limitation, not a mechanism failure.
+
+**Additional risk — embedding model mismatch:** R3 used `BAAI/bge-m3` (its default). R2 chose `mE5-large`. Entity linking threshold 0.85 was validated on bge-m3 vectors, NOT the chosen mE5-large. Phase 8 must re-validate entity linking on mE5-large vectors before production.
+
+**Carry-forward from spike:**
+- Schema validated: `entities (id, name, name_norm, lang, type, embedding vector(1024))` + `entity_links (entity_id FK, item_id, mention, lang)`
+- HNSW with `vector_cosine_ops`, LINK_THRESHOLD=0.85
+- Phase 8 must add multi-day rolling window with multiple feeds per language to create cross-language merge opportunities
+- Phase 8 must re-validate entity linking on mE5-large vectors (not bge-m3)
+
+**Source:** SPIKE-FINDINGS.md §R3, R3-VERDICT.md, ADR-006, Phase 00 VERIFICATION.md
+
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd-review-backlog when ready)
+
+### Phase 999.4: Cross-language synthesis verification for Wiki-LLM (BACKLOG)
+
+**Goal:** Add per-language coverage verification to Wiki-LLM synthesis so that cross-language corpus items are not silently omitted from synthesized articles.
+
+**Context:** Phase 00 concept spike (R4) found PARTIAL: local qwen36 synthesis mechanism works (NATO standing page + Venezuela on-demand article both coherent with citation grounding PASS). However, the Venezuela on-demand article retrieved 17 items across 3 languages (en/no/ru) via R3 entity_links, but the synthesis cited only en (bbc) and no (nrk) — all 7 TASS (ru) items [11]–[17] were gathered into context yet went uncited. The cross-language gather works; the cross-language synthesis silently dropped Russian.
+
+**Additional nit:** Minor internal contradiction in Venezuela page (Norway "har ingen egen ambassade" then "ambassaden har kommet i kontakt med nordmenn" [7]) — a reader-level coherence issue.
+
+**Carry-forward from spike:**
+- Synthesis mechanism is viable on local qwen36
+- Citation grounding (every [N] → real source id, hard-exit on violation) is a sound guardrail
+- Phase 10 must add per-language coverage check before synthesis to catch silent omissions
+- Phase 10 should flag/avoid intra-page contradictions
+
+**Source:** SPIKE-FINDINGS.md §R4, R4-VERDICT.md, Phase 00 VERIFICATION.md
+
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd-review-backlog when ready)
