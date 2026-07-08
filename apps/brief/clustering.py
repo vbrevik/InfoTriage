@@ -57,7 +57,7 @@ class EnrichedItem:
     why: str
     pmesii: str | None
     tessoc: str | None
-    embedding: list[float]
+    embedding: list[float] | None
 
 
 def _cosine_distance(a: list[float], b: list[float]) -> float:
@@ -156,12 +156,11 @@ def cluster_items(
         row["item_id"]: row["embedding"] for row in emb_rows
     }
 
-    # Build EnrichedItem objects (only for items that have embeddings)
+    # Build EnrichedItem objects. Items without embeddings pass through as
+    # singleton clusters because they cannot be compared semantically.
     items_by_ccir: dict[str, list[EnrichedItem]] = {}
     for row in rows:
         emb = embedding_map.get(row["item_id"])
-        if emb is None:
-            continue  # skip items without embeddings
         item = EnrichedItem(
             item_id=row["item_id"],
             title=row["title"],
@@ -195,10 +194,16 @@ def cluster_items(
         clusters: list[tuple[list[float], list[EnrichedItem]]] = []
 
         for item in items:
+            if item.embedding is None:
+                clusters.append(([], [item]))
+                continue
+
             best_cluster_idx: int | None = None
             best_dist = max_dist
 
             for idx, (centroid, _) in enumerate(clusters):
+                if not centroid:
+                    continue
                 dist = _cosine_distance(item.embedding, centroid)
                 if dist < best_dist:
                     best_dist = dist
@@ -240,6 +245,9 @@ def cluster_items_in_memory(
     operates entirely in Python using _cosine_distance(). This enables
     unit tests without requiring a Postgres/pgvector connection.
 
+    Items without embeddings cannot be compared semantically, so they pass
+    through as singleton clusters.
+
     Args:
         items: List of EnrichedItem with embedding vectors already populated.
         threshold: Cosine similarity threshold (0.0-1.0).
@@ -280,6 +288,10 @@ def cluster_items_in_memory(
         centroids: list[list[float]] = []
 
         for item in ccir_items:
+            if item.embedding is None:
+                section_clusters.append([item])
+                continue
+
             best_idx: int | None = None
             best_dist = max_dist
 

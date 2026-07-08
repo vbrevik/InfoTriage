@@ -164,6 +164,9 @@ services:
       - "host.docker.internal:host-gateway"   # resolves the host oMLX endpoint on non-Docker-Desktop engines
     volumes:
       - ./data:/data
+      # CCIR hot-read (D-5): triage_score.py's CCIR_PATH resolves to /ccir.md inside the
+      # container; without this mount the scorer silently falls back to a stub prompt.
+      - ./ccir.md:/ccir.md:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -195,6 +198,9 @@ services:
       INFOTRIAGE_AMQP_DSN: ${INFOTRIAGE_AMQP_DSN:-amqp://infotriage:infotriage_rmq@rabbitmq:5672}
       INFOTRIAGE_BLOB_ROOT: /data/blobs
       INFOTRIAGE_DIGESTS_DIR: /data/digests
+      INFOTRIAGE_VAULT_PATH: /vault/brief-outbox
+      CLUSTER_THRESHOLD: ${CLUSTER_THRESHOLD:-0.75}
+      VAULT_INCLUDE_EMAIL: ${VAULT_INCLUDE_EMAIL:-1}
       # NOT ${LLM_BASE_URL:-...}: .env's LLM_BASE_URL=127.0.0.1 is for host-side scripts;
       # inside the container that resolves to the container itself (see triage note).
       LLM_BASE_URL: http://host.docker.internal:8000/v1   # host oMLX — ADR-004, local only
@@ -204,6 +210,7 @@ services:
       - "host.docker.internal:host-gateway"   # resolves the host oMLX endpoint on non-Docker-Desktop engines
     volumes:
       - ./data:/data
+      - ${OBSIDIAN_VAULT_PATH:-./data/obsidian}/brief-outbox:/vault/brief-outbox:rw
     depends_on:
       postgres:
         condition: service_healthy

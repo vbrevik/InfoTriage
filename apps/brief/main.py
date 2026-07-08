@@ -47,9 +47,11 @@ if not (0.0 <= CLUSTER_THRESHOLD <= 1.0):
 
 _ENRICHMENT_SQL = (
     "SELECT e.item_id, e.ccir, e.cnr, e.score, e.bucket, e.why, e.pmesii, e.tessoc, "
-    "a.title, a.summary, a.source, a.url "
+    "a.title, a.summary, a.source, a.url, "
+    "emb.embedding "
     "FROM infotriage.enrichment e "
     "JOIN infotriage.articles a ON a.id = e.item_id "
+    "LEFT JOIN infotriage.embeddings emb ON emb.item_id = e.item_id "
     "WHERE e.created_at >= %s ORDER BY e.score DESC"
 )
 
@@ -122,7 +124,9 @@ async def lifespan(app: FastAPI):
                     "amqp://infotriage:infotriage_rmq@127.0.0.1:22001",
                 )
                 bus = RabbitMQBus(amqp_url=amqp_dsn)
-                _state["consumer_task"] = asyncio.create_task(run_consumer(bus, store))
+                _state["consumer_task"] = asyncio.create_task(
+                    run_consumer(bus, store, cluster_threshold=CLUSTER_THRESHOLD)
+                )
                 log.info("verdict.ready consumer started")
             except Exception as e:  # HTTP serving survives a dead consumer
                 log.error("consumer failed to start: %s", e, exc_info=True)

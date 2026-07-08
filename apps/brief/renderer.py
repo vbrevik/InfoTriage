@@ -101,7 +101,11 @@ def _group_by_ccir(rows: list[dict], ccir_order: list[tuple[str, str]]) -> dict[
 
 
 def _rows_to_enriched_items(rows: list[dict]) -> list[EnrichedItem]:
-    """Convert enrichment row dicts to EnrichedItem objects for clustering."""
+    """Convert enrichment row dicts to EnrichedItem objects for clustering.
+    
+    Items without embeddings are included and pass through as singleton
+    clusters.
+    """
     return [
         EnrichedItem(
             item_id=r.get("item_id", f"tmp-{i}"),
@@ -116,7 +120,7 @@ def _rows_to_enriched_items(rows: list[dict]) -> list[EnrichedItem]:
             why=r.get("why", ""),
             pmesii=r.get("pmesii"),
             tessoc=r.get("tessoc"),
-            embedding=r.get("embedding", [0.0] * 4),
+            embedding=r.get("embedding"),
         )
         for i, r in enumerate(rows)
     ]
@@ -141,18 +145,30 @@ def _enriched_to_dicts(items: list[EnrichedItem]) -> list[dict]:
     } for i in items]
 
 
-def _cluster_rows(rows: list[dict]) -> list[dict]:
+def _cluster_rows(rows: list[dict], threshold: float | None = None) -> list[dict]:
     """Cluster enrichment rows using pgvector. Returns same format as _digest_cluster.
     
-    Returns list of dicts: [{"items": [dict, dict, ...]}, ...]
+    Args:
+        rows: enrichment row dicts
+        threshold: clustering threshold (0.0-1.0), defaults to 0.75
+    
+    Returns:
+        list of dicts: [{"items": [dict, dict, ...]}, ...]
     """
+    if threshold is None:
+        threshold = 0.75
+    if not (0.0 <= threshold <= 1.0):
+        threshold = 0.75
+    
     items = _rows_to_enriched_items(rows)
-    clusters_raw = cluster_items_in_memory(items, threshold=0.75)
+    clusters_raw = cluster_items_in_memory(items, threshold=threshold)
     return [{"items": _enriched_to_dicts(cl)} for cl in clusters_raw]
 
 def render_brief(
     enrichment_rows: list[dict],
     ccir_order: list[tuple[str, str]] | None = None,
+    *,
+    cluster_threshold: float = 0.75,
 ) -> str:
     """Produce SAB markdown: CNR CAT I first, then CCIR sections.
     
@@ -183,7 +199,7 @@ def render_brief(
     if cat_i:
         lines.append("## 🚩 CNR — varsle straks")
         # Cluster items
-        clusters = _cluster_rows(cat_i)
+        clusters = _cluster_rows(cat_i, threshold=cluster_threshold)
         for cl in clusters:
             lead = max(cl["items"], key=lambda i: i.get("score", 0))
             srcs = sorted({i.get("source", "") for i in cl["items"]})
@@ -211,7 +227,7 @@ def render_brief(
                 continue
             lines.append(f"## {cid} · {title}")
             cs = sorted(
-                _cluster_rows(items),
+                _cluster_rows(items, threshold=cluster_threshold),
                 key=lambda c: -max(i.get("score", 0) for i in c["items"]),
             )
             for cl in cs[:6]:
@@ -353,6 +369,8 @@ def render_bluf(
 def render_cluster(
     enrichment_rows: list[dict],
     ccir_order: list[tuple[str, str]] | None = None,
+    *,
+    cluster_threshold: float = 0.75,
 ) -> str:
     """Produce cluster markdown grouped by CCIR section.
     
@@ -388,7 +406,7 @@ def render_cluster(
         if not items:
             continue
         lines.append(f"## {cid} · {title}")
-        clusters = _cluster_rows(items)
+        clusters = _cluster_rows(items, threshold=cluster_threshold)
         for cl in clusters:
             lead = max(cl["items"], key=lambda i: i.get("score", 0))
             srcs = sorted({i.get("source", "") for i in cl["items"]})
@@ -404,7 +422,7 @@ def render_cluster(
     no_ccir = [r for r in enrichment_rows if (r.get("ccir") or "none").lower() == "none"]
     if no_ccir:
         lines.append("## Uten CCIR")
-        for cl in _cluster_rows(no_ccir):
+        for cl in _cluster_rows(no_ccir, threshold=cluster_threshold):
             lead = max(cl["items"], key=lambda i: i.get("score", 0))
             lines.append(
                 f"- **[{lead.get('score')}] {lead.get('title','')}**"

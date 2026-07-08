@@ -196,8 +196,7 @@ class RabbitMQBus:
     async def subscribe(self, routing_key: str) -> list[dict]:
         """Return all currently-queued payloads for routing_key in FIFO order.
 
-        Uses a short-lived consumer (500ms window) to drain pending messages.
-        Auto-acks each message after deserialization.
+        Uses basic.get to drain pending messages directly, avoiding consumer issues.
         Returns [] if the queue is empty or routing_key is unknown.
         """
         await self._ensure_connection()
@@ -211,13 +210,18 @@ class RabbitMQBus:
         queue = await self._channel.get_queue(queue_name)
         messages: list[dict] = []
 
-        async def _on_message(msg: aio_pika.IncomingMessage) -> None:
-            async with msg.process():
-                messages.append(json.loads(msg.body.decode()))
+        while True:
+            try:
+                msg = await queue.get(no_ack=True)
+                if msg is None:
+                    break
+                try:
+                    messages.append(json.loads(msg.body.decode()))
+                except Exception:
+                    pass
+            except Exception:
+                break
 
-        consumer_tag = await queue.consume(_on_message)
-        await asyncio.sleep(0.5)   # drain window — consume pending messages
-        await queue.cancel(consumer_tag)
         return messages
 
     async def consume(self, routing_key: str, handler, prefetch_count: int = 1) -> None:

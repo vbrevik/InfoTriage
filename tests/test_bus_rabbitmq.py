@@ -25,7 +25,24 @@ import time
 import pytest
 import aio_pika
 
+import sys
+sys.path.insert(0, '/Users/vidarbrevik/projects/InfoTriage/libs/contracts/src')
 from contracts import RabbitMQBus
+
+
+async def _cancel_stale_consumers():
+    bus = RabbitMQBus(amqp_url=AMQP_URL)
+    await bus._ensure_connection()
+    try:
+        for rk, q in bus._queues.items():
+            live_q = await bus._channel.get_queue(q.name)
+            try:
+                await live_q.cancel('')
+            except Exception:
+                pass
+    except Exception:
+        pass
+    await bus.close()
 
 AMQP_URL = "amqp://infotriage:infotriage_rmq@127.0.0.1:22001"
 
@@ -66,7 +83,6 @@ def _skip_if_unavailable() -> None:
 
 
 async def _fresh_bus() -> RabbitMQBus:
-    """Return a connected RabbitMQBus with all queues purged for test isolation."""
     bus = RabbitMQBus(amqp_url=AMQP_URL)
     await bus._ensure_connection()
     # Purge all queues for clean test isolation
@@ -79,6 +95,21 @@ async def _fresh_bus() -> RabbitMQBus:
     except Exception:
         pass
     return bus
+
+
+async def _cancel_all_consumers() -> None:
+    bus = RabbitMQBus(amqp_url=AMQP_URL)
+    await bus._ensure_connection()
+    try:
+        for rk, q in bus._queues.items():
+            live_q = await bus._channel.get_queue(q.name)
+            try:
+                await live_q.cancel('')
+            except Exception:
+                pass
+    except Exception:
+        pass
+    await bus.close()
 
 
 # ---------------------------------------------------------------------------

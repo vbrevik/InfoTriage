@@ -24,6 +24,7 @@ from apps.brief.renderer import (  # noqa: E402
     render_bluf,
     render_cluster,
 )
+from apps.brief.vault_writer import write_vault_digest  # noqa: E402
 
 log = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ async def process_verdict(
     bus: RabbitMQBus,
     *,
     snap_day: str,
+    cluster_threshold: float = 0.75,
 ) -> SabPublished | None:
     """Process a verdict.ready for item_id: fetch enrichment, render SAB, publish event.
     
@@ -54,11 +56,14 @@ async def process_verdict(
     # Fetch enrichment row from Postgres.
     # title/summary/source/url live on infotriage.articles — enrichment holds
     # only scoring columns (005-stubs + 006-enrichment), hence the JOIN.
+    # LEFT JOIN embeddings to get pgvector data for clustering.
     _SELECT = (
         "SELECT e.item_id, e.ccir, e.cnr, e.score, e.bucket, e.why, e.pmesii, e.tessoc, "
-        "a.title, a.summary, a.source, a.url, a.ts "
+        "a.title, a.summary, a.source, a.url, a.ts, "
+        "emb.embedding "
         "FROM infotriage.enrichment e "
         "JOIN infotriage.articles a ON a.id = e.item_id "
+        "LEFT JOIN infotriage.embeddings emb ON emb.item_id = e.item_id "
     )
 
     def _fetch():  # plain def — runs inside asyncio.to_thread
@@ -97,8 +102,8 @@ async def process_verdict(
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     brief_md, cluster_md, list_md, bluf_md = await asyncio.gather(
-        asyncio.to_thread(render_brief, enrichment_rows),
-        asyncio.to_thread(render_cluster, enrichment_rows),
+        asyncio.to_thread(render_brief, enrichment_rows, cluster_threshold=cluster_threshold),
+        asyncio.to_thread(render_cluster, enrichment_rows, cluster_threshold=cluster_threshold),
         asyncio.to_thread(render_list, enrichment_rows),
         asyncio.to_thread(_render_bluf_all_sections, enrichment_rows),
     )
@@ -117,6 +122,11 @@ async def process_verdict(
         tmp.write_text(content, encoding="utf-8")
         os.replace(tmp, fpath)
         log.info("wrote %s", fpath)
+
+    # Write Obsidian vault projection (SC2, SC3)
+    vault_dir = Path(os.environ.get("INFOTRIAGE_VAULT_PATH", "data/obsidian"))
+    await asyncio.to_thread(write_vault_digest, enrichment_rows, vault_dir)
+    log.info("wrote Obsidian vault projection")
 
     # Publish SabPublished event
     ccir_topics = sorted({
@@ -198,7 +208,7 @@ def _render_bluf_all_sections(enrichment_rows: list[dict]) -> str:
 # ---------------------------------------------------------------------------
 
 
-async def on_verdict_message(message, store, bus) -> None:
+async def on_verdict_message(message, store, bus, *, cluster_threshold: float = 0.75) -> None:
     """Decode a verdict.ready message and run process_verdict.
     
     message.process() acks on clean return, nacks (requeue=False -> DLQ) on error.
@@ -209,7 +219,13 @@ async def on_verdict_message(message, store, bus) -> None:
         
         snap_day = __import__("datetime").date.today().isoformat()
         try:
-            await process_verdict(item_id, store, bus, snap_day=snap_day)
+            await process_verdict(
+                item_id,
+                store,
+                bus,
+                snap_day=snap_day,
+                cluster_threshold=cluster_threshold,
+            )
         except Exception as e:
             log.error("process_verdict failed for item_id=%s: %s", item_id, e, exc_info=True)
             raise  # re-raise so message.process() nacks
@@ -220,12 +236,12 @@ async def on_verdict_message(message, store, bus) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def run_consumer(bus, store) -> None:
+async def run_consumer(bus, store, *, cluster_threshold: float = 0.75) -> None:
     """Register the verdict.ready consumer and run forever."""
     await bus._ensure_connection()
 
     async def _handler(message) -> None:
-        await on_verdict_message(message, store, bus)
+        await on_verdict_message(message, store, bus, cluster_threshold=cluster_threshold)
 
     await bus.consume("verdict.ready", _handler, prefetch_count=1)
     await asyncio.Future()  # run forever

@@ -214,6 +214,31 @@ class TestSingleItemCluster(unittest.TestCase):
         for cluster in clusters:
             self.assertEqual(len(cluster), 1)
 
+    def test_missing_embedding_passes_through_as_singleton(self):
+        items = [
+            _item(item_id="with-embedding", ccir="PIR-1", score=9, embedding=[1.0, 0.0]),
+            EnrichedItem(
+                item_id="without-embedding",
+                title="No embedding",
+                source="src",
+                url="http://example.com/no-embedding",
+                summary="summary",
+                ccir="PIR-1",
+                cnr="I",
+                score=8,
+                bucket="read",
+                why="missing embedding",
+                pmesii=None,
+                tessoc=None,
+                embedding=None,
+            ),
+        ]
+
+        clusters = cluster_items_in_memory(items, threshold=0.75)
+        cluster_ids = [set(item.item_id for item in cluster) for cluster in clusters]
+
+        self.assertIn({"without-embedding"}, cluster_ids)
+
 
 # ---- Test 5: Empty Input ----------------------------------------------------
 
