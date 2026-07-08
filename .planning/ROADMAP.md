@@ -205,8 +205,9 @@ to the running pipeline.
   2. A vault-writer emits high-value items + the SAB as Obsidian `.md` (front-matter via codec; body summary; `[[entity]]` wikilinks).
   3. Email surfaces here (SAB + Obsidian), not in FreshRSS.
 
-**Plans**: 06-01 through 06-04 (executed). Gap-closure (UAT test 1 — prod DB wiped by tests + idle-in-transaction):
-- [ ] 06-05-PLAN.md — db_live test DSN safety: require INFOTRIAGE_TEST_DSN, no prod fallback, regression guard + throwaway test DB (W1)
+**Plans**: 5/6 plans executed
+
+- [x] 06-05-PLAN.md — db_live test DSN safety: require INFOTRIAGE_TEST_DSN, no prod fallback, regression guard + throwaway test DB (W1)
 - [ ] 06-06-PLAN.md — PostgresStore read-path txn hygiene: end read txn (rollback) + idle-in-transaction backstop + regression test (W2)
 
 ### Phase 7: Ops + cutover
@@ -300,6 +301,9 @@ Likely home: enrichment stage in **Phase 5** (store translated field) or render-
 **Plans:** 5/5 plans complete
 
 Plans:
+
+- [x] 06-03-PLAN.md
+- [x] 06-04-PLAN.md
 
 - [x] 03-PLAN.md
 

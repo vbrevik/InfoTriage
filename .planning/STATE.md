@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 6 UAT complete (4 pass, 1 root-caused issue); gap-closure plans 06-05/06-06 verified, ready to execute
+status: 06-05 complete (test-DSN safety landed, prod wipe path closed); 06-06 (store txn hygiene) remaining
 stopped_at: null
-last_updated: "2026-07-08T20:45:00.000Z"
+last_updated: "2026-07-08T21:30:00.000Z"
 progress:
   total_phases: 13
   completed_phases: 7
@@ -17,6 +17,33 @@ progress:
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-07-08 — 06-05 executed (test-DSN safety, gap closure)
+
+### Just-completed
+
+- **06-05 COMPLETE** (commits `2d6c255`, `6fecb46`, `f92f8ed`): db_live tests now resolve their
+  DSN exclusively from **INFOTRIAGE_TEST_DSN** (no INFOTRIAGE_PG_DSN fallback, no prod literal);
+  unset ⇒ all 26 db_live tests skip. Always-run guard `tests/test_dsn_safety.py` fails on any
+  prod-port (22000) DSN/probe under tests/. `docker-compose.test.yml` = tmpfs pgvector on :22062.
+  **Bare `pytest` is now safe** — verified: no prod connection attempted with DSN unset;
+  26/26 db_live green against a pristine compose test DB.
+- Deviations (Rule 3, both in `f92f8ed`): `001-schema.sql` now uses `CREATE EXTENSION vector
+  WITH SCHEMA public` (was landing in infotriage schema on fresh DBs → register_vector failed);
+  db_live fixtures bootstrap `init_schema()` before TRUNCATE/`__enter__` (fresh-DB safe).
+- Deferred (pre-existing, `deferred-items.md`): `tests/integration/test_clustering_integration.py`
+  hardcodes 127.0.0.1:5432 (not prod) with no skip guard; 4 rabbitmq test failures (contention).
+
+### Decisions recorded
+
+- db_live DSN source = INFOTRIAGE_TEST_DSN only; reachability parsed from the DSN, never hardcoded.
+- `CREATE EXTENSION vector` must specify `WITH SCHEMA public` — search_path-relative install
+  breaks pgvector adapter registration on default-search_path connections.
+- db_live fixtures must run init_schema() before TRUNCATE and before entering the store context.
+
+### Next
+
+- Execute **06-06** (store read-path rollback + idle_in_transaction_session_timeout backstop).
 
 ## Session: 2026-07-08 — Phase 6 UAT run + SIR-3 live add + new gap plans
 
@@ -46,8 +73,8 @@ progress:
 
 ### Watch out for
 
-- **NEVER run bare `pytest` until 06-05 lands** — db_live fixtures still wipe prod :22000.
-  Run focused non-db files only.
+- ~~NEVER run bare `pytest` until 06-05 lands~~ **RESOLVED 2026-07-08**: 06-05 landed — db_live
+  tests skip unless INFOTRIAGE_TEST_DSN is set; guard test blocks prod-port reintroduction.
 - /sab default path caches sab.html for 24h (D-01) — `rm data/digests/sab.html` or
   `?window=24h` to see fresh data.
 
@@ -490,6 +517,7 @@ untouched this session, still needs separate investigation.
 | Phase 05 P02 | 12min | 2 tasks | 4 files |
 | Phase 05 P03 | 22min | 3 tasks | 3 files |
 | Phase 05 P04 | continuation | 3 tasks | 3 files |
+| Phase 06 P05 | 15min | 2 tasks | 7 files |
 
 ## Decisions
 
