@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 6 verification ran — gaps_found (3 gaps), fix plans needed via plan-phase --gaps
+status: Phase 6 UAT complete (4 pass, 1 root-caused issue); gap-closure plans 06-05/06-06 verified, ready to execute
 stopped_at: null
-last_updated: "2026-07-06T14:00:00.000Z"
+last_updated: "2026-07-08T20:45:00.000Z"
 progress:
   total_phases: 13
   completed_phases: 7
@@ -17,6 +17,60 @@ progress:
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-07-08 — Phase 6 UAT run + SIR-3 live add + new gap plans
+
+### Just-completed
+
+- **06-UAT complete (agent-run, live): 4 pass / 1 issue (root-caused).** Clustering
+  (5-source FFIR-3 merge), vault writer (7 item files + obsidian-sab.md), email-in-vault,
+  CLUSTER_THRESHOLD validation — all verified against real containers.
+- **Root cause of "empty SAB" found forensically**: db_live test fixtures TRUNCATE the
+  PRODUCTION Postgres :22000 (DEV_DSN in test_store_integration/test_triage_enrichment/
+  test_store_contract) — every pytest run wipes live data. Plus triage worker's
+  PostgresStore read paths leave connections idle-in-transaction (observed 8.5h; a queued
+  fixture TRUNCATE then blocked all reads). Unblocked via pg_cancel_backend + triage restart.
+- **DB repopulated live**: POST /run to ingest-imap/:22010 + ingest-youtube/:22011 →
+  108 articles → 108 enrichments → 108 embeddings → SAB rendering 108 items.
+- **Found + fixed: triage container had NO ccir.md** (CCIR_PATH → /ccir.md not in image;
+  scorer used 76-char fallback stub). Added `./ccir.md:/ccir.md:ro` mount (committed e6fab90).
+- **SIR-3 (NATO-toppmøtet i Ankara) added to ccir.md** + both CCIR_ORDER copies
+  (digest.py, sab_html.py — DRIFT-1 duplication is real; seeds SEED-001/SEED-002 planted).
+  Live-verified: synthetic summit article scored `SIR-3|II|8|read`, renders in SAB SIR-3
+  section. Commit ef2ae38.
+- **Committed stranded 06-03/06-04 patchset** (e6fab90) — was uncommitted from 07-07 session.
+- **Gap-closure plans written + checker-verified**: 06-05 (test-DSN safety: require
+  INFOTRIAGE_TEST_DSN, dsn-safety guard test, ephemeral test Postgres on 22062) →
+  06-06 (store read-path rollback + idle_in_transaction_session_timeout backstop). Ready:
+  `/gsd-execute-phase 06 --gaps-only`.
+
+### Watch out for
+
+- **NEVER run bare `pytest` until 06-05 lands** — db_live fixtures still wipe prod :22000.
+  Run focused non-db files only.
+- /sab default path caches sab.html for 24h (D-01) — `rm data/digests/sab.html` or
+  `?window=24h` to see fresh data.
+
+## Session: 2026-07-07 — Phase 6 gap-closure patchset (06-03, 06-04)
+
+### Just-completed
+
+- Addressed code-review findings from Phase 6 gap closure:
+  - `vault_writer.py` now uses `contracts.to_frontmatter()` instead of hand-rolled YAML.
+  - `brief` compose service now has `INFOTRIAGE_VAULT_PATH=/vault/brief-outbox`, `CLUSTER_THRESHOLD`, `VAULT_INCLUDE_EMAIL`, and a writable Obsidian brief-outbox mount.
+  - `CLUSTER_THRESHOLD` is validated in `main.py` and passed into `run_consumer()` → `process_verdict()` → `render_brief()`/`render_cluster()`.
+  - Missing embeddings now pass through as singleton clusters instead of silently disappearing from clustered sections.
+- Added regression tests:
+  - codec-parseable Obsidian front matter, including punctuation/multiline fields.
+  - default inclusion of `imap://` email-sourced items in the vault projection.
+  - no-embedding singleton pass-through in in-memory clustering.
+- Focused validation passed: `python -m pytest tests/test_brief_clustering.py tests/test_brief_renderer.py tests/test_vault_writer.py -q` → 43 passed; `python -m pytest tests/test_vault_writer.py -q` → 8 passed.
+
+### Still pending
+
+- Live Postgres/container verification for 06-03: prove at least one real enrichment cluster merges through the production fetch → render path.
+- Live compose verification for 06-04: run `brief` with a real `OBSIDIAN_VAULT_PATH` and confirm files land in the host vault brief-outbox.
+- No commit created in this Codex session; user did not request committing.
 
 ## Session: 2026-07-06 — Integrity fix: stranded 06-02 work committed
 
