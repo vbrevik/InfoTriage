@@ -1,0 +1,84 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-07-09T19:02:03Z",
+  "phase": "06-brief-app",
+  "phase_name": "Brief app",
+  "phase_dir": ".planning/phases/06-brief-app",
+  "plan": 6,
+  "task": 1,
+  "total_tasks": 9,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "06-01 Wave 1 renderer + Wave 2 serving", "status": "done", "commit": "316a20f"},
+    {"id": 2, "name": "06-02 pgvector semantic clustering", "status": "done", "commit": "3047116"},
+    {"id": 3, "name": "06-03 Clustering data-flow gap closure", "status": "done", "commit": "e6fab90"},
+    {"id": 4, "name": "06-04 Vault-writer gap closure", "status": "done", "commit": "e6fab90"},
+    {"id": 5, "name": "06-05 Test-DSN safety", "status": "done", "commit": "2d6c255"},
+    {"id": 6, "name": "06-06 Store txn hygiene", "status": "done", "commit": "53d2174"}
+  ],
+  "remaining_tasks": [
+    {"id": 1, "name": "UAT Test 1: Cold Start Smoke Test", "status": "not_started"},
+    {"id": 2, "name": "UAT Test 2: View SAB /sab endpoint", "status": "not_started"},
+    {"id": 3, "name": "UAT Test 3: Semantic clustering on real data", "status": "not_started"},
+    {"id": 4, "name": "UAT Test 4: Vault writer .md files", "status": "not_started"},
+    {"id": 5, "name": "UAT Test 5: Email items in vault", "status": "not_started"},
+    {"id": 6, "name": "UAT Test 6: CLUSTER_THRESHOLD validation", "status": "not_started"},
+    {"id": 7, "name": "UAT Test 7: Event-driven rendering", "status": "not_started"},
+    {"id": 8, "name": "UAT Test 8: Semantic clustering on real data", "status": "not_started"},
+    {"id": 9, "name": "UAT Test 9: CLUSTER_THRESHOLD configurable", "status": "not_started"}
+  ],
+  "blockers": [],
+  "async_jobs": [],
+  "human_actions_pending": [
+    {"action": "Run UAT tests 1-9 against live stack", "context": "All gap-closure plans complete; need live verification", "blocking": true}
+  ],
+  "decisions": [
+    {"decision": "pgvector HNSW greedy centroid clustering per CCIR section", "rationale": "Replaces keyword-overlap fallback; semantic similarity via mE5-large embeddings", "phase": "06"},
+    {"decision": "Vault-writer uses interim heuristic wikilinks", "rationale": "Full entity resolution deferred to Phase 8; interim heuristic sufficient for UAT", "phase": "06"},
+    {"decision": "Test-DSN pattern: INFOTRIAGE_TEST_DSN only, no fallback", "rationale": "Prevents prod DB wipe; guard test enforces", "phase": "06"},
+    {"decision": "Idle-in-transaction backstop: 5-min server-side timeout", "rationale": "Self-heals future leaks; 300s >> legitimate operations (~120s)", "phase": "06"},
+    "threshold config: CLUSTER_THRESHOLD env var (0.0-1.0), default 0.75",
+    "rationale": "Configurable threshold for clustering; validated in main.py",
+    "phase": "06"
+  ],
+  "uncommitted_files": [
+    ".env.bak-channels",
+    ".planning/phases/00-concept-spike/00-VERIFICATION.md",
+    ".planning/research/",
+    "test_*.py"
+  ],
+  "next_action": "Run UAT Test 1: Cold Start Smoke Test — docker compose down -v && docker compose up -d && sleep 10 && curl -s http://localhost:22040/health",
+  "context_notes": "Phase 6 gap-closure complete. All 6 plans have SUMMARY.md. UAT.md created with 9 tests. Need to run UAT tests sequentially against live stack. Key technical debt: clustering threshold 0.75 may be too high (similarities 0.72-0.82); HTML renderer still uses keyword clustering via sab_html.py. Ready for UAT re-run.",
+  "critical_anti_patterns": [
+    {
+      "pattern": "Writing SUMMARY before verifying artifacts on disk",
+      "description": "06-01 SUMMARY claimed deliverables not on disk",
+      "severity": "blocking",
+      "prevention": "git status + ls first; never trust agent output"
+    },
+    {
+      "pattern": "Running tests against prod DB",
+      "description": "DEV_DSN = prod :22000 in test fixtures",
+      "severity": "blocking",
+      "prevention": "test_dsn_safety.py guard; INFOTRIAGE_TEST_DSN only"
+    },
+    {
+      "pattern": "Monkey-patch without verification",
+      "description": "HTML renderer monkey-patch didn't apply",
+      "severity": "blocking",
+      "prevention": "Test monkey-patch in isolation before integrating"
+    },
+    {
+      "pattern": "Threshold too high",
+      "description": "0.75 excluded 0.72-0.82 similarity pairs",
+      "severity": "advisory",
+      "prevention": "Calibrate on held-out corpus; log merge decisions"
+    },
+    {
+      "pattern": "Monkey-patch not applied",
+      "description": "sab_html.cluster called directly, not via module",
+      "severity": "blocking",
+      "prevention": "Modify module function, not local reference"
+    }
+  ]
+}
