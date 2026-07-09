@@ -69,7 +69,20 @@ class PostgresStore:
 
     def __enter__(self) -> "PostgresStore":
         """Open one psycopg3 connection and register the pgvector type adapter."""
-        self._conn = psycopg.connect(self._dsn, row_factory=dict_row)
+        # idle_in_transaction_session_timeout is a BACKSTOP, not the primary fix:
+        # read methods end their read txn explicitly (rollback). This server-side
+        # 5-minute cap self-heals any FUTURE leaked read txn (e.g. a raw cursor()
+        # caller) instead of letting an idle-in-transaction connection block
+        # DDL/TRUNCATE and queue all reads behind it (T-06G-05, 06-UAT gap: an
+        # 8.5-hour leak wedged the database). 300000 ms is comfortably larger
+        # than any legitimate operation (worker embed/score windows are ~120s),
+        # so it only ever fires on a genuinely stuck connection. init_schema
+        # uses a SEPARATE autocommit connection and is unaffected.
+        self._conn = psycopg.connect(
+            self._dsn,
+            row_factory=dict_row,
+            options="-c idle_in_transaction_session_timeout=300000",
+        )
         register_vector(self._conn)  # Pitfall 1: must be called before any vector query
         return self
 
@@ -194,6 +207,7 @@ class PostgresStore:
             """,
             (item_id,),
         ).fetchone()
+        self._conn.rollback()  # end read txn — avoid idle-in-transaction
         if row is None:
             return None
         return Item(
@@ -244,6 +258,7 @@ class PostgresStore:
                 """,
                 (limit,),
             ).fetchall()
+        self._conn.rollback()  # end read txn — avoid idle-in-transaction
         return [
             Item(
                 source=r["source"],
@@ -350,6 +365,7 @@ class PostgresStore:
             """,
             (item_id,),
         ).fetchone()
+        self._conn.rollback()  # end read txn — avoid idle-in-transaction
         if row is None:
             return None
         return {
@@ -419,6 +435,7 @@ class PostgresStore:
             """,
             (vector, f"{window_days} days", vector),
         ).fetchone()
+        self._conn.rollback()  # end read txn — avoid idle-in-transaction
         if row is not None and row["dist"] < (1.0 - threshold):
             return row["item_id"]
         return None

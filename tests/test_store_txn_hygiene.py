@@ -154,6 +154,8 @@ def test_read_method_leaves_connection_idle(pg_store, method_name, call, expect_
     (rollback) and leaves the connection IDLE. A connection left INTRANS while
     idle blocks DDL/TRUNCATE and queues all subsequent reads behind it
     (T-06G-04, 06-UAT.md root cause).
+
+    # end read txn — avoid idle-in-transaction
     """
     result = call(pg_store)
     assert expect_miss(result), (
@@ -165,3 +167,24 @@ def test_read_method_leaves_connection_idle(pg_store, method_name, call, expect_
         f"{status.name} — expected IDLE. The read method did not end its "
         f"read transaction (idle-in-transaction leak)."
     )
+
+@db_live
+def test_idle_in_transaction_backstop_is_set(tmp_path):
+    """Verify the connection was created with idle_in_transaction_session_timeout set.
+
+    This is the backstop that self-heals any future leaked read txn (the 300s cap
+    prevents the 8.5-hour wedge that blocked DDL and queued all reads).
+    """
+    dsn = _get_dsn()
+    store = PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs")
+
+    with store:
+        # The connection options string should contain the timeout setting
+        # psycopg3 stores this in conn.info.parameters
+        params = dict(store._conn.info.get_parameters())
+        options = params.get("options", "")
+        assert "idle_in_transaction_session_timeout=300000" in options, (
+            f"idle_in_transaction_session_timeout not set; "
+            f"options={options!r}"
+        )
+
