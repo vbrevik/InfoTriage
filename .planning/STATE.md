@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: 06-05 complete (test-DSN safety landed, prod wipe path closed); 06-06 (store txn hygiene) remaining
+status: 06-05 + 06-06 complete (test-DSN safety landed, store txn hygiene closed)
 stopped_at: null
-last_updated: "2026-07-08T21:30:00.000Z"
+last_updated: "2026-07-09T00:00:00.000Z"
 progress:
   total_phases: 13
   completed_phases: 7
