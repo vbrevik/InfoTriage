@@ -22,3 +22,9 @@ services:
       POSTGRES_PASSWORD: test
     tmpfs:
       - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d infotriage_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
