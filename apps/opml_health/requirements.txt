@@ -1,0 +1,4 @@
+json-log-formatter>=1.1
+httpx>=0.25
+fastapi>=0.104
+uvicorn>=0.24

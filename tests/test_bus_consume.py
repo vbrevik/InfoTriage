@@ -32,15 +32,17 @@ AMQP_URL = os.environ.get(
 
 
 def _rabbitmq_reachable() -> bool:
-    """Return True if RabbitMQ AMQP port is reachable."""
-    try:
-        s = socket.socket()
-        s.settimeout(2)
-        s.connect(("127.0.0.1", 22001))
-        s.close()
-        return True
-    except OSError:
-        return False
+    """Return True if RabbitMQ is reachable and speaks AMQP."""
+
+    async def _check() -> bool:
+        try:
+            conn = await aio_pika.connect(AMQP_URL, timeout=2.0)
+            await conn.close()
+            return True
+        except Exception:
+            return False
+
+    return asyncio.run(_check())
 
 
 def _skip_if_unavailable() -> None:

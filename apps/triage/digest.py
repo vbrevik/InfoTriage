@@ -14,25 +14,14 @@ Covers everything that arrived SINCE your last situation update (default: yester
   python3 score/digest.py --since "2026-06-22 16:00"   # explicit cutoff (Oslo)
   python3 score/digest.py --hours 18                    # or a rolling window
 """
-import os, sys, re, time, argparse, datetime
-from pathlib import Path
+import os, sys, re, time, datetime
 from zoneinfo import ZoneInfo
-
-from contracts import Item  # D-08: proves the contract seam resolves via editable install
-from store import PostgresStore
-
-sys.path.insert(0, os.path.dirname(__file__))
-from triage_score import score_item, load_dotenv                 # noqa: E402
-from fever_triage import fever_key, fever, strip_html             # noqa: E402
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 OUT = os.path.join(ROOT, "data", "digests")
 OSLO = ZoneInfo("Europe/Oslo")
 STOP = set("the a an of to in on for and or at by with from is are as it its this that "
            "i og å en et er på til av for som med det den de har om mot ved".split())
-
-# D-08 wiring: module-level type/marker reference — proves the editable install resolves
-__contract__ = Item
 
 # CCIR display order + titles (must match the ids the model emits from ccir.md)
 CCIR_ORDER = [
@@ -71,80 +60,6 @@ def default_cutoff():
 
 def stamp(dt):
     return dt.strftime("%Y-%m-%d %H:%M")
-
-def fetch_window(cutoff_epoch, hardcap):
-    """Fetch Fever items within the time window via unread_item_ids.
-
-    Strategy: get unread IDs (sorted newest-first by Fever), batch-fetch by ID
-    using with_ids (batches of 50), filter by cutoff_epoch, stop early when
-    items are older than cutoff.
-    """
-    key = fever_key()
-    if fever(key, "")["auth"] != 1:
-        raise SystemExit("Fever auth failed — check .env creds / API enabled.")
-    feeds = {f["id"]: f["title"] for f in fever(key, "feeds").get("feeds", [])}
-
-    # Get unread IDs — Fever returns them newest-first (highest id first)
-    ids_raw = fever(key, "unread_item_ids").get("unread_item_ids", "")
-    unread_ids = sorted((i for i in ids_raw.split(",") if i), key=int, reverse=True)
-    if not unread_ids:
-        print("  nothing unread.", file=sys.stderr)
-        return []
-    # Cap to most recent hardcap items
-    candidate_ids = unread_ids[:hardcap]
-    print(f"  {len(candidate_ids)} candidate unread ids (of {len(unread_ids)} total)",
-          file=sys.stderr, flush=True)
-
-    # Batch-fetch by ID (Fever caps at 50 per request)
-    items = []
-    for i in range(0, len(candidate_ids), 50):
-        chunk = ",".join(candidate_ids[i:i+50])
-        batch = fever(key, "items", **{"with_ids": chunk}).get("items", [])
-        items += [it for it in batch if it.get("created_on_time", 0) >= cutoff_epoch]
-        # If the oldest in this batch is before cutoff, we're past the window
-        if batch and min(it.get("created_on_time", 0) for it in batch) < cutoff_epoch:
-            break
-    # score
-    out = []
-    for n, it in enumerate(items, 1):
-        v = score_item({"title": it.get("title", ""),
-                        "source": feeds.get(it.get("feed_id"), ""),
-                        "summary": strip_html(it.get("html", ""))[:500]})
-        v.update(id=it["id"], url=it.get("url", ""), t=it.get("created_on_time", 0))
-        out.append(v)
-        if n % 10 == 0 or n == len(items):
-            print(f"  …scored {n}/{len(items)}", file=sys.stderr, flush=True)
-    return out
-
-def map_verdict_to_item(v: dict) -> Item:
-    """Map a scored verdict dict from fetch_window to a contracts.Item.
-
-    Core fields land in Item columns; all score/enrichment metadata goes into
-    Item.payload (R6, D-02). Source type is always "rss" — digest pulls from
-    FreshRSS/Fever. Language defaults to "no" (Norwegian-primary corpus).
-    """
-    ts = datetime.datetime.fromtimestamp(v.get("t", 0), tz=datetime.timezone.utc)
-    payload = {
-        "ccir": v.get("ccir"),
-        "cnr": v.get("cnr"),
-        "pmesii": v.get("pmesii"),
-        "tessoc": v.get("tessoc"),
-        "score": v.get("score"),
-        "why": v.get("why"),
-        "bucket": v.get("bucket"),
-        "fever_id": v.get("id"),
-    }
-    return Item(
-        source=v["source"],
-        source_type="rss",
-        url=v.get("url", ""),
-        title=v["title"],
-        ts=ts,
-        lang="no",
-        summary=v.get("summary"),
-        body_ref=None,
-        payload=payload,
-    )
 
 def keywords(title):
     return {w for w in re.findall(r"[a-zA-ZæøåÆØÅ0-9]{4,}", (title or "").lower()) if w not in STOP}
@@ -346,56 +261,9 @@ def write_list(verdicts, period):
     return "list.md", "\n".join(L)
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--mode", choices=["all", "brief", "cluster", "list", "bluf"], default="cluster")
-    ap.add_argument("--since", help='cutoff "YYYY-MM-DD HH:MM" (Oslo)')
-    ap.add_argument("--hours", type=int, help="rolling window instead of yesterday-1600")
-    ap.add_argument("--max", type=int, default=400, help="hard cap on items scored")
-    ap.add_argument("--bluf-top", type=int, default=12,
-                    help="top-N items per CCIR fed to LLM (BLUF mode only); ~1500 tokens at N=12")
-    ap.add_argument("--bluf-cap-total", type=int, default=6000,
-                    help="per-LLM-prompt input token cap for BLUF synthesis (default 6000); "
-                         "items dropped from the tail (lowest-score end) until the prompt fits; "
-                         "set very high (e.g. 100000) to disable trimming entirely. "
-                         "Cap below the smallest frame (~200 estimated tok) skips the section cleanly.")
-    args = ap.parse_args()
-    load_dotenv(os.path.join(ROOT, ".env"))
-
-    if args.since:
-        cutoff = datetime.datetime.strptime(args.since, "%Y-%m-%d %H:%M").replace(tzinfo=OSLO)
-    elif args.hours:
-        cutoff = oslo_now() - datetime.timedelta(hours=args.hours)
-    else:
-        cutoff = default_cutoff()
-    period = f"siden {stamp(cutoff)} → {stamp(oslo_now())}"
-    print(f"window: {period}", file=sys.stderr)
-
-    verdicts = fetch_window(int(cutoff.timestamp()), args.max)
-
-    dsn = os.environ["INFOTRIAGE_PG_DSN"]
-    blob_root = Path(os.path.join(ROOT, "data", "blobs"))
-    with PostgresStore(dsn=dsn, blob_root=blob_root) as store:
-        store.init_schema()
-        for v in verdicts:
-            store.put_item(map_verdict_to_item(v))
-
-    os.makedirs(OUT, exist_ok=True)
-
-    writers = {"brief": write_brief, "cluster": write_cluster, "list": write_list, "bluf": write_bluf}
-    chosen = writers if args.mode == "all" else {args.mode: writers[args.mode]}
-    for name, fn in chosen.items():
-        if name == "bluf":
-            fname, text = fn(verdicts, period,
-                             top_n=args.bluf_top,
-                             cap_total=args.bluf_cap_total)
-        else:
-            fname, text = fn(verdicts, period)
-        fpath = os.path.join(OUT, fname)
-        tmp = fpath + ".tmp"
-        with open(tmp, "w") as f:
-            f.write(text + "\n")
-        os.replace(tmp, fpath)
-        print(f"wrote {fpath}")
+    raise SystemExit(
+        "digest.py CLI is deprecated; use the brief app event-driven renderer instead."
+    )
 
 if __name__ == "__main__":
     main()

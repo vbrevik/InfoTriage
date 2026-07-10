@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-07-09T19:02:03Z",
+  "timestamp": "2026-07-10T00:00:00Z",
   "phase": "06-brief-app",
   "phase_name": "Brief app",
   "phase_dir": ".planning/phases/06-brief-app",
@@ -14,7 +14,10 @@
     {"id": 3, "name": "06-03 Clustering data-flow gap closure", "status": "done", "commit": "e6fab90"},
     {"id": 4, "name": "06-04 Vault-writer gap closure", "status": "done", "commit": "e6fab90"},
     {"id": 5, "name": "06-05 Test-DSN safety", "status": "done", "commit": "2d6c255"},
-    {"id": 6, "name": "06-06 Store txn hygiene", "status": "done", "commit": "53d2174"}
+    {"id": 6, "name": "06-06 Store txn hygiene", "status": "done", "commit": "53d2174"},
+    {"id": 7, "name": "SAB source status card + hide empty CCIR slides", "status": "done", "commit": "uncommitted"},
+    {"id": 8, "name": "FreshRSS OPML import + NewsAPI 3h TTL", "status": "done", "commit": "uncommitted"},
+    {"id": 9, "name": "TTL docs (RSS_BRIDGE_NOTES.md) + syntax test", "status": "done", "commit": "uncommitted"}
   ],
   "remaining_tasks": [
     {"id": 1, "name": "UAT Test 1: Cold Start Smoke Test", "status": "not_started"},
@@ -37,9 +40,7 @@
     {"decision": "Vault-writer uses interim heuristic wikilinks", "rationale": "Full entity resolution deferred to Phase 8; interim heuristic sufficient for UAT", "phase": "06"},
     {"decision": "Test-DSN pattern: INFOTRIAGE_TEST_DSN only, no fallback", "rationale": "Prevents prod DB wipe; guard test enforces", "phase": "06"},
     {"decision": "Idle-in-transaction backstop: 5-min server-side timeout", "rationale": "Self-heals future leaks; 300s >> legitimate operations (~120s)", "phase": "06"},
-    "threshold config: CLUSTER_THRESHOLD env var (0.0-1.0), default 0.75",
-    "rationale": "Configurable threshold for clustering; validated in main.py",
-    "phase": "06"
+    {"decision": "threshold config: CLUSTER_THRESHOLD env var (0.0-1.0), default 0.75", "rationale": "Configurable threshold for clustering; validated in main.py", "phase": "06"}
   ],
   "uncommitted_files": [
     ".env.bak-channels",
@@ -47,8 +48,8 @@
     ".planning/research/",
     "test_*.py"
   ],
-  "next_action": "Run UAT Test 1: Cold Start Smoke Test — docker compose down -v && docker compose up -d && sleep 10 && curl -s http://localhost:22040/health",
-  "context_notes": "Phase 6 gap-closure complete. All 6 plans have SUMMARY.md. UAT.md created with 9 tests. Need to run UAT tests sequentially against live stack. Key technical debt: clustering threshold 0.75 may be too high (similarities 0.72-0.82); HTML renderer still uses keyword clustering via sab_html.py. Ready for UAT re-run.",
+  "next_action": "Run UAT Test 1: Cold Start Smoke Test — docker compose down -v && docker compose up -d && sleep 10 && curl -s http://localhost:22040/health (or continue with Phase 7 ops planning if UAT is deferred)",
+  "context_notes": "Phase 6 gap-closure complete. All 6 plans have SUMMARY.md. UAT.md created with 9 tests. SAB UI polished (source status card, hide empty CCIR slides). FreshRSS OPML imported and NewsAPI feeds throttled to 3h TTL. TTL docs + syntax test added. Need to run UAT tests sequentially against live stack. Key technical debt: clustering threshold 0.75 may be too high (similarities 0.72-0.82); HTML renderer still uses keyword clustering via sab_html.py. Ready for UAT re-run or Phase 7 ops planning.",
   "critical_anti_patterns": [
     {
       "pattern": "Writing SUMMARY before verifying artifacts on disk",

@@ -127,18 +127,18 @@ def test_200_html_with_literal_rss_in_body_is_warning():
 # load_opml()
 # ---------------------------------------------------------------------------
 
-def test_categories_count_11():
-    """feeds.opml has 11 top-level outlines (Norske aviser → Sport SIR-2)."""
+def test_categories_count_12():
+    """feeds.opml has 12 top-level outlines (Norske aviser → NewsAPI.org → Sport SIR-2)."""
     groups = _check.load_opml(OPML)
-    assert len(groups) == 11, \
-        f"Expected 11 category groups, got {len(groups)}: {[cat for cat, _ in groups]}"
+    assert len(groups) == 12, \
+        f"Expected 12 category groups, got {len(groups)}: {[cat for cat, _ in groups]}"
 
 
-def test_total_rss_count_64():
-    """feeds.opml has 64 RSS feeds total (verified 2026-06-24)."""
+def test_total_rss_count_70():
+    """feeds.opml has 70 RSS feeds total (verified 2026-06-24)."""
     groups = _check.load_opml(OPML)
     total = sum(len(rss) for _, rss in groups)
-    assert total == 64, f"Expected 64 RSS feeds, got {total}"
+    assert total == 70, f"Expected 70 RSS feeds, got {total}"
 
 
 def test_filter_outlines_substring():

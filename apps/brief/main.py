@@ -29,9 +29,10 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from apps.brief.html_renderer import build_html
 from apps.brief.renderer import render_list
 
-# default_cutoff (yesterday 16:00 Oslo) — same first-render default as digest.py (D-09)
+# Default SAB cutoff now comes from BRIEF_WINDOW_HOURS (rolling window, default 24h).
+# OSLO timezone is used for the period label.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "triage"))
-from digest import default_cutoff  # noqa: E402
+from digest import OSLO  # noqa: E402
 
 log = logging.getLogger("brief.main")
 
@@ -44,6 +45,22 @@ WINDOW_RE = re.compile(r"^(\d{1,3})h$")
 CLUSTER_THRESHOLD = float(os.getenv("CLUSTER_THRESHOLD", "0.75"))
 if not (0.0 <= CLUSTER_THRESHOLD <= 1.0):
     raise ValueError(f"CLUSTER_THRESHOLD must be 0.0–1.0, got {CLUSTER_THRESHOLD}")
+
+# Default SAB window in hours (default 24). Override with BRIEF_WINDOW_HOURS to
+# extend the 'since' time window, e.g. 72 or 168.
+def _default_window_hours() -> int:
+    try:
+        hours = int(os.getenv("BRIEF_WINDOW_HOURS", "24"))
+    except ValueError:
+        hours = 24
+    return max(1, hours)
+
+
+def _default_cutoff() -> datetime.datetime:
+    """Return the default SAB cutoff: now (Oslo) minus BRIEF_WINDOW_HOURS."""
+    return (datetime.datetime.now(OSLO) - datetime.timedelta(
+        hours=_default_window_hours()
+    ))
 
 _ENRICHMENT_SQL = (
     "SELECT e.item_id, e.ccir, e.cnr, e.score, e.bucket, e.why, e.pmesii, e.tessoc, "
@@ -93,13 +110,14 @@ def _parse_window(window: str) -> datetime.datetime:
     if not m:
         raise HTTPException(status_code=422, detail="window must look like '24h' (1-999 hours)")
     hours = int(m.group(1))
-    return datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=hours)
+    return datetime.datetime.now(OSLO) - datetime.timedelta(hours=hours)
 
 
 async def _render_sab(since: datetime.datetime, with_bluf: bool) -> str:
     rows = await asyncio.to_thread(_fetch_rows, since)
     return await asyncio.to_thread(
-        build_html, rows, _period_label(since), with_bluf
+        build_html, rows, _period_label(since), with_bluf,
+        cluster_threshold=CLUSTER_THRESHOLD,
     )
 
 
@@ -154,7 +172,7 @@ async def sab(window: str | None = None, mode: str | None = None):
 
     # ?mode=list — list markdown for the window, never written to disk (SPEC)
     if mode == "list":
-        since = _parse_window(window) if window else default_cutoff()
+        since = _parse_window(window) if window else _default_cutoff()
         rows = await asyncio.to_thread(_fetch_rows, since)
         return PlainTextResponse(render_list(rows), media_type="text/markdown")
     if mode is not None:
@@ -172,7 +190,7 @@ async def sab(window: str | None = None, mode: str | None = None):
     except FileNotFoundError:
         fresh = False
     if not fresh:
-        html = await _render_sab(default_cutoff(), with_bluf)
+        html = await _render_sab(_default_cutoff(), with_bluf)
         await asyncio.to_thread(_write_atomic, SAB_HTML, html)
     return FileResponse(SAB_HTML, media_type="text/html",
                         headers={"Cache-Control": "max-age=86400"})

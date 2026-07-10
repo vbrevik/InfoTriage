@@ -11,8 +11,8 @@ import xml.etree.ElementTree as ET
 
 OPML = os.path.join(os.path.dirname(__file__), "..", "apps", "opml", "feeds.opml")
 
-EXPECTED_TOP_OUTLINES = 11  # Norske aviser, Offentlig Norge, ... , Sport VM 2026 (SIR-2)
-EXPECTED_RSS_FEEDS = 64     # total type="rss" outlines (verified 2026-06-24)
+EXPECTED_TOP_OUTLINES = 12  # Norske aviser, Offentlig Norge, ... , NewsAPI.org, Sport VM 2026 (SIR-2)
+EXPECTED_RSS_FEEDS = 70     # total type="rss" outlines (verified 2026-06-24)
 
 
 def _parse(path):

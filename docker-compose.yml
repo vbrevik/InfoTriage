@@ -200,6 +200,7 @@ services:
       INFOTRIAGE_DIGESTS_DIR: /data/digests
       INFOTRIAGE_VAULT_PATH: /vault/brief-outbox
       CLUSTER_THRESHOLD: ${CLUSTER_THRESHOLD:-0.75}
+      BRIEF_WINDOW_HOURS: ${BRIEF_WINDOW_HOURS:-24}
       VAULT_INCLUDE_EMAIL: ${VAULT_INCLUDE_EMAIL:-1}
       # NOT ${LLM_BASE_URL:-...}: .env's LLM_BASE_URL=127.0.0.1 is for host-side scripts;
       # inside the container that resolves to the container itself (see triage note).
@@ -211,6 +212,7 @@ services:
     volumes:
       - ./data:/data
       - ${OBSIDIAN_VAULT_PATH:-./data/obsidian}/brief-outbox:/vault/brief-outbox:rw
+      - ./apps/opml:/app/opml:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -377,6 +379,41 @@ services:
       - ingest-youtube
       - ingest-gmail
       - ingest-obsidian
+    networks: [infotriage]
+
+  # ── Phase 7: opml-health admin + DLQ consumer ──────────────────────────────
+  # Standalone container: polls all services' /health endpoints and aggregates
+  # status at /admin/health. Also consumes from q.ops.dlx (dead-letter queue)
+  # and re-emits items after configurable backoff.
+  opml-health:
+    build:
+      context: .
+      dockerfile: apps/opml_health/Dockerfile
+    container_name: infotriage-opml-health
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:22032:22032"   # admin dashboard: localhost:22032
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      INFOTRIAGE_PG_DSN: ${INFOTRIAGE_PG_DSN:-postgresql://infotriage:infotriage_dev@postgres:5432/infotriage}
+      INFOTRIAGE_AMQP_DSN: ${INFOTRIAGE_AMQP_DSN:-amqp://infotriage:infotriage_rmq@rabbitmq:5672}
+      INFOTRIAGE_OPML_HEALTH_PORT: "22032"
+      INFOTRIAGE_OPML_HEALTH_SINCE_HOURS: "24"
+    volumes:
+      - ./opml:/app/opml:ro   # OPML feed list for health probes
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:22032/health', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     networks: [infotriage]
 
 networks:

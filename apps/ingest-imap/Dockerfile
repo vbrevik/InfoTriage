@@ -10,9 +10,9 @@ COPY libs/store /build/store
 COPY libs/ingest_common /build/ingest_common
 RUN pip install --no-deps /build/contracts /build/store /build/ingest_common
 
-# 2. Install adapter requirements (includes all transitive deps for the above libs)
+# 2. Install adapter requirements + JSON formatter for structured container logging (Phase 7)
 COPY apps/ingest-imap/requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install -r requirements.txt json-log-formatter
 
 # 3. Copy adapter source
 COPY apps/ingest-imap/ .

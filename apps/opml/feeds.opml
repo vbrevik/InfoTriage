@@ -106,6 +106,20 @@
            works, just throttled. Edit query=... to your topic. -->
       <outline type="rss" text="GDELT · Ukraine 🟡" title="GDELT · Ukraine 🟡" xmlUrl="https://api.gdeltproject.org/api/v2/doc/doc?query=Ukraine&amp;mode=ArtList&amp;format=rss&amp;maxrecords=75" htmlUrl="https://www.gdeltproject.org/"/>
     </outline>
+    <outline text="NewsAPI.org" title="NewsAPI.org">
+      <!-- NewsAPI.org feeds via RSS-Bridge (http://localhost:3000).
+           Free tier: 100 requests/day across all endpoints. With 6 feeds polled,
+           a 30-minute cadence would exhaust the quota in ~8 hours. Recommended
+           FreshRSS refresh interval: ≥2 hours (safer: 3–4 hours) so the full
+           set of feeds stays under the daily limit. RSS-Bridge may cache
+           responses, but throttle at the reader level to avoid account limits. -->
+      <outline type="rss" text="NewsAPI · General" title="NewsAPI · General" xmlUrl="http://localhost:3000/?action=display&amp;bridge=NewsAPI&amp;category=general&amp;language=en&amp;apiKey=2e2ed7afa3db4c36b5ea3a7ef07658fb&amp;format=Atom" htmlUrl="https://newsapi.org/"/>
+      <outline type="rss" text="NewsAPI · Ukraine / Russia" title="NewsAPI · Ukraine / Russia" xmlUrl="http://localhost:3000/?action=display&amp;bridge=NewsAPI&amp;q=Ukraine+OR+Russia&amp;language=en&amp;apiKey=2e2ed7afa3db4c36b5ea3a7ef07658fb&amp;format=Atom" htmlUrl="https://newsapi.org/"/>
+      <outline type="rss" text="NewsAPI · NATO / Europe security" title="NewsAPI · NATO / Europe security" xmlUrl="http://localhost:3000/?action=display&amp;bridge=NewsAPI&amp;q=NATO+OR+European+security&amp;language=en&amp;apiKey=2e2ed7afa3db4c36b5ea3a7ef07658fb&amp;format=Atom" htmlUrl="https://newsapi.org/"/>
+      <outline type="rss" text="NewsAPI · Spy" title="NewsAPI · Spy" xmlUrl="http://localhost:3000/?action=display&amp;bridge=NewsAPI&amp;q=spy&amp;language=en&amp;apiKey=2e2ed7afa3db4c36b5ea3a7ef07658fb&amp;format=Atom" htmlUrl="https://newsapi.org/"/>
+      <outline type="rss" text="NewsAPI · China" title="NewsAPI · China" xmlUrl="http://localhost:3000/?action=display&amp;bridge=NewsAPI&amp;q=China&amp;language=en&amp;apiKey=2e2ed7afa3db4c36b5ea3a7ef07658fb&amp;format=Atom" htmlUrl="https://newsapi.org/"/>
+      <outline type="rss" text="NewsAPI · Military" title="NewsAPI · Military" xmlUrl="http://localhost:3000/?action=display&amp;bridge=NewsAPI&amp;q=military&amp;language=en&amp;apiKey=2e2ed7afa3db4c36b5ea3a7ef07658fb&amp;format=Atom" htmlUrl="https://newsapi.org/"/>
+    </outline>
     <outline text="Medium" title="Medium">
       <outline type="rss" text="Medium · AI"               title="Medium · AI"               xmlUrl="https://medium.com/feed/tag/artificial-intelligence" htmlUrl="https://medium.com/tag/artificial-intelligence"/>
       <outline type="rss" text="Medium · LLM"              title="Medium · LLM"              xmlUrl="https://medium.com/feed/tag/llm" htmlUrl="https://medium.com/tag/llm"/>

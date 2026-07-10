@@ -1,20 +1,21 @@
+# ingest-youtube adapter (Phase 4, D-10/D-11)
+# Build context: project root
 FROM python:3.12-slim
 
 WORKDIR /app
 
-# Copy and install local libs without their external deps (wheels installed next)
+# 1. Copy and install local libs without their external deps
 COPY libs/contracts /build/contracts
 COPY libs/store /build/store
 COPY libs/ingest_common /build/ingest_common
 RUN pip install --no-deps /build/contracts /build/store /build/ingest_common
 
-# Install adapter dependencies (yt-dlp from official yt-dlp/yt-dlp; T-04-SC)
+# 2. Install adapter dependencies + JSON formatter for structured logging (Phase 7)
 COPY apps/ingest-youtube/requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt json-log-formatter
 
-# Copy adapter source
+# 3. Copy adapter source
 COPY apps/ingest-youtube/ .
 
-# data/feeds is bind-mounted by docker-compose (Plan 06) for Atom XML output
-# data/blobs is bind-mounted for content-addressed blob storage
+# data/feeds is bind-mounted by docker-compose; data/blobs for blob storage
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

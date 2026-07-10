@@ -10,8 +10,9 @@ COPY libs/store /build/store
 RUN pip install --no-deps /build/contracts /build/store
 
 # 2. Install worker requirements (includes all transitive deps for the above libs)
+#    Add json-log-formatter for structured container logging (Phase 7)
 COPY apps/triage/requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install -r requirements.txt json-log-formatter
 
 # 3. Copy worker source
 COPY apps/triage/ .

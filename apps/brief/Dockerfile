@@ -9,9 +9,9 @@ COPY libs/contracts /build/contracts
 COPY libs/store /build/store
 RUN pip install --no-deps /build/contracts /build/store
 
-# 2. Install brief requirements (includes all transitive deps for the above libs)
+# 2. Install brief requirements + JSON formatter for structured container logging (Phase 7)
 COPY apps/brief/requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install -r requirements.txt json-log-formatter
 
 # 3. Copy source — apps/ layout preserved: brief imports apps.brief.* absolutely and
 #    reaches sibling apps/triage/ (digest.py, sab_html.py, triage_score.py) via sys.path

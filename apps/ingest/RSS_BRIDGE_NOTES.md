@@ -40,6 +40,38 @@ rss-bridge doesn't refresh on its own — FreshRSS pulls the rss-bridge-generate
 
 If you have a feed that rss-bridge struggles with (rate limits, Cloudflare), set a long per-feed TTL in FreshRSS (feed ▸ Manage ▸ Refresh at most every N hours).
 
+## Setting per-feed TTL manually (FreshRSS UI)
+
+Some upstream sources are aggressively rate-limited. The most important example in this project is **NewsAPI.org**, whose free tier allows only **100 requests/day**. With the six NewsAPI feeds in [`apps/opml/feeds.opml`](../../apps/opml/feeds.opml), the default twice-an-hour cadence would exhaust the quota quickly.
+
+To slow a feed down from the FreshRSS web UI:
+
+1. Open <http://localhost:8088> and log in.
+2. Go to **Subscriptions**.
+3. Click the feed you want to throttle (e.g., one of the *NewsAPI · …* feeds).
+4. Choose **Manage**.
+5. Set **"Refresh at most every"** to a conservative interval:
+   - **2 hours** = 72 requests/day for 6 feeds
+   - **3 hours** = 48 requests/day for 6 feeds (recommended)
+   - **4 hours** = 36 requests/day for 6 feeds
+6. Save and repeat for each rate-limited feed.
+
+For NewsAPI.org specifically, **3 hours** is the recommended starting point: it keeps the 6 feeds under the 100-requests/day free-tier cap while still refreshing several times a day.
+
+## Automated TTL helper
+
+If you prefer to set the TTL from the command line, use the helper script at [`scripts/set_newsapi_ttl.py`](../../scripts/set_newsapi_ttl.py):
+
+```bash
+# Default: 3 hours (10800 seconds)
+python3 scripts/set_newsapi_ttl.py
+
+# Or specify a different TTL in seconds
+python3 scripts/set_newsapi_ttl.py 14400   # 4 hours
+```
+
+The script finds every feed whose URL contains `bridge=NewsAPI` in the FreshRSS SQLite database and updates its `ttl` value. It is safe to re-run after re-importing the OPML.
+
 ## When to automate (optional CLI driver)
 
 If you find yourself adding >5 sites this way, or you want a CI gate that re-validates the bridge URLs exist, a small `bridge/sites_to_feeds.py` driver can:

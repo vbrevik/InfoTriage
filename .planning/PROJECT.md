@@ -73,14 +73,14 @@ These are not defaults — they are rules. If a future change appears to violate
 
 | Piece | State |
 |---|---|
-| Test suite | ✅ **162 tests pass** (Phase 3 complete) |
+| Test suite | ✅ **162+ tests pass** (Phase 3 complete; `tests/test_set_newsapi_ttl.py` added) |
 | RabbitMQ bus | ✅ **aio-pika BusClient**, 4 routing keys, DLX/DLQ, publisher confirms, smoke tests green |
 | BusClient Protocol | ✅ **async-first** — InMemoryBus + RabbitMQBus interchangeable at call site |
 | Bridges `imap_to_atom` / `yt_to_atom` | ✅ **working** (not "scaffolded") — yt live-fetched a public channel; XML-gen + escaping verified |
 | `gmail_to_atom` (IMAP + app password) | ❌ **dead end** — account 2SV ON, app passwords hard-blocked. To be retired. |
 | Gmail via OAuth2/MCP | ✅ **proven** — live MCP pull produced valid `data/feeds/gmail.xml` (20 entries), no app password. Runtime = self-hosted Gmail MCP server (P4). |
-| score pipeline (triage_score + fever_triage + digest + sab_html) | ✅ working on host Python; **PMESII/TESSOC enrichment done** (not "planned") |
-| FreshRSS + rss-bridge + feeds in Docker | ✅ reachable (`:8088`, `:3000`) — to be re-mapped into 22000 band |
+| score pipeline (triage_score + fever_triage + digest + sab_html) | ✅ working on host Python; **PMESII/TESSOC enrichment done**; SAB hides empty CCIR slides and shows source status card |
+| FreshRSS + rss-bridge + feeds in Docker | ✅ reachable (`:8088`, `:3000`); OPML imported; NewsAPI feeds throttled to 3h TTL |
 | qwen36 triage vs oMLX endpoint | ✅ correct buckets, ~3 s/item |
 | `.env.example` | ✅ **exists** (README/PROJECT previously said missing) |
 

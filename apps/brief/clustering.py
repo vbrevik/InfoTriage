@@ -60,6 +60,15 @@ class EnrichedItem:
     embedding: list[float] | None
 
 
+def _as_list(vec) -> list[float]:
+    """Convert pgvector Vector or any iterable to list[float]."""
+    if isinstance(vec, list):
+        return vec
+    if hasattr(vec, 'to_list'):
+        return vec.to_list()
+    return list(vec)
+
+
 def _cosine_distance(a: list[float], b: list[float]) -> float:
     """Compute cosine distance between two equal-length float vectors.
 
@@ -68,6 +77,8 @@ def _cosine_distance(a: list[float], b: list[float]) -> float:
 
     Returns 1.0 for zero vectors (maximum distance).
     """
+    a = _as_list(a)
+    b = _as_list(b)
     dot = sum(x * y for x, y in zip(a, b))
     norm_a = math.sqrt(sum(x * x for x in a))
     norm_b = math.sqrt(sum(x * x for x in b))
@@ -306,15 +317,17 @@ def cluster_items_in_memory(
                 # Update centroid
                 cluster = section_clusters[best_idx]
                 n = len(cluster)
-                dim = len(item.embedding)
+                item_emb = _as_list(item.embedding)
+                dim = len(item_emb)
                 new_centroid = [0.0] * dim
                 for ci in cluster:
+                    ci_emb = _as_list(ci.embedding)
                     for d in range(dim):
-                        new_centroid[d] += ci.embedding[d]
+                        new_centroid[d] += ci_emb[d]
                 centroids[best_idx] = [v / n for v in new_centroid]
             else:
                 section_clusters.append([item])
-                centroids.append(list(item.embedding))
+                centroids.append(_as_list(item.embedding))
 
         all_clusters.extend(section_clusters)
 

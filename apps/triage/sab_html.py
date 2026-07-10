@@ -15,9 +15,20 @@ Usage:
   python3 score/sab_html.py --no-bluf        # skip LLM synthesis
 """
 import os, sys, json, time, argparse, datetime
+import xml.etree.ElementTree as ET
 from zoneinfo import ZoneInfo
 
 sys.path.insert(0, os.path.dirname(__file__))
+
+# Import semantic clustering from brief app
+try:
+    from apps.brief.clustering import (
+        EnrichedItem,
+        cluster_items_in_memory,
+    )
+    SEMANTIC_CLUSTERING_AVAILABLE = True
+except ImportError:
+    SEMANTIC_CLUSTERING_AVAILABLE = False
 from triage_score import load_dotenv, llm  # noqa: E402
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -48,6 +59,9 @@ TESSOC_ICONS = {
     "skills": "🎓", "organization": "🏢", "communications": "📶",
 }
 
+# Placeholder text shown when a CCIR has no items in the current window
+_PLACEHOLDER_BLUF = "Intet nytt å rapportere i perioden."
+
 
 def oslo_now():
     return datetime.datetime.fromtimestamp(time.time(), OSLO)
@@ -75,11 +89,154 @@ def load_verdicts(cutoff_epoch):
             out.append(v)
     return out
 
+
+def parse_opml_sources(opml_path: str | None = None) -> list[str]:
+    """Return configured RSS source titles from the OPML feed list.
+
+    Falls back to an empty list if the OPML file is not present.
+    """
+    if opml_path is None:
+        candidates = [
+            os.path.join(ROOT, "apps", "opml", "feeds.opml"),
+            os.path.join(ROOT, "opml", "feeds.opml"),
+            "/app/opml/feeds.opml",
+        ]
+    else:
+        candidates = [opml_path]
+    opml_path = None
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            opml_path = candidate
+            break
+    if not opml_path:
+        return []
+    try:
+        tree = ET.parse(opml_path)
+    except ET.ParseError:
+        return []
+    sources = []
+    seen = set()
+    for outline in tree.iter("outline"):
+        if outline.attrib.get("type") == "rss":
+            title = outline.attrib.get("title") or outline.attrib.get("text") or ""
+            title = title.strip()
+            if title and title not in seen:
+                seen.add(title)
+                sources.append(title)
+    return sources
+
+
+def aggregate_source_timestamps(verdicts: list[dict]) -> dict[str, int]:
+    """Return the latest epoch timestamp per source from verdicts."""
+    latest: dict[str, int] = {}
+    for v in verdicts:
+        source = (v.get("source") or "").strip()
+        if not source:
+            continue
+        t = v.get("t", 0) or 0
+        if t > latest.get(source, 0):
+            latest[source] = t
+    return latest
+
+
+def render_source_status_card(sources: list[str], last_by_source: dict[str, int],
+                                cutoff_epoch: int, generated_at: str) -> str:
+    """Render the floating source-status card in the upper right corner.
+
+    Sources are listed alphabetically. A green checkmark is shown if the
+    source provided data within the current window; otherwise a red cross.
+    The timestamp shows when the source last provided data.
+    """
+    if not sources:
+        sources = sorted(last_by_source.keys())
+    if not sources:
+        return ""
+
+    active_count = 0
+    rows = []
+    for source in sorted(sources, key=lambda s: s.lower()):
+        last_ts = last_by_source.get(source)
+        if last_ts and last_ts >= cutoff_epoch:
+            active_count += 1
+            icon = '<span class="source-status ok" aria-label="Hentet">✓</span>'
+            ts_text = escape(stamp(datetime.datetime.fromtimestamp(last_ts, OSLO)))
+        else:
+            icon = '<span class="source-status fail" aria-label="Ikke hentet">✕</span>'
+            ts_text = "Ikke hentet"
+        rows.append(
+            f'<div class="source-row">'
+            f'  {icon}'
+            f'  <span class="source-name">{escape(source)}</span>'
+            f'  <span class="source-ts">{ts_text}</span>'
+            f'</div>'
+        )
+
+    summary = f"{active_count}/{len(sources)} aktive"
+    rows_html = "\n".join(rows)
+    return (
+        f'<div class="source-status-card collapsed" id="sourceStatusCard">\n'
+        f'  <div class="source-status-header" onclick="toggleSourceCard()">\n'
+        f'    <span class="source-status-title">📡 Kilder</span>\n'
+        f'    <span class="source-status-summary">{escape(summary)}</span>\n'
+        f'    <span class="source-status-chevron" id="sourceCardChevron">▼</span>\n'
+        f'  </div>\n'
+        f'  <div class="source-status-body" id="sourceStatusBody">\n'
+        f'    {rows_html}\n'
+        f'  </div>\n'
+        f'</div>\n'
+    )
+
 def keywords(title):
     return {w for w in __import__("re").findall(
         r"[a-zA-ZæøåÆØÅ0-9]{4,}", (title or "").lower()) if w not in STOP}
 
-def cluster(items):
+
+def _semantic_cluster(items, threshold=0.75):
+    """Semantic clustering using pgvector embeddings.
+    
+    Falls back to keyword clustering if embeddings are not available.
+    """
+    if not SEMANTIC_CLUSTERING_AVAILABLE:
+        return _keyword_cluster(items)
+    
+    # Build EnrichedItem objects for clustering
+    items_by_ccir = {}
+    for v in items:
+        emb = v.get("embedding")
+        if not isinstance(emb, list) or not emb:
+            emb = None
+        item = EnrichedItem(
+            item_id=v.get("item_id", ""),
+            title=v.get("title", ""),
+            source=v.get("source", ""),
+            url=v.get("url", ""),
+            summary=v.get("summary", ""),
+            ccir=v.get("ccir", ""),
+            cnr=v.get("cnr", ""),
+            score=v.get("score", 0),
+            bucket=v.get("bucket", ""),
+            why=v.get("why", ""),
+            pmesii=v.get("pmesii"),
+            tessoc=v.get("tessoc"),
+            embedding=emb,
+        )
+        cid = (v.get("ccir") or "none").upper()
+        items_by_ccir.setdefault(cid, []).append(item)
+    
+    # Cluster within each CCIR section
+    all_clusters = []
+    for cid, items in items_by_ccir.items():
+        if not items:
+            continue
+        clusters = cluster_items_in_memory(items, threshold=threshold)
+        for cluster in clusters:
+            all_clusters.append({"kw": set(), "items": cluster})
+    
+    return all_clusters
+
+
+def _keyword_cluster(items):
+    """Original keyword-based clustering (fallback)."""
     clusters = []
     for v in sorted(items, key=lambda x: -x.get("score", 0)):
         kw = keywords(v["title"])
@@ -90,6 +247,42 @@ def cluster(items):
         else:
             clusters.append({"kw": kw, "items": [v]})
     return clusters
+
+
+def _group_by_cluster_idx(items):
+    """Group items by pre-computed _cluster_idx metadata (CCIR-scoped).
+
+    Used by the brief app's html_renderer to pass semantic clusters through
+    without monkey-patching the cluster function.
+    """
+    by_cluster = {}
+    for item in items:
+        cluster_idx = item.get("_cluster_idx", -1)
+        if cluster_idx >= 0:
+            key = f"{item.get('ccir', 'none')}_{cluster_idx}"
+            if key not in by_cluster:
+                by_cluster[key] = {"kw": set(), "items": []}
+            by_cluster[key]["items"].append(item)
+            by_cluster[key]["kw"] |= keywords(item.get("title", ""))
+        else:
+            by_cluster[f"singleton_{id(item)}"] = {"kw": set(), "items": [item]}
+
+    clusters = list(by_cluster.values())
+    for c in clusters:
+        if len(c["items"]) > 1:
+            lead = max(c["items"], key=lambda i: i.get("score", 0))
+            lead["_sources_in_cluster"] = len(
+                {i.get("source", "") for i in c["items"]}
+            )
+    return clusters
+
+
+def cluster(items):
+    """Cluster items using semantic clustering when embeddings are available."""
+    # If the caller already computed semantic clusters, use them directly.
+    if items and any("_cluster_idx" in item for item in items):
+        return _group_by_cluster_idx(items)
+    return _semantic_cluster(items)
 
 def kept(verdicts):
     return [v for v in verdicts if (v.get("ccir") or "none").lower() != "none"]
@@ -132,6 +325,127 @@ def render_item(v):
         f'</a>\n'
     )
 
+
+def render_filtered_item(v):
+    """Render a skipped/non-CCIR item for the 'Filtrert ut' slide."""
+    score = v.get("score", 0)
+    title = escape(v.get("title", ""))
+    why = escape(v.get("why", ""))
+    source = escape(v.get("source", ""))
+    url = escape(v.get("url", ""))
+    return (
+        f'<a class="item filtered" href="{url}">'
+        f'<span class="item-score cool">{score}</span>'
+        f'<div class="item-body">'
+        f'<div class="item-why">{title}</div>'
+        f'<div class="item-source">{source}{" · " if source and why else ""}{why}</div>'
+        f'</div>'
+        f'<span class="item-link">les →</span>'
+        f'</a>\n'
+    )
+
+
+def render_filtered_section(items):
+    """Render a slide showing items that were filtered out (ccir='none')."""
+    if not items:
+        return ""
+    items_html = "".join(render_filtered_item(v) for v in items[:30])
+    return (
+        f'<section class="slide" id="filtered">\n'
+        f'  <div class="slide-inner">\n'
+        f'    <div class="slide-header">\n'
+        f'      <div class="slide-header-left">\n'
+        f'        <span class="ccir-badge" style="background:var(--text-dim);color:var(--bg);">FILTER</span>\n'
+        f'        <span class="ccir-title">Filtrert ut</span>\n'
+        f'      </div>\n'
+        f'      <span class="ccir-count">{len(items)} saker · vist: {min(len(items), 30)}</span>\n'
+        f'    </div>\n'
+        f'    <div class="bluf">Saker vurdert som ikke CCIR-relevante i perioden.</div>\n'
+        f'    <div class="items">{items_html}</div>\n'
+        f'  </div>\n'
+        f'</section>\n'
+    )
+
+
+def render_bluf_section(blufs_by_ccir: dict[str, str], exec_bluf: str = "") -> str:
+    """Render a slide aggregating all CCIR BLUFs in one place."""
+    rows = []
+    for cid, title in CCIR_ORDER:
+        bluf = escape(blufs_by_ccir.get(cid, ""))
+        c_type = ccir_type(cid)
+        rows.append(
+            f'<div class="bluf-row collapsed">\n'
+            f'  <div class="bluf-row-header" role="button" tabindex="0" aria-expanded="false" onclick="toggleBlufRow(this)">\n'
+            f'    <div>\n'
+            f'      <span class="ccir-badge {c_type}">{cid}</span>\n'
+            f'      <span class="ccir-title-small">{escape(title)}</span>\n'
+            f'    </div>\n'
+            f'    <span class="bluf-chevron">▼</span>\n'
+            f'  </div>\n'
+            f'  <div class="bluf-row-body">\n'
+            f'    <div class="bluf-text">{bluf}</div>\n'
+            f'  </div>\n'
+            f'</div>'
+        )
+    rows_html = "\n      ".join(rows)
+    exec_html = ""
+    if exec_bluf:
+        exec_html = (
+            f'<div class="exec-bluf-box">\n'
+            f'  <div class="exec-bluf-title">EXECUTIVE SUMMARY</div>\n'
+            f'  <div class="bluf-text">{escape(exec_bluf)}</div>\n'
+            f'</div>\n'
+        )
+    return (
+        f'<section class="slide" id="blufs">\n'
+        f'  <div class="slide-inner">\n'
+        f'    <div class="slide-header">\n'
+        f'      <div class="slide-header-left">\n'
+        f'        <span class="ccir-badge" style="background:var(--purple);color:#fff;">BLUF</span>\n'
+        f'        <span class="ccir-title">Alle BLUF</span>\n'
+        f'      </div>\n'
+        f'      <button type="button" class="copy-blufs-btn" id="copyBlufsBtn" onclick="copyAllBlufs()" title="Kopier alle BLUFs til utklippstavlen" aria-label="Kopier alle BLUFs til utklippstavlen">\n'
+        f'        <span class="copy-icon">📋</span>\n'
+        f'        <span class="copy-label">Kopier alle BLUFs</span>\n'
+        f'      </button>\n'
+        f'    </div>\n'
+        f'    {exec_html}'
+        f'    <div class="bluf-list" id="blufsList">\n'
+        f'      {rows_html}\n'
+        f'    </div>\n'
+        f'  </div>\n'
+        f'</section>\n'
+    )
+
+def generate_exec_summary(blufs_by_ccir: dict[str, str]) -> str:
+    """Generate a short executive summary from all per-CCIR BLUFs."""
+    valid_blufs = [
+        f"[{cid}] {bluf}"
+        for cid, bluf in blufs_by_ccir.items()
+        if bluf and not bluf.startswith("_(") and bluf != _PLACEHOLDER_BLUF
+    ]
+    if not valid_blufs:
+        return "Ingen signifikant aktivitet å rapportere for perioden."
+
+    prompt = (
+        "Du er en senior etterretningsoffiser som skriver en kort overordnet "
+        "oppsummering (executive summary) på norsk.\n\n"
+        "Her er de gjeldende BLUF-ene per CCIR:\n\n"
+        + "\n\n".join(valid_blufs) + "\n\n"
+        "Instruksjoner:\n"
+        "1. Skriv 1-2 setninger som oppsummerer de viktigste overordnede "
+        "temaene eller trusselbildet på tvers av CCIR-ene.\n"
+        "2. Fokuser på det mest kritiske. Ikke list opp hver CCIR.\n"
+        "3. Returner KUN oppsummeringsteksten. Ingen overskrifter, ingen intro."
+    )
+    try:
+        print("  …Executive Summary BLUF", file=sys.stderr, flush=True)
+        return llm([{"role": "user", "content": prompt}], max_tokens=150).strip()
+    except Exception as e:
+        print(f"  …Exec BLUF failure: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+        return "_(Kunne ikke generere overordnet oppsummering — sjekk logg for detaljer)_"
+
+
 def generate_bluf(cid, title, items, top_n=12):
     top = sorted(items, key=lambda x: -x.get("score", 0))[:top_n]
     ctx = []
@@ -164,9 +478,6 @@ def generate_bluf(cid, title, items, top_n=12):
         return "_(Kunne ikke generere BLUF — sjekk logg for detaljer)_"
 
 def render_section(cid, title, items, total_scanned, bluf_text=""):
-    if not items:
-        return ""
-
     c_type = ccir_type(cid)
     clusters = cluster(items)
     cluster_count = len(clusters)
@@ -250,7 +561,9 @@ def render_nav(verdicts):
     rows = ""
     for cid, title in CCIR_ORDER:
         count = len(by.get(cid, []))
-        dot = "active" if count > 0 else "empty"
+        if count == 0:
+            continue
+        dot = "active"
         c_type = ccir_type(cid)
         rows += (
             f'<li><span class="nav-dot {dot}"></span>'
@@ -281,6 +594,13 @@ def build_html(verdicts, period, with_bluf=True, generated_at=None):
             latest_fetch_ts = stamp(datetime.datetime.fromtimestamp(max_t, OSLO))
     fetch_line = f'<span>📥 Sist hentet: {escape(latest_fetch_ts)}</span>' if latest_fetch_ts else ""
 
+    # Build source status card (uses all configured OPML sources)
+    opml_sources = parse_opml_sources()
+    last_by_source = aggregate_source_timestamps(verdicts)
+    source_status_card = render_source_status_card(
+        opml_sources, last_by_source, int(cutoff.timestamp()), gen_ts
+    )
+
     # Build slide index and slides
     has_cnr = any(v.get("cnr") == "I" for v in ks)
     slide_index = []
@@ -298,19 +618,46 @@ def build_html(verdicts, period, with_bluf=True, generated_at=None):
         slide_index.append((slide_num, "cnr", "🚩 CNR — varsle straks", f"{cat1_count} saker"))
         cnr_html = render_cnr(ks)
 
-    # CCIR slides
-    sections = ""
+    # Generate BLUFs once for both per-CCIR sections and the aggregate BLUF slide
+    blufs_by_ccir: dict[str, str] = {}
     for cid, title in CCIR_ORDER:
         grp = by.get(cid, [])
-        bluf_text = ""
         if with_bluf and grp:
-            bluf_text = generate_bluf(cid, title, grp)
+            blufs_by_ccir[cid] = generate_bluf(cid, title, grp)
+        elif with_bluf:
+            blufs_by_ccir[cid] = _PLACEHOLDER_BLUF
+        else:
+            blufs_by_ccir[cid] = ""
+
+    # CCIR slides (only render if there are items in the current window)
+    sections = ""
+    visible_ccirs = []
+    for cid, title in CCIR_ORDER:
+        grp = by.get(cid, [])
+        if not grp:
+            continue
+        visible_ccirs.append((cid, title))
+        bluf_text = blufs_by_ccir.get(cid, "")
         section_html = render_section(cid, title, grp, total, bluf_text=bluf_text)
-        if section_html:
-            slide_num += 1
-            c_type = ccir_type(cid)
-            slide_index.append((slide_num, c_type, f"{cid} · {title}", f"{len(grp)} saker"))
-            sections += section_html
+        slide_num += 1
+        c_type = ccir_type(cid)
+        slide_index.append((slide_num, c_type, f"{cid} · {title}", f"{len(grp)} saker"))
+        sections += section_html
+
+    # Filtered / non-CCIR slide
+    filtered_items = [v for v in verdicts if (v.get("ccir") or "none").lower() == "none"]
+    filtered_html = render_filtered_section(filtered_items)
+    if filtered_html:
+        slide_num += 1
+        slide_index.append((slide_num, "filtered", "Filtrert ut", f"{len(filtered_items)} saker"))
+        sections += filtered_html
+
+    # Aggregate BLUF slide (below all CCIR/CNR/SIR/PIR sections)
+    if with_bluf:
+        slide_num += 1
+        exec_bluf = generate_exec_summary(blufs_by_ccir)
+        slide_index.append((slide_num, "blufs", "Alle BLUF", f"{len(CCIR_ORDER)} CCIR"))
+        sections += render_bluf_section(blufs_by_ccir, exec_bluf=exec_bluf)
 
     # Stats slide
     slide_num += 1
@@ -320,7 +667,7 @@ def build_html(verdicts, period, with_bluf=True, generated_at=None):
     # Build index HTML
     index_items = ""
     for num, typ, label, sub in slide_index:
-        dot_class = f"idx-{typ}" if typ in ("pir", "sir", "ffir", "cnr", "stats") else "idx-gray"
+        dot_class = f"idx-{typ}" if typ in ("pir", "sir", "ffir", "cnr", "stats", "filtered") else "idx-gray"
         sub_html = f'<span class="idx-sub">{escape(sub)}</span>' if sub else ""
         index_items += (
             f'<div class="idx-item" onclick="goToSlide({num - 1})">'
@@ -332,6 +679,24 @@ def build_html(verdicts, period, with_bluf=True, generated_at=None):
         )
 
     nav_html = render_nav(verdicts)
+
+    # Stats slide CCIR list (only CCIRs with items)
+    stats_ccir_list_html = ""
+    for cid, title in CCIR_ORDER:
+        count = len(by.get(cid, []))
+        if count == 0:
+            continue
+        c_type = ccir_type(cid)
+        max_score = max((v.get("score", 0) for v in by.get(cid, [])), default=0)
+        bar_width = min(100, max_score * 10)
+        stats_ccir_list_html += (
+            f'<li>'
+            f'  <span class="sid {c_type}">{cid}</span>'
+            f'  <span class="stitle">{escape(title)}</span>'
+            f'  <span class="scount">{count}</span>'
+            f'  <span class="sbar"><span class="sbar-fill" style="width:{bar_width}%;background:var(--{c_type})"></span></span>'
+            f'</li>\n'
+        )
 
     # PMESII domain distribution
     from collections import Counter
@@ -397,8 +762,10 @@ def build_html(verdicts, period, with_bluf=True, generated_at=None):
         sections=sections,
         index_items=index_items,
         nav=nav_html,
+        stats_ccir_list=stats_ccir_list_html,
         pmesii_dist=pmesii_dist_html,
         tessoc_dist=tessoc_dist_html,
+        source_status_card=source_status_card,
     )
 
 
@@ -673,6 +1040,122 @@ HTML_TEMPLATE = """\
     white-space: nowrap;
   }}
   .item:hover .item-link {{ opacity: 1; }}
+  .item.filtered {{ opacity: 0.7; }}
+  .item.filtered:hover {{ opacity: 1; }}
+
+  /* ═══ AGGREGATE BLUF SLIDE ═══ */
+  .bluf-list {{ display: flex; flex-direction: column; gap: 8px; }}
+  .bluf-row {{
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--border-accent);
+    border-radius: 4px;
+  }}
+  .bluf-row-header {{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+  }}
+  .bluf-row-header:hover {{
+    background: var(--bg-hover);
+  }}
+  .bluf-row-header > div {{
+    display: flex;
+    align-items: center;
+  }}
+  .bluf-chevron {{
+    font-size: 10px;
+    color: var(--text-dim);
+    transition: transform 0.2s ease;
+  }}
+  .bluf-row.collapsed .bluf-chevron {{
+    transform: rotate(-90deg);
+  }}
+  .bluf-row-body {{
+    padding: 0 18px 16px 18px;
+  }}
+  .bluf-row.collapsed .bluf-row-body {{
+    display: none;
+  }}
+  .bluf-row .ccir-title-small {{
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-bright);
+    margin-left: 10px;
+  }}
+  .bluf-row .bluf-text {{
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--text);
+    padding-left: 0;
+    border-left: none;
+  }}
+
+  /* ═══ COPY BLUFS BUTTON ═══ */
+  .copy-blufs-btn {{
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-accent);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 8px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+  }}
+  .copy-blufs-btn:hover {{
+    background: var(--bg-hover);
+    border-color: var(--blue);
+    color: var(--text-bright);
+  }}
+  .copy-blufs-btn:active {{
+    background: var(--border);
+  }}
+  .copy-blufs-btn.copied {{
+    background: var(--green-dim);
+    border-color: var(--green);
+    color: var(--green);
+  }}
+  .copy-blufs-btn .copy-icon {{
+    font-size: 14px;
+  }}
+  .copy-blufs-btn .copy-label {{
+    white-space: nowrap;
+  }}
+
+  /* ═══ EXECUTIVE SUMMARY ═══ */
+  .exec-bluf-box {{
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--red);
+    padding: 16px 18px;
+    border-radius: 4px;
+    margin-bottom: 24px;
+  }}
+  .exec-bluf-box .exec-bluf-title {{
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--red);
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }}
+  .exec-bluf-box .bluf-text {{
+    font-size: 16px;
+    line-height: 1.8;
+    color: var(--text-bright);
+    padding-left: 0;
+    border-left: none;
+  }}
 
   /* ═══ STATS SLIDE ═══ */
   .stats-slide-grid {{
@@ -815,6 +1298,8 @@ HTML_TEMPLATE = """\
   .idx-dot.idx-cnr {{ background: var(--red); }}
   .idx-dot.idx-stats {{ background: var(--purple); }}
   .idx-dot.idx-gray {{ background: var(--text-dim); }}
+  .idx-dot.idx-filtered {{ background: var(--text-dim); }}
+  .idx-dot.idx-blufs {{ background: var(--purple); }}
   .idx-label {{
     font-family: var(--sans);
     font-size: 14px;
@@ -955,9 +1440,112 @@ HTML_TEMPLATE = """\
   ::-webkit-scrollbar {{ width: 6px; }}
   ::-webkit-scrollbar-track {{ background: transparent; }}
   ::-webkit-scrollbar-thumb {{ background: var(--border); border-radius: 3px; }}
+
+  /* ═══ SOURCE STATUS CARD ═══ */
+  .source-status-card {{
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    min-width: 220px;
+    max-width: 320px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    z-index: 500;
+    backdrop-filter: blur(12px);
+    overflow: hidden;
+    transition: max-height 0.25s ease;
+  }}
+  .source-status-card.collapsed {{ max-height: 44px; }}
+  .source-status-card:not(.collapsed) {{ max-height: 70vh; }}
+  .source-status-header {{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    cursor: pointer;
+    user-select: none;
+    border-bottom: 1px solid transparent;
+    transition: background 0.15s, border-color 0.15s;
+  }}
+  .source-status-card:not(.collapsed) .source-status-header {{
+    border-bottom-color: var(--border);
+  }}
+  .source-status-header:hover {{ background: var(--bg-hover); }}
+  .source-status-title {{
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-bright);
+  }}
+  .source-status-summary {{
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }}
+  .source-status-chevron {{
+    font-size: 10px;
+    color: var(--text-dim);
+    transition: transform 0.2s ease;
+  }}
+  .source-status-card:not(.collapsed) .source-status-chevron {{
+    transform: rotate(180deg);
+  }}
+  .source-status-body {{
+    overflow-y: auto;
+    max-height: calc(70vh - 44px);
+    padding: 8px 0;
+  }}
+  .source-row {{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 14px;
+    font-size: 12px;
+    line-height: 1.4;
+  }}
+  .source-row:nth-child(even) {{ background: rgba(255,255,255,0.02); }}
+  .source-status {{
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+  }}
+  .source-status.ok {{ background: var(--green-dim); color: var(--green); }}
+  .source-status.fail {{ background: var(--red-dim); color: var(--red); }}
+  .source-name {{
+    flex: 1;
+    color: var(--text-bright);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }}
+  .source-ts {{
+    flex-shrink: 0;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }}
+
+  ::-webkit-scrollbar {{ width: 6px; }}
+  ::-webkit-scrollbar-track {{ background: transparent; }}
+  ::-webkit-scrollbar-thumb {{ background: var(--border); border-radius: 3px; }}
 </style>
 </head>
 <body class="mode-present">
+
+<!-- Source status card -->
+{source_status_card}
 
 <!-- Progress bar -->
 <div class="progress" id="progress"></div>
@@ -1025,7 +1613,7 @@ HTML_TEMPLATE = """\
       </div>
     </div>
     <ul class="stats-ccir-list">
-      {nav}
+      {stats_ccir_list}
     </ul>
     <h3 style="font-family:var(--sans);font-size:16px;font-weight:600;color:var(--text-bright);margin-top:32px;margin-bottom:4px;">PMESII — operasjonelle domener</h3>
     {pmesii_dist}
@@ -1081,8 +1669,101 @@ HTML_TEMPLATE = """\
     overlay.classList.remove('visible');
   }}
 
+  function copyAllBlufs() {{
+    const section = document.getElementById('blufs');
+    if (!section) return;
+    const lines = [];
+
+    // Include executive summary first
+    const execBox = section.querySelector('.exec-bluf-box');
+    if (execBox) {{
+      const execText = execBox.querySelector('.bluf-text');
+      if (execText && execText.textContent.trim()) {{
+        lines.push('EXECUTIVE SUMMARY');
+        lines.push(execText.textContent.trim());
+        lines.push('');
+      }}
+    }}
+
+    const rows = section.querySelectorAll('.bluf-row');
+    rows.forEach(row => {{
+      const badge = row.querySelector('.ccir-badge');
+      const title = row.querySelector('.ccir-title-small');
+      const text = row.querySelector('.bluf-text');
+      const cid = badge ? badge.textContent.trim() : '';
+      const ttl = title ? title.textContent.trim() : '';
+      const bluf = text ? text.textContent.trim() : '';
+      if (cid && bluf) {{
+        lines.push(`${{cid}} — ${{ttl}}`);
+        lines.push(bluf);
+        lines.push('');
+      }}
+    }});
+    const payload = lines.join('\\n');
+    const btn = document.getElementById('copyBlufsBtn');
+    const label = btn ? btn.querySelector('.copy-label') : null;
+    if (navigator.clipboard && navigator.clipboard.writeText) {{
+      navigator.clipboard.writeText(payload).then(() => {{
+        if (btn) btn.classList.add('copied');
+        if (label) label.textContent = 'Kopiert!';
+        setTimeout(() => {{
+          if (btn) btn.classList.remove('copied');
+          if (label) label.textContent = 'Kopier alle BLUFs';
+        }}, 2000);
+      }}).catch(err => {{
+        console.error('Kunne ikke kopiere BLUFs:', err);
+        if (label) label.textContent = 'Kopiering feilet';
+        setTimeout(() => {{ if (label) label.textContent = 'Kopier alle BLUFs'; }}, 2000);
+      }});
+    }} else {{
+      // Fallback for older browsers / insecure contexts
+      try {{
+        const ta = document.createElement('textarea');
+        ta.value = payload;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        if (btn) btn.classList.add('copied');
+        if (label) label.textContent = 'Kopiert!';
+        setTimeout(() => {{
+          if (btn) btn.classList.remove('copied');
+          if (label) label.textContent = 'Kopier alle BLUFs';
+        }}, 2000);
+      }} catch (err) {{
+        console.error('Kunne ikke kopiere BLUFs:', err);
+        if (label) label.textContent = 'Kopiering feilet';
+        setTimeout(() => {{ if (label) label.textContent = 'Kopier alle BLUFs'; }}, 2000);
+      }}
+    }}
+  }}
+
   function nextSlide() {{ goToSlide(current + 1); }}
   function prevSlide() {{ goToSlide(current - 1); }}
+
+  function toggleBlufRow(header) {{
+    const row = header.parentElement;
+    if (!row) return;
+    const isCollapsed = row.classList.toggle('collapsed');
+    header.setAttribute('aria-expanded', String(!isCollapsed));
+  }}
+
+  function toggleSourceCard() {{
+    const card = document.getElementById('sourceStatusCard');
+    if (!card) return;
+    card.classList.toggle('collapsed');
+  }}
+
+  // Keyboard accessibility for collapsible BLUF rows
+  document.addEventListener('keydown', (e) => {{
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const header = e.target.closest('.bluf-row-header');
+    if (!header) return;
+    e.preventDefault();
+    toggleBlufRow(header);
+  }});
 
   function toggleIndex() {{
     overlay.classList.toggle('visible');
@@ -1158,6 +1839,15 @@ HTML_TEMPLATE = """\
   // Initial state
   slides[0].classList.add('visible');
   updateUI();
+
+  // Collapse source status card by default on small screens
+  if (window.innerWidth < 768) {{
+    const sourceCard = document.getElementById('sourceStatusCard');
+    if (sourceCard) sourceCard.classList.add('collapsed');
+  }} else {{
+    const sourceCard = document.getElementById('sourceStatusCard');
+    if (sourceCard) sourceCard.classList.add('collapsed');
+  }}
 </script>
 
 </body>

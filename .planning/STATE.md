@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: 06-05 + 06-06 complete (test-DSN safety landed, store txn hygiene closed)
+status: 06-05 + 06-06 complete; SAB UI polish + FreshRSS/NewsAPI ops done
 stopped_at: null
-last_updated: "2026-07-09T00:00:00.000Z"
+last_updated: "2026-07-10T00:00:00.000Z"
 progress:
   total_phases: 13
   completed_phases: 7
@@ -17,6 +17,24 @@ progress:
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-07-10 — SAB UI polish + FreshRSS/NewsAPI ops
+
+### Just-completed
+
+- **SAB UI refinements**: source status card added (upper-right, OPML-based, green/red per source)
+  and empty CCIR slides hidden while the Alle BLUF slide remains visible.
+- **FreshRSS ops**: imported `apps/opml/feeds.opml` into the `admin` account via the FreshRSS CLI.
+- **NewsAPI rate-limiting**: created and ran `scripts/set_newsapi_ttl.py`; all 6 NewsAPI feeds now
+  have a 3-hour TTL (10,800 s), keeping the free-tier request count under the 100/day cap.
+- **Documentation**: manual FreshRSS TTL steps documented in `apps/ingest/RSS_BRIDGE_NOTES.md`
+  (including the automated helper script).
+- **CI coverage**: added `tests/test_set_newsapi_ttl.py` to validate the script's syntax and
+  basic structure.
+
+### Next
+
+- Resume **Phase 6 UAT** (cold-start smoke test and remaining UAT items from `.planning/phases/06-brief-app/06-UAT.md`).
 
 ## Session: 2026-07-08 — 06-05 executed (test-DSN safety, gap closure)
 

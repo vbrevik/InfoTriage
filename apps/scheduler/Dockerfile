@@ -4,9 +4,9 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install scheduler requirements (no local libs dependency — scheduler only calls HTTP)
+# Install scheduler requirements + JSON formatter for structured logging (Phase 7)
 COPY apps/scheduler/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt json-log-formatter
 
 # Copy scheduler source
 COPY apps/scheduler/ .

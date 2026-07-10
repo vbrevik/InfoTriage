@@ -205,10 +205,11 @@ to the running pipeline.
   2. A vault-writer emits high-value items + the SAB as Obsidian `.md` (front-matter via codec; body summary; `[[entity]]` wikilinks).
   3. Email surfaces here (SAB + Obsidian), not in FreshRSS.
 
-**Plans**: 5/6 plans executed
+**Plans**: 6/6 plans executed
 
 - [x] 06-05-PLAN.md — db_live test DSN safety: require INFOTRIAGE_TEST_DSN, no prod fallback, regression guard + throwaway test DB (W1)
-- [ ] 06-06-PLAN.md — PostgresStore read-path txn hygiene: end read txn (rollback) + idle-in-transaction backstop + regression test (W2)
+- [x] 06-06-PLAN.md — PostgresStore read-path txn hygiene: end read txn (rollback) + idle-in-transaction backstop + regression test (W2)
+- [x] 06-UAT prep — SAB UI polish (source status card, hide empty CCIR slides), FreshRSS OPML import, NewsAPI 3h TTL, TTL docs + test (W3)
 
 ### Phase 7: Ops + cutover
 
@@ -222,7 +223,13 @@ to the running pipeline.
   3. Host-run scripts + legacy Gmail IMAP bridge deleted.
   4. The full pipeline runs on the new architecture at parity with today's spike (M1 ship gate).
 
-**Plans**: TBD
+**Plans**
+
+- [ ] 07-01-PLAN.md — FreshRSS/rss-bridge ops: OPML import, per-feed TTL hygiene, rate-limit documentation (W1)
+- [ ] 07-02-PLAN.md — opml-health container + DLQ consumer (W2)
+- [ ] 07-03-PLAN.md — Structured container logging + ops Makefile hardening (W3)
+- [ ] 07-04-PLAN.md — Retire host-run scripts and legacy Gmail IMAP bridge (W4)
+- [ ] 07-05-PLAN.md — End-to-end M1 ship verification / UAT sign-off (W5)
 
 ### Phase 8: Entity resolution
 
