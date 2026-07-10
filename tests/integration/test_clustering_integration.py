@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
 """test_clustering_integration.py — Integration tests for clustering with real embeddings (Phase 6, SC1b)."""
-import pytest
 from pathlib import Path
 
-# Needs PostgresStore for actual database interaction
-from store import PostgresStore
-from apps.brief.renderer import render_brief, _rows_to_enriched_items, _cluster_rows
-from apps.brief.clustering import EnrichedItem
+import numpy as np
+import pytest
+
+from apps.brief.renderer import _cluster_rows
+
+from tests.conftest import db_live, pg_store  # noqa: F401
 
 
-@pytest.fixture(scope="module")
-def pg_store():
-    """Provide a PostgresStore connected to the test database."""
-    pg_dsn = "postgresql://infotriage:infotriage_db@127.0.0.1:5432/infotriage"
-    with PostgresStore(dsn=pg_dsn, blob_root=Path("/data/blobs")) as store:
-        yield store
+# Re-exported here for tests that import directly from this module.
+# The actual implementation lives in tests/conftest.py.
+
 
 
 def test_enrichment_sql_joins_embeddings():
@@ -44,9 +42,28 @@ def test_cluster_threshold_wired_to_renderer():
     assert "threshold=0.75" not in renderer_content or "os.getenv" in renderer_content
 
 
+@db_live
 def test_enrichment_row_has_embedding_column(pg_store):
     """Fetch from Postgres and assert embedding is present in rows (not None)."""
     from psycopg.rows import dict_row
+
+    # Seed one article + enrichment row + embedding so the join has something to return.
+    with pg_store._conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO infotriage.articles (id, source, source_type, url, title, ts, lang, summary) "
+            "VALUES (%s, %s, %s, %s, %s, now(), %s, %s) ON CONFLICT (id) DO NOTHING",
+            ("test-embedding-001", "test", "rss", "https://test.example/1", "Test Article", "en", "summary"),
+        )
+        cur.execute(
+            "INSERT INTO infotriage.enrichment (item_id, ccir, cnr, score, bucket, why) "
+            "VALUES (%s, %s, %s, %s, %s, %s)",
+            ("test-embedding-001", "PIR-1", "I", 8, "read", "test"),
+        )
+        cur.execute(
+            "INSERT INTO infotriage.embeddings (item_id, embedding, model) VALUES (%s, %s, %s)",
+            ("test-embedding-001", np.zeros(1024, dtype=np.float32).tolist(), "test-model"),
+        )
+        pg_store._conn.commit()
 
     _SELECT = (
         "SELECT e.item_id, e.ccir, e.cnr, e.score, e.bucket, e.why, e.pmesii, e.tessoc, "
@@ -62,16 +79,18 @@ def test_enrichment_row_has_embedding_column(pg_store):
         cur.execute(_SELECT)
         rows = cur.fetchall()
 
-    # All rows should have the embedding key
+    # All rows should have the embedding key; the seeded row should return the vector
     for row in rows:
         assert "embedding" in row, "embedding column missing from row"
-        # embedding can be NULL (None) if no matching embedding, but that's okay
-        # The test ensures the join produces the column
 
     assert len(rows) > 0, "No enrichment rows found to test"
+    assert any(row["item_id"] == "test-embedding-001" and row["embedding"] is not None for row in rows), (
+        "Seeded embedding should be returned by the LEFT JOIN"
+    )
 
 
 def test_pgvector_clustering_merges_similar_items():
+    """In-memory clustering does not require the database."""
     item1 = {
         "item_id": "test-1",
         "title": "Test Item 1",
@@ -119,9 +138,9 @@ def test_pgvector_clustering_merges_similar_items():
     clusters = _cluster_rows(rows, threshold=0.75)
 
     assert len(clusters) == 2, f"Expected 2 clusters, got {len(clusters)}"
-    
+
     cluster_1_2 = next((c for c in clusters if len(c["items"]) == 2 and {"test-1", "test-2"} == {i["item_id"] for i in c["items"]}), None)
     assert cluster_1_2 is not None, "test-1 and test-2 should be in the same cluster"
-    
+
     cluster_3 = next((c for c in clusters if len(c["items"]) == 1 and c["items"][0]["item_id"] == "test-3"), None)
     assert cluster_3 is not None, "test-3 should be in a separate cluster"

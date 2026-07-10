@@ -17,41 +17,85 @@ Tests:
     test_dlq_poison              — NACK requeue=False routes to infotriage.dlq (R2.AC4)
 """
 import asyncio
+import contextlib
 import json
+import logging
 import socket
-import subprocess
 import time
+from unittest.mock import patch
 
-import pytest
 import aio_pika
+import pytest
+
+log = logging.getLogger(__name__)
 
 import sys
 sys.path.insert(0, '/Users/vidarbrevik/projects/InfoTriage/libs/contracts/src')
 from contracts import RabbitMQBus
 
 
-async def _cancel_stale_consumers():
-    bus = RabbitMQBus(amqp_url=AMQP_URL)
-    await bus._ensure_connection()
-    try:
-        for rk, q in bus._queues.items():
-            live_q = await bus._channel.get_queue(q.name)
-            try:
-                await live_q.cancel('')
-            except Exception:
-                pass
-    except Exception:
-        pass
-    await bus.close()
-
 AMQP_URL = "amqp://infotriage:infotriage_rmq@127.0.0.1:22001"
 
-ROUTING_KEYS = [
-    "item.ingested",
-    "verdict.ready",
-    "sab.published",
-    "feed.unhealthy",
-]
+# Test-isolated topology names.  Prefixing queues/exchanges with "test." keeps
+# the running triage/brief containers from consuming messages published by
+# these tests, while still exercising the same _bus_rabbitmq.py code paths.
+TEST_PREFIX = "test."
+TEST_ROUTING_KEY_TO_QUEUE = {
+    "item.ingested": f"{TEST_PREFIX}q.triage",
+    "verdict.ready": f"{TEST_PREFIX}q.brief",
+    "sab.published": f"{TEST_PREFIX}q.notify",
+    "feed.unhealthy": f"{TEST_PREFIX}q.ops",
+}
+TEST_DLX_NAME = f"{TEST_PREFIX}infotriage.dlx"
+TEST_DLQ_NAME = f"{TEST_PREFIX}infotriage.dlq"
+TEST_DLQ_ROUTING_KEY = f"{TEST_PREFIX}dead"
+
+ROUTING_KEYS = list(TEST_ROUTING_KEY_TO_QUEUE.keys())
+
+
+@contextlib.contextmanager
+def _patched_topology():
+    """Patch RabbitMQBus topology globals to test-isolated names."""
+    with patch.multiple(
+        "contracts._bus_rabbitmq",
+        ROUTING_KEY_TO_QUEUE=TEST_ROUTING_KEY_TO_QUEUE,
+        DLX_NAME=TEST_DLX_NAME,
+        DLQ_NAME=TEST_DLQ_NAME,
+        DLQ_ROUTING_KEY=TEST_DLQ_ROUTING_KEY,
+    ):
+        yield
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _cleanup_test_topology():
+    """Yield to tests, then delete test-isolated RabbitMQ topology after the module."""
+    yield
+    if not _rabbitmq_reachable():
+        return
+
+    async def _delete() -> None:
+        try:
+            connection = await aio_pika.connect_robust(AMQP_URL)
+            channel = await connection.channel()
+            # Delete test queues first (queues must be removed before exchanges)
+            for q_name in list(TEST_ROUTING_KEY_TO_QUEUE.values()) + [TEST_DLQ_NAME]:
+                try:
+                    queue = await channel.get_queue(q_name)
+                    await queue.delete()
+                except Exception as exc:  # pragma: no cover
+                    log.debug("Could not delete test queue %s: %s", q_name, exc)
+            # Delete test DLX (main exchange is shared with production and must stay)
+            try:
+                exchange = await channel.get_exchange(TEST_DLX_NAME)
+                await exchange.delete()
+            except Exception as exc:  # pragma: no cover
+                log.debug("Could not delete test DLX %s: %s", TEST_DLX_NAME, exc)
+            await channel.close()
+            await connection.close()
+        except Exception as exc:  # pragma: no cover
+            log.warning("RabbitMQ test topology cleanup failed: %s", exc)
+
+    asyncio.run(_delete())
 
 
 def _rabbitmq_reachable() -> bool:
@@ -66,16 +110,6 @@ def _rabbitmq_reachable() -> bool:
         return False
 
 
-def _wait_for_rabbitmq(timeout: int = 30) -> bool:
-    """Poll until :22001 is reachable or timeout (seconds)."""
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if _rabbitmq_reachable():
-            return True
-        time.sleep(1)
-    return False
-
-
 def _skip_if_unavailable() -> None:
     """Skip the current test if RabbitMQ :22001 is not reachable."""
     if not _rabbitmq_reachable():
@@ -85,31 +119,16 @@ def _skip_if_unavailable() -> None:
 async def _fresh_bus() -> RabbitMQBus:
     bus = RabbitMQBus(amqp_url=AMQP_URL)
     await bus._ensure_connection()
-    # Purge all queues for clean test isolation
+    # Purge all test-isolated queues for clean test isolation
     for rk, q in bus._queues.items():
         live_q = await bus._channel.get_queue(q.name)
         await live_q.purge()
     try:
-        dlq = await bus._channel.get_queue("infotriage.dlq")
+        dlq = await bus._channel.get_queue(TEST_DLQ_NAME)
         await dlq.purge()
     except Exception:
         pass
     return bus
-
-
-async def _cancel_all_consumers() -> None:
-    bus = RabbitMQBus(amqp_url=AMQP_URL)
-    await bus._ensure_connection()
-    try:
-        for rk, q in bus._queues.items():
-            live_q = await bus._channel.get_queue(q.name)
-            try:
-                await live_q.cancel('')
-            except Exception:
-                pass
-    except Exception:
-        pass
-    await bus.close()
 
 
 # ---------------------------------------------------------------------------
@@ -136,7 +155,8 @@ def test_publisher_confirms_enabled() -> None:
         finally:
             await bus.close()
 
-    asyncio.run(_check())
+    with _patched_topology():
+        asyncio.run(_check())
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +183,8 @@ def test_rabbitmq_available() -> None:
         finally:
             await bus.close()
 
-    asyncio.run(_check())
+    with _patched_topology():
+        asyncio.run(_check())
 
 
 # ---------------------------------------------------------------------------
@@ -212,7 +233,8 @@ def test_publish_consume_roundtrip() -> None:
         finally:
             await bus.close()
 
-    asyncio.run(_run())
+    with _patched_topology():
+        asyncio.run(_run())
 
 
 # ---------------------------------------------------------------------------
@@ -244,7 +266,8 @@ def test_dedup() -> None:
         finally:
             await bus.close()
 
-    asyncio.run(_run())
+    with _patched_topology():
+        asyncio.run(_run())
 
 
 # ---------------------------------------------------------------------------
@@ -267,8 +290,10 @@ def test_dlq_poison() -> None:
             await bus.publish(rk, item_id, poison_payload)
             await asyncio.sleep(0.2)
 
-            # Consume from q.triage and NACK with requeue=False
-            q_triage = await bus._channel.get_queue("q.triage")
+            # Consume from test-isolated q.triage and NACK with requeue=False
+            q_triage = await bus._channel.get_queue(
+                TEST_ROUTING_KEY_TO_QUEUE["item.ingested"]
+            )
             nacked = asyncio.Event()
 
             async def _consumer(msg: aio_pika.IncomingMessage) -> None:
@@ -286,7 +311,7 @@ def test_dlq_poison() -> None:
                 await q_triage.cancel(consumer_tag)
 
             # Wait for dead-letter routing (up to 5s)
-            dlq = await bus._channel.get_queue("infotriage.dlq")
+            dlq = await bus._channel.get_queue(TEST_DLQ_NAME)
             dlq_payload = None
             deadline = time.monotonic() + 5.0
 
@@ -305,4 +330,5 @@ def test_dlq_poison() -> None:
         finally:
             await bus.close()
 
-    asyncio.run(_run())
+    with _patched_topology():
+        asyncio.run(_run())

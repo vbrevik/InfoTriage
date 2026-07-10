@@ -19,7 +19,6 @@ run can never touch the production database.
 """
 import datetime
 import os
-import socket
 
 import numpy as np
 import psycopg
@@ -28,64 +27,15 @@ import pytest
 from contracts import Item
 from store import PostgresStore
 
+from tests.conftest import db_live, pg_store  # noqa: F401
+
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-TEST_DSN_ENV = "INFOTRIAGE_TEST_DSN"  # the ONLY DSN source for db_live tests
 DIM = 1024           # locked embedding dimension (D-05a)
 THRESHOLD = 0.85     # inclusive cosine link threshold (D-05b)
-
-
-# ---------------------------------------------------------------------------
-# db_live marker — skip when INFOTRIAGE_TEST_DSN is unset or unreachable
-# ---------------------------------------------------------------------------
-
-
-def _test_db_reachable() -> bool:
-    """Return True if the INFOTRIAGE_TEST_DSN test DB accepts a TCP connection within 1s.
-
-    Returns False when INFOTRIAGE_TEST_DSN is unset/empty, so db_live tests
-    auto-skip when no isolated test DB is configured (R8). Host/port are parsed
-    from the DSN itself — never hardcoded.
-    """
-    dsn = os.environ.get(TEST_DSN_ENV)
-    if not dsn:
-        return False
-    try:
-        info = psycopg.conninfo.conninfo_to_dict(dsn)
-    except psycopg.Error:
-        return False
-    host = info.get("host") or "localhost"
-    port = int(info.get("port") or 5432)
-    try:
-        with socket.create_connection((host, port), timeout=1.0):
-            return True
-    except OSError:
-        return False
-
-
-_PG_UP = _test_db_reachable()  # evaluated once at collection time
-
-
-def db_live(fn):
-    """Decorator: apply @pytest.mark.db_live AND @pytest.mark.skipif when the test DB is unavailable.
-
-    Applying both marks so that:
-    - `pytest -m db_live` selects these tests (the db_live marker)
-    - Tests auto-skip when the DB is not reachable (the skipif condition)
-
-    Using function-level mark application (not functools.wraps) so pytest's
-    fixture injection continues to work — pytest marks the function in-place
-    and returns the same function object.
-    """
-    fn = pytest.mark.db_live(fn)
-    fn = pytest.mark.skipif(
-        not _PG_UP,
-        reason="INFOTRIAGE_TEST_DSN unset or test DB unreachable — db_live test skipped",
-    )(fn)
-    return fn
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +48,7 @@ def _get_dsn() -> str | None:
 
     Only called from db_live-guarded fixtures/tests, so it is non-None there.
     """
-    return os.environ.get(TEST_DSN_ENV)
+    return os.environ.get("INFOTRIAGE_TEST_DSN")
 
 
 def _ts(offset_seconds: int = 0) -> datetime.datetime:
@@ -117,16 +67,6 @@ def _item(**kwargs) -> Item:
     )
     defaults.update(kwargs)
     return Item(**defaults)
-
-
-def _truncate_all(dsn: str) -> None:
-    """TRUNCATE all infotriage tables for per-test isolation."""
-    with psycopg.connect(dsn, autocommit=True) as conn:
-        conn.execute(
-            "TRUNCATE infotriage.entity_links, infotriage.embeddings, "
-            "infotriage.enrichment, infotriage.ccir, infotriage.audit, "
-            "infotriage.articles, infotriage.entities RESTART IDENTITY"
-        )
 
 
 def _make_cosine_fixture_vectors(dim: int = DIM):
@@ -168,24 +108,6 @@ def _make_cosine_fixture_vectors(dim: int = DIM):
     putin = (putin / np.linalg.norm(putin)).astype(np.float32)
 
     return nato1, nato2, putin
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def pg_store(tmp_path):
-    """Open a PostgresStore against the INFOTRIAGE_TEST_DSN test DB, truncated for isolation."""
-    dsn = _get_dsn()
-    # Bootstrap first: on a fresh test DB (docker-compose.test.yml) the infotriage
-    # schema/extension don't exist yet — init_schema() must run before TRUNCATE and
-    # before __enter__ (which registers the pgvector type adapter).
-    PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs").init_schema()
-    _truncate_all(dsn)
-    with PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs") as s:
-        yield s
 
 
 # ---------------------------------------------------------------------------
