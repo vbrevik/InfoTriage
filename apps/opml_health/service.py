@@ -87,7 +87,7 @@ def run_health_check(
                     event="feed.unhealthy",
                     feed_url=url,
                     feed_name=text,
-                    reason=f"{emoji} {reason}"[:120],
+                    reason=f"{emoji} {reason}",
                     ts=datetime.datetime.now(datetime.timezone.utc),
                 ))
     return results, unhealthy

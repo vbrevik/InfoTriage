@@ -21,6 +21,7 @@ It catches:
      inline class, identity check fails IMMEDIATELY.
 """
 import datetime
+import re
 import sys
 from pathlib import Path
 
@@ -53,8 +54,15 @@ def test_feed_unhealthy_schema_accepts_opml_health_emit_shape():
     assert isinstance(d["ts"], str), (
         f"ts must serialize to ISO-8601 string under mode='json'; got {type(d['ts']).__name__}"
     )
-    # Verify ISO-8601 format (very lightweight: contains 'T' separator).
-    assert "T" in d["ts"], f"ts must be ISO-8601-formatted; got {d['ts']!r}"
+    # Strict ISO-8601 fingerprint: YYYY-MM-DDTHH:MM:SS prefix + UTC tz marker
+    # (+00:00 or Z). The +00:00 form is what `datetime.isoformat()` emits for
+    # tz-aware UTC datetimes; Z is the RFC3339 equivalent. Both are acceptable.
+    assert re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", d["ts"]), (
+        f"ts must start with ISO-8601 YYYY-MM-DDTHH:MM:SS prefix; got {d['ts']!r}"
+    )
+    assert d["ts"].endswith("+00:00") or d["ts"].endswith("Z"), (
+        f"ts must end with UTC tz marker (+00:00 or Z); got {d['ts']!r}"
+    )
 
 
 def test_feed_unhealthy_max_length_120_enforced():
