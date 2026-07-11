@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: 06-05 + 06-06 complete; SAB UI polish + FreshRSS/NewsAPI ops done; Phase 6 UAT bug-fix landed
+status: Phase 06 verified complete (re-verification passed 14/14, UAT 9/9); Phase 07 next — execute 07-01
 stopped_at: null
-last_updated: "2026-07-11T00:00:00.000Z"
+last_updated: "2026-07-11T19:10:38.100Z"
 progress:
   total_phases: 13
   completed_phases: 7
-  total_plans: 28
-  completed_plans: 28
+  total_plans: 33
+  completed_plans: 32
   percent: 54
 ---
 
@@ -28,25 +28,30 @@ progress:
   which short-circuits `title` (and silently drops `score`) whenever
   `why` is truthy. Visible in the brief app as `- <why>  [les](<url>)`
   under any CAT_II/ROUTINE section.
+
 - **Trigger:** re-running the test suite after the COP/CIP view-filter
   work landed. `tests/test_brief_consumer.py::test_process_verdict_renders_default_cop_cip_files`
   failed with `AssertionError: assert 'COP Item' in '# InfoTriage · SAB\n_1 saker · ~10 min_\n\n## FFIR-1 · Norsk forsvar & sikkerhetspolitikk\n- Test why  [les](http://example.com)\n'`
   — note the missing `**[9] COP Item**` prefix.
+
 - **Fix:** replaced the single `lines.append(_digest_line(lead, extra))`
   call with inline formatting (matches the existing CAT_I section's
   style: flag + score + title + why + extra + url). Also deleted
   pre-existing dead code `_group_by_ccir()` (defined but never called;
   return shape was broken — it returned a `dict` over a concatenated
   key seq).
+
 - **Regression test added:** `tests/test_brief_renderer.py::TestRenderBriefIncludesAllItemFields`
   — two test methods asserting title/score/why all appear for CAT_II
   items, and title+score for `Routine` (no-CCIR) items.
+
 - **Live proof confirmed:** rendered a CAT_II item with
   `why="Krigsøkonomi under press"`, `title="Russland varsler nye
   sanksjoner"`, `score=7` through the live `render_brief()` path.
   Output: `## PIR-1 · Russland / Ukraina\n- **[7] Russland varsler nye
   sanksjoner** · Krigsøkonomi under press  [les](http://example.com)` —
   all three fields present.
+
 - **Full pytest suite:** 280 passed, 34 skipped.
 - **Live UAT re-confirmed:** `uat_test6_cluster_threshold.py` and
   `uat_test8_semantic.py` both pass after the fix.
@@ -57,6 +62,7 @@ progress:
   verification — the renderer fix unblocks them, but the live
   republish-to-q.brief / vault-mount / email-in-vault checks still
   need to be run end-to-end).
+
 - Commit the uncommitted view-filter pipeline (consumer.py / main.py
   / vault_writer.py / html_renderer.py) + TESSOC taxonomy work
   (sab_html.py / triage_score.py / ccir.md per ADR-010) + UAT scripts
@@ -69,11 +75,14 @@ progress:
 
 - **SAB UI refinements**: source status card added (upper-right, OPML-based, green/red per source)
   and empty CCIR slides hidden while the Alle BLUF slide remains visible.
+
 - **FreshRSS ops**: imported `apps/opml/feeds.opml` into the `admin` account via the FreshRSS CLI.
 - **NewsAPI rate-limiting**: created and ran `scripts/set_newsapi_ttl.py`; all 6 NewsAPI feeds now
   have a 3-hour TTL (10,800 s), keeping the free-tier request count under the 100/day cap.
+
 - **Documentation**: manual FreshRSS TTL steps documented in `apps/ingest/RSS_BRIDGE_NOTES.md`
   (including the automated helper script).
+
 - **CI coverage**: added `tests/test_set_newsapi_ttl.py` to validate the script's syntax and
   basic structure.
 
@@ -91,9 +100,11 @@ progress:
   prod-port (22000) DSN/probe under tests/. `docker-compose.test.yml` = tmpfs pgvector on :22062.
   **Bare `pytest` is now safe** — verified: no prod connection attempted with DSN unset;
   26/26 db_live green against a pristine compose test DB.
+
 - Deviations (Rule 3, both in `f92f8ed`): `001-schema.sql` now uses `CREATE EXTENSION vector
   WITH SCHEMA public` (was landing in infotriage schema on fresh DBs → register_vector failed);
   db_live fixtures bootstrap `init_schema()` before TRUNCATE/`__enter__` (fresh-DB safe).
+
 - Deferred (pre-existing, `deferred-items.md`): `tests/integration/test_clustering_integration.py`
   hardcodes 127.0.0.1:5432 (not prod) with no skip guard; 4 rabbitmq test failures (contention).
 
@@ -102,6 +113,7 @@ progress:
 - db_live DSN source = INFOTRIAGE_TEST_DSN only; reachability parsed from the DSN, never hardcoded.
 - `CREATE EXTENSION vector` must specify `WITH SCHEMA public` — search_path-relative install
   breaks pgvector adapter registration on default-search_path connections.
+
 - db_live fixtures must run init_schema() before TRUNCATE and before entering the store context.
 
 ### Next
@@ -115,19 +127,24 @@ progress:
 - **06-UAT complete (agent-run, live): 4 pass / 1 issue (root-caused).** Clustering
   (5-source FFIR-3 merge), vault writer (7 item files + obsidian-sab.md), email-in-vault,
   CLUSTER_THRESHOLD validation — all verified against real containers.
+
 - **Root cause of "empty SAB" found forensically**: db_live test fixtures TRUNCATE the
   PRODUCTION Postgres :22000 (DEV_DSN in test_store_integration/test_triage_enrichment/
   test_store_contract) — every pytest run wipes live data. Plus triage worker's
   PostgresStore read paths leave connections idle-in-transaction (observed 8.5h; a queued
   fixture TRUNCATE then blocked all reads). Unblocked via pg_cancel_backend + triage restart.
+
 - **DB repopulated live**: POST /run to ingest-imap/:22010 + ingest-youtube/:22011 →
   108 articles → 108 enrichments → 108 embeddings → SAB rendering 108 items.
+
 - **Found + fixed: triage container had NO ccir.md** (CCIR_PATH → /ccir.md not in image;
   scorer used 76-char fallback stub). Added `./ccir.md:/ccir.md:ro` mount (committed e6fab90).
+
 - **SIR-3 (NATO-toppmøtet i Ankara) added to ccir.md** + both CCIR_ORDER copies
   (digest.py, sab_html.py — DRIFT-1 duplication is real; seeds SEED-001/SEED-002 planted).
   Live-verified: synthetic summit article scored `SIR-3|II|8|read`, renders in SAB SIR-3
   section. Commit ef2ae38.
+
 - **Committed stranded 06-03/06-04 patchset** (e6fab90) — was uncommitted from 07-07 session.
 - **Gap-closure plans written + checker-verified**: 06-05 (test-DSN safety: require
   INFOTRIAGE_TEST_DSN, dsn-safety guard test, ephemeral test Postgres on 22062) →
@@ -138,6 +155,7 @@ progress:
 
 - ~~NEVER run bare `pytest` until 06-05 lands~~ **RESOLVED 2026-07-08**: 06-05 landed — db_live
   tests skip unless INFOTRIAGE_TEST_DSN is set; guard test blocks prod-port reintroduction.
+
 - /sab default path caches sab.html for 24h (D-01) — `rm data/digests/sab.html` or
   `?window=24h` to see fresh data.
 
@@ -171,9 +189,11 @@ progress:
   wiring, tests/test_brief_clustering.py) plus 06-02-SUMMARY.md and 00-07-SUMMARY.md sat
   uncommitted in the working tree after a session death. Verified tests green before
   committing.
+
 - Left untracked on purpose: `.env.bak-channels` (env backup — never commit),
   `apps/opml-health/` (orphan side work, no plan/summary claims it — needs triage),
   `.planning/research/` (only a .cache dir).
+
 - Phase 6 has no VERIFICATION.md — running verification next (Route V.missing).
 - **Verification result: gaps_found (1/3 success criteria).** 06-VERIFICATION.md written.
   Gap 1 (real bug): production path never joins `infotriage.embeddings` — renderer.py
@@ -566,9 +586,9 @@ untouched this session, still needs separate investigation.
 
 ## Session
 
-**Last session:** 2026-07-05T17:36:24.673Z
-**Stopped at:** context exhaustion at 81% (2026-07-05)
-**Resume file:** .planning/phases/05-triage-app/05-05-PLAN.md
+**Last session:** 2026-07-11T20:45:00Z
+**Stopped at:** Phase 06 verified complete (re-verification 14/14, UAT 9/9); clean stop
+**Resume file:** .planning/phases/07-ops-cutover/07-01-PLAN.md
 
 ## Performance Metrics
 

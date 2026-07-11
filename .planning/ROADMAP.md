@@ -302,7 +302,7 @@ multilingual and already emits no/en). Scope: on-demand per-item, never eager wh
 Likely home: enrichment stage in **Phase 5** (store translated field) or render-time action in
 **Phase 6** (brief/Obsidian). Surfaced during R4 (00-05) Wiki-LLM spike, 2026-06-26.
 **Requirements:** TBD
-**Plans:** 5/5 plans complete
+**Plans:** 6/6 plans complete
 
 Plans:
 
@@ -320,6 +320,7 @@ Plans:
 **Context:** Phase 00 concept spike (R2) found PARTIAL: mE5-large @ 0.84 threshold got 78.3% collapse rate with 1 control overmerge on a single-day (2026-06-25) corpus from NRK + BBC + TASS. Root cause: same-topic/different-event control pairs (e.g. three distinct Trump articles) have embedding similarity overlapping with same-event cross-language pairs. The control set was too topically narrow. Cross-date generalization was never verified.
 
 **Carry-forward from spike:**
+
 - Model: mE5-large (locked)
 - Starting threshold: 0.84 (must re-tune)
 - Input: `title + summary[:512]` only (never full body)
@@ -332,6 +333,7 @@ Plans:
 **Plans:** 0 plans
 
 Plans:
+
 - [ ] TBD (promote with /gsd-review-backlog when ready)
 
 ### Phase 999.3: Entity resolution cross-language coverage and mE5-large re-validation (BACKLOG)
@@ -343,6 +345,7 @@ Plans:
 **Additional risk — embedding model mismatch:** R3 used `BAAI/bge-m3` (its default). R2 chose `mE5-large`. Entity linking threshold 0.85 was validated on bge-m3 vectors, NOT the chosen mE5-large. Phase 8 must re-validate entity linking on mE5-large vectors before production.
 
 **Carry-forward from spike:**
+
 - Schema validated: `entities (id, name, name_norm, lang, type, embedding vector(1024))` + `entity_links (entity_id FK, item_id, mention, lang)`
 - HNSW with `vector_cosine_ops`, LINK_THRESHOLD=0.85
 - Phase 8 must add multi-day rolling window with multiple feeds per language to create cross-language merge opportunities
@@ -354,6 +357,7 @@ Plans:
 **Plans:** 0 plans
 
 Plans:
+
 - [ ] TBD (promote with /gsd-review-backlog when ready)
 
 ### Phase 999.4: Cross-language synthesis verification for Wiki-LLM (BACKLOG)
@@ -365,6 +369,7 @@ Plans:
 **Additional nit:** Minor internal contradiction in Venezuela page (Norway "har ingen egen ambassade" then "ambassaden har kommet i kontakt med nordmenn" [7]) — a reader-level coherence issue.
 
 **Carry-forward from spike:**
+
 - Synthesis mechanism is viable on local qwen36
 - Citation grounding (every [N] → real source id, hard-exit on violation) is a sound guardrail
 - Phase 10 must add per-language coverage check before synthesis to catch silent omissions
@@ -376,4 +381,5 @@ Plans:
 **Plans:** 0 plans
 
 Plans:
+
 - [ ] TBD (promote with /gsd-review-backlog when ready)
