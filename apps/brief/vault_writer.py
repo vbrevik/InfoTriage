@@ -244,8 +244,9 @@ def write_vault_digest(
     if vault_path is None:
         vault_path = Path(os.environ.get("INFOTRIAGE_VAULT_PATH", "data/obsidian"))
 
-    # Include email-sourced items if VAULT_INCLUDE_EMAIL=1
-    include_email = os.environ.get("VAULT_INCLUDE_EMAIL", "1") == "1"
+    # Include email-sourced items unless VAULT_INCLUDE_EMAIL is explicitly falsy
+    # (accepts common truthy strings like "true"/"yes" without inverting intent)
+    include_email = os.environ.get("VAULT_INCLUDE_EMAIL", "1").strip().lower() not in ("0", "false", "no")
 
     # Filter: items with score >= 8, or all items with CCIR (but not none)
     kept = [
