@@ -18,4 +18,6 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt json-log-formatter
 COPY apps/ingest-youtube/ .
 
 # data/feeds is bind-mounted by docker-compose; data/blobs for blob storage
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+COPY libs/contracts/src/contracts/uvicorn-log-config.json /app/uvicorn-log-config.json
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--log-config", "/app/uvicorn-log-config.json"]

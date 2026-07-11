@@ -449,6 +449,15 @@ services:
     environment:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       INFOTRIAGE_AMQP_DSN: ${INFOTRIAGE_AMQP_DSN:-amqp://infotriage:infotriage_rmq@rabbitmq:5672}
+      # Phase 7 07-02: live RabbitMQ-mgmt queue-depth probe (gap-closure for the M1
+      # known-gap "DLQ depth not a live probe"). mgmt API is on the compose network
+      # at port 15672; defaults match .env-example credentials. Depth thresholds are
+      # tunable via env. Connectivity failure is best-effort (WARNING + continue).
+      RABBITMQ_MGMT_URL: ${RABBITMQ_MGMT_URL:-http://rabbitmq:15672}
+      RABBITMQ_MGMT_USER: ${RABBITMQ_DEFAULT_USER:-infotriage}
+      RABBITMQ_MGMT_PASS: ${RABBITMQ_DEFAULT_PASS:-infotriage_rmq}
+      DLQ_DEPTH_PROBE_INTERVAL_S: ${DLQ_DEPTH_PROBE_INTERVAL_S:-30}
+      DLQ_DEPTH_CRITICAL_N: ${DLQ_DEPTH_CRITICAL_N:-50}
     volumes:
       - ./data:/data
     depends_on:

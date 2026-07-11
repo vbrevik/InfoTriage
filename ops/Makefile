@@ -1,14 +1,15 @@
 # InfoTriage ops — quick commands for the containerized stack.
-# Usage: make help | up | down | logs | status | restart | shell-<service> | seed | backfill | replay | test-full | clean
+# Usage: make help | up | down | logs | status | restart | shell-<service> | seed | backfill | replay | test-safe | test-full | clean
 
 COMPOSE := docker compose
 # Directory of this Makefile (ops/), used to locate compose files regardless of
 # where make is invoked from.
 OPS_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 ROOT_DIR := $(abspath $(OPS_DIR)/..)
+SCRIPTS_DIR := $(ROOT_DIR)/scripts
 SERVICES := freshrss rssbridge feeds postgres rabbitmq ingest-imap ingest-youtube ingest-gmail ingest-obsidian triage brief scheduler opml-health dlq-consumer
 
-.PHONY: help up down logs status restart shell seed backfill replay test-full clean
+.PHONY: help up down logs status restart shell seed backfill replay test-safe test-full clean
 
 help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -79,12 +80,32 @@ backfill: ## Re-run all ingest adapters
 replay: ## Replay dead-letter queue messages back to original queues
 	$(COMPOSE) exec dlq-consumer python worker.py --replay
 
+# Phase 7 07-02 gap closure: shell-layer safety check before pytest runs that
+# resolve db_live fixtures. Refuses to allow a DSN pointing at the prod host
+# port (22000) or the default Postgres port (5432). Pairs with the in-Python
+# tests/test_dsn_safety.py guard — belt-and-suspenders against an ambient
+# prod-port DSN TRUNCATEing the live DB on a test run.
+test-safe: ## Run scripts/check_test_dsn.sh first, then make test-full
+	@bash $(SCRIPTS_DIR)/check_test_dsn.sh
+	@echo "DSN smoke check passed; running full pytest..."
+	$(MAKE) test-full
+
 test-full: ## Run the full pytest suite against a throwaway test Postgres container
 	$(COMPOSE) -f $(OPS_DIR)/../docker-compose.test.yml up -d --wait
 	@trap '$(COMPOSE) -f $(OPS_DIR)/../docker-compose.test.yml down' EXIT; \
 	cd $(OPS_DIR)/.. && \
 	INFOTRIAGE_TEST_DSN=postgresql://test:test@localhost:22062/infotriage_test \
 		python -m pytest tests/ -q
+
+# Convenience targets for the three new gap-closure tests (operator-facing).
+test-uvicorn-log: ## Run only the uvicorn log-config regression test
+	cd $(OPS_DIR)/.. && python -m pytest tests/test_uvicorn_log_config.py -q
+
+test-dlq-depth: ## Run only the DLQ depth-probe regression test
+	cd $(OPS_DIR)/.. && python -m pytest tests/test_dlq_depth_probe.py -q
+
+test-dsn-smoke: ## Run only the INFOTRIAGE_TEST_DSN shell-smoke regression test
+	cd $(OPS_DIR)/.. && python -m pytest tests/test_check_test_dsn.py -q
 
 clean: ## Stop and wipe all data (dangerous)
 	$(COMPOSE) down -v

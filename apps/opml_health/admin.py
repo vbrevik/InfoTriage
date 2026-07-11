@@ -9,7 +9,7 @@ import sys
 from typing import Any
 
 import httpx
-from contracts import setup_logging
+from contracts import LOGGING_CONFIG, setup_logging
 from fastapi import FastAPI, Response
 
 setup_logging("opml-health-admin")
@@ -107,5 +107,9 @@ async def admin_health() -> dict:
 
 if __name__ == "__main__":
     import uvicorn
+
+    # Phase 7 07-02: route uvicorn's access / error / info loggers through the
+    # JSONFormatter via contracts.LOGGING_CONFIG. `disable_existing_loggers=False`
+    # keeps our setup_logging()'s root handlers (stdout + rotating file) alive.
     port = int(os.environ.get("INFOTRIAGE_OPML_HEALTH_PORT", "22032"))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=port, log_config=LOGGING_CONFIG)

@@ -19,4 +19,6 @@ RUN pip install -r requirements.txt json-log-formatter
 COPY apps/ingest-obsidian/ .
 
 # Vault articles-inbox is bind-mounted read-only at container runtime.
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+COPY libs/contracts/src/contracts/uvicorn-log-config.json /app/uvicorn-log-config.json
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--log-config", "/app/uvicorn-log-config.json"]

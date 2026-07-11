@@ -20,3 +20,9 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+# Phase 7 07-02: ship the uvicorn JSON log-config as package data so
+# `importlib.resources.files("contracts").joinpath("uvicorn-log-config.json")`
+# resolves in wheel-installed contracts (not just source-tree editable installs).
+[tool.setuptools.package-data]
+contracts = ["uvicorn-log-config.json"]

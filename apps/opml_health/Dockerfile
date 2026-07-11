@@ -27,5 +27,10 @@ USER opml-health
 HEALTHCHECK --interval=10s --timeout=3s --retries=3 \
   CMD python -c "import urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:22032/health', timeout=3).status == 200 else 1)"
 
+# Phase 7 07-02: ship uvicorn JSON log-config (consumed via log_config= kwarg in admin.py).
+# Admin/tooling lifecycle change: was `python -c "..."` one-liner; now `python admin.py`
+# so the entry runs a real `if __name__ == "__main__":` block (easier to test/reason-about).
+COPY libs/contracts/src/contracts/uvicorn-log-config.json /app/uvicorn-log-config.json
+
 EXPOSE 22032
-CMD ["python", "-c", "from apps.opml_health.admin import app; import uvicorn; uvicorn.run(app, host='0.0.0.0', port=22032)"]
+CMD ["python", "apps/opml_health/admin.py"]

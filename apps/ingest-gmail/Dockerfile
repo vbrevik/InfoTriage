@@ -19,4 +19,6 @@ COPY apps/ingest-gmail/ .
 # SECURITY: No ARG/ENV carrying CLIENT_SECRET, REFRESH_TOKEN, or CLIENT_ID.
 # All credentials come from .env via docker-compose env_file at runtime (NF-6, D-07).
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+COPY libs/contracts/src/contracts/uvicorn-log-config.json /app/uvicorn-log-config.json
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--log-config", "/app/uvicorn-log-config.json"]

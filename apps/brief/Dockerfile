@@ -25,6 +25,10 @@ COPY ccir.md .
 RUN useradd --no-create-home --shell /usr/sbin/nologin brief
 USER brief
 
+# Phase 7 07-02: ship uvicorn JSON log-config so HTTP access logs join the
+# structured-logging stream (paired with contracts.setup_logging).
+COPY libs/contracts/src/contracts/uvicorn-log-config.json /app/uvicorn-log-config.json
+
 # Secrets arrive at runtime via env_file (.env) only — no credential ARG/ENV (NF-6)
 EXPOSE 22040
-CMD ["uvicorn", "apps.brief.main:app", "--host", "0.0.0.0", "--port", "22040"]
+CMD ["uvicorn", "apps.brief.main:app", "--host", "0.0.0.0", "--port", "22040", "--log-config", "/app/uvicorn-log-config.json"]

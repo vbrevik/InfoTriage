@@ -2,23 +2,29 @@
 """dlq-consumer — InfoTriage dead-letter queue consumer (Phase 7).
 
 Subscribes to ``infotriage.dlq``, logs each poison message at ERROR level,
-emits a ``feed.unhealthy`` event, and supports a consecutive-message alert
-plus a replay mode that republishes messages to their original
-exchange/routing-key.
+emits a ``feed.unhealthy`` event, and supports two threshold policies:
+
+1. **Consecutive-message**: after 10 consecutive DLQ messages, log CRITICAL
+   and reset (per-message rate signal — Phase 7 07-01).
+2. **Live queue-depth**: periodic GET of the RabbitMQ Management API
+   (``/api/queues/{vhost}/{queue}``). When ``messages`` >= ``DLQ_DEPTH_CRITICAL_N``
+   (default 50), log CRITICAL + emit ``feed.unhealthy`` (queue-load signal —
+   Phase 7 07-02). Connectivity failures log WARNING and continue; never take
+   down the consumer.
 
 Run modes:
-    python worker.py              # consume DLQ forever
+    python worker.py              # consume DLQ + depth probe forever
     python worker.py --replay     # drain DLQ and republish to original queues
 
 Environment:
-    INFOTRIAGE_AMQP_DSN  AMQP URL (default: amqp://infotriage:infotriage_rmq@rabbitmq:5672)
-    LOG_LEVEL              DEBUG/INFO/WARNING/ERROR/CRITICAL (default INFO)
-
-Notes:
-- The CRITICAL alert fires after 10 consecutive DLQ messages (not a live
-  queue-depth probe). This satisfies the "after N consecutive errors" gate.
-- Replay preserves the original ``x-death`` headers; downstream consumers
-  should treat them as historical metadata.
+    INFOTRIAGE_AMQP_DSN              AMQP URL (default amqp://infotriage:infotriage_rmq@rabbitmq:5672)
+    RABBITMQ_MGMT_URL                HTTP mgmt URL (default derived from *_AMQP_DSN)
+    RABBITMQ_MGMT_USER               mgmt-API basic-auth user (default $RABBITMQ_DEFAULT_USER = infotriage)
+    RABBITMQ_MGMT_PASS               mgmt-API basic-auth password
+    RABBITMQ_MGMT_VHOST              vhost (default "/")
+    DLQ_DEPTH_PROBE_INTERVAL_S       probe cadence in seconds (default 30)
+    DLQ_DEPTH_CRITICAL_N             threshold in messages (default 50)
+    LOG_LEVEL                       DEBUG/INFO/WARNING/ERROR/CRITICAL (default INFO)
 """
 import argparse
 import asyncio
@@ -26,9 +32,10 @@ import datetime
 import json
 import logging
 import os
-from collections import deque
+from urllib.parse import urlparse
 
 import aio_pika
+import httpx
 from contracts import FeedUnhealthy, RabbitMQBus, setup_logging
 
 setup_logging("dlq-consumer")
@@ -37,10 +44,21 @@ log = logging.getLogger(__name__)
 DLQ_NAME = "infotriage.dlq"
 EVENTS_EXCHANGE = "infotriage.events"
 DEFAULT_AMQP_URL = "amqp://infotriage:infotriage_rmq@rabbitmq:5672"
+DEPTH_PROBE_DEFAULT_INTERVAL_S = 30
+DEPTH_PROBE_DEFAULT_THRESHOLD_N = 50
+MGMT_API_DEFAULT_PORT = 15672
+
+
+def _default_mgmt_url(amqp_url: str) -> str:
+    """Derive the mgmt-API URL from the AMQP URL (host-only — port becomes 15672)."""
+    parsed = urlparse(amqp_url)
+    if not parsed.hostname:
+        return "http://rabbitmq:15672"
+    return f"http://{parsed.hostname}:{MGMT_API_DEFAULT_PORT}"
 
 
 class DLQConsumer:
-    """Consume, log, and optionally replay dead-lettered messages."""
+    """Consume, log, optionally replay, and live-probe rabbitmq DLQ depth."""
 
     def __init__(self, amqp_url: str):
         self.amqp_url = amqp_url
@@ -62,12 +80,21 @@ class DLQConsumer:
             await self._connection.close()
 
     async def consume_forever(self) -> None:
-        """Consume DLQ messages until cancelled."""
+        """Consume the DLQ + run a periodic depth probe; runs until cancelled.
+
+        Both run concurrently via asyncio.gather:
+        - The consumer is "live" via aio_pika.RobustQueue.consume(); the
+          sentinel future in gather keeps the coroutine alive without polling.
+        - The depth probe runs on a fixed interval (best-effort; never raises).
+        """
         await self.connect()
         assert self._dlq is not None
         await self._dlq.consume(self._on_message)
-        log.info("DLQ consumer started on %s", DLQ_NAME)
-        await asyncio.Future()  # run forever
+        log.info("DLQ consumer started on %s (depth probe enabled)", DLQ_NAME)
+        await asyncio.gather(
+            asyncio.Future(),          # sentinel — the consumer stays attached
+            self._depth_probe_loop(),
+        )
 
     async def _on_message(self, message: aio_pika.IncomingMessage) -> None:
         async with message.process():
@@ -135,6 +162,100 @@ class DLQConsumer:
         await self._events_exchange.publish(message, routing_key="feed.unhealthy")
         log.debug("Emitted feed.unhealthy for %s", event_type)
 
+    # ---- Live queue-depth probe (Phase 7 07-02) --------------------------------
+    async def _depth_probe_loop(self) -> None:
+        """Periodic best-effort probe of the live RabbitMQ-mgmt API.
+
+        Each probe is self-contained: catches its own connectivity errors
+        and logs WARNING; the loop just sleeps. RabbitMQ transient outages
+        must NOT take down the consumer.
+        """
+        interval_s = int(
+            os.environ.get(
+                "DLQ_DEPTH_PROBE_INTERVAL_S",
+                str(DEPTH_PROBE_DEFAULT_INTERVAL_S),
+            )
+        )
+        while True:
+            await self._probe_queue_depth()
+            await asyncio.sleep(interval_s)
+
+    async def _probe_queue_depth(
+        self,
+        *,
+        threshold: int | None = None,
+        mgmt_url: str | None = None,
+        mgmt_user: str | None = None,
+        mgmt_pass: str | None = None,
+        mgmt_vhost: str | None = None,
+    ) -> None:
+        """Probe one mgmt-API cycle and emit alerts on breach.
+
+        Logs INFO on every successful probe; emits CRITICAL + ``feed.unhealthy``
+        when ``messages >= threshold``. Connectivity failures are absorbed with
+        a WARNING log so the consumer loop keeps running. Never raises.
+        """
+        threshold = int(
+            threshold
+            if threshold is not None
+            else os.environ.get(
+                "DLQ_DEPTH_CRITICAL_N", str(DEPTH_PROBE_DEFAULT_THRESHOLD_N)
+            )
+        )
+        mgmt_url = mgmt_url or os.environ.get(
+            "RABBITMQ_MGMT_URL",
+            _default_mgmt_url(self.amqp_url),
+        )
+        mgmt_user = mgmt_user or os.environ.get(
+            "RABBITMQ_MGMT_USER",
+            os.environ.get("RABBITMQ_DEFAULT_USER", "infotriage"),
+        )
+        mgmt_pass = mgmt_pass or os.environ.get(
+            "RABBITMQ_MGMT_PASS",
+            os.environ.get("RABBITMQ_DEFAULT_PASS", "infotriage_rmq"),
+        )
+        mgmt_vhost = mgmt_vhost or os.environ.get("RABBITMQ_MGMT_VHOST", "/")
+
+        full_url = f"{mgmt_url.rstrip('/')}/api/queues/{mgmt_vhost}/{DLQ_NAME}"
+        auth = (mgmt_user, mgmt_pass)
+
+        try:
+            async with httpx.AsyncClient(timeout=5.0, auth=auth) as client:
+                resp = await client.get(full_url)
+                resp.raise_for_status()
+                data = resp.json()
+                # Use "messages" (total incl. unacked) — THINKER Q5: alerting on
+                # messages_ready would hide a stuck consumer holding messages in
+                # unacked limbo.
+                depth = int(data.get("messages", 0))
+        except Exception as exc:
+            log.warning(
+                "DLQ depth probe failed: %s: %s",
+                type(exc).__name__,
+                str(exc)[:200],
+            )
+            return
+
+        log.info(
+            "DLQ depth: %d messages (threshold %d, queue %s)",
+            depth, threshold, DLQ_NAME,
+        )
+
+        if depth >= threshold:
+            log.critical(
+                "DLQ depth threshold breached: %d >= %d on %s",
+                depth, threshold, DLQ_NAME,
+            )
+            # Surface the depth value in the event_type so the FeedUnhealthy
+            # `reason` field (which embeds event_type) carries the breach count
+            # for grep-ability: "DLQ message for dlq.depth.critical:depth=75".
+            await self._emit_feed_unhealthy(
+                event_type=f"dlq.depth.critical:depth={depth}",
+                routing_key="dlq.depth",
+                body={"queue": DLQ_NAME, "depth": depth, "threshold": threshold},
+            )
+
+    # ---- Replay --------------------------------------------------------------
     async def replay(self, count: int = 1000) -> int:
         """Drain up to ``count`` DLQ messages and republish to original queues.
 
