@@ -37,6 +37,7 @@ from urllib.parse import quote as _quote_vhost, urlparse
 import aio_pika
 import httpx
 from contracts import FeedUnhealthy, RabbitMQBus, setup_logging
+from pydantic import ValidationError
 
 setup_logging("dlq-consumer")
 log = logging.getLogger(__name__)
@@ -147,13 +148,33 @@ class DLQConsumer:
             log.error("Cannot emit feed.unhealthy: events exchange not available")
             return
 
-        payload = FeedUnhealthy(
-            event="feed.unhealthy",
-            feed_url=routing_key or "dlq",
-            feed_name=event_type,
-            reason=f"DLQ message for {event_type}",
-            ts=datetime.datetime.now(tz=datetime.timezone.utc),
-        )
+        # Inner try/except ValidationError (Option B, mirror of 44f8b9d fix): the
+        # canonical `FeedUnhealthy` model enforces `Field(max_length=120)` on `reason`.
+        # If `event_type` is unusually long (e.g.
+        # `f"dlq.depth.critical:depth={"9"*200}"` from a runaway depth probe, or
+        # a 1KB routing key from upstream), `reason=f"DLQ message for {event_type}"`
+        # exceeds 120 chars, and the unguarded construction would propagate
+        # ValidationError out of `_handle_message` -> `_on_message` ->
+        # `message.process()` nacks the DLQ message (default requeue=False
+        # -> aio_pika's `process()` nack path), causing a silent nack-cycle where
+        # the bad message keeps coming back to DLQ. Trap the ValidationError
+        # locally so the consumer loop stays alive + the bad-reason event is
+        # logged-and-skipped.
+        try:
+            payload = FeedUnhealthy(
+                event="feed.unhealthy",
+                feed_url=routing_key or "dlq",
+                feed_name=event_type,
+                reason=f"DLQ message for {event_type}",
+                ts=datetime.datetime.now(tz=datetime.timezone.utc),
+            )
+        except ValidationError as e:
+            log.error(
+                "Discarding feed.unhealthy event for event_type=%s due to schema "
+                "validation failure (reason > 120 chars? malformed ts?): %s",
+                event_type, e,
+            )
+            return
         message = aio_pika.Message(
             body=json.dumps(payload.model_dump(mode="json")).encode(),
             content_type="application/json",

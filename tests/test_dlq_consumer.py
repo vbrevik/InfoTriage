@@ -1,6 +1,7 @@
 """Tests for apps/dlq_consumer/worker.py."""
 import datetime
 import json
+import logging
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -153,3 +154,49 @@ async def test_handle_message_critical_after_threshold(consumer):
     with patch("apps.dlq_consumer.worker.log") as mock_log:
         await consumer._handle_message(message)
         mock_log.critical.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_emit_feed_unhealthy_skips_validation_error(consumer, caplog):
+    """`apps/dlq_consumer/worker.py::_emit_feed_unhealthy` is constructed on
+    every DLQ message + every depth-breach tick. The `reason` field is
+    `f"DLQ message for {event_type}"` -- bounded in practice, but if
+    `event_type` carries an absurdly-long value (1KB routing key from
+    upstream, or a depth label from the depth-probe that grew past 120 chars),
+    `Field(max_length=120)` will fail validation. With the inner guard
+    (mirror of 44f8b9d Option B), the emit is logged-and-skipped via
+    `log.error("Discarding feed.unhealthy event ...")`, and the consumer loop
+    survives -- the DLQ process MUST stay alive. Without the guard, the
+    ValidationError propagates out of `_on_message`'s `message.process()`
+    context and re-NACKs the message back onto DLQ -> infinite nack-cycle.
+
+    This test pins post-44f8b9d runtime behavior for the dlq consumer:
+    when emit body is malformed, `_emit_feed_unhealthy` does NOT raise +
+    does NOT publish + DOES log the discard at ERROR.
+    """
+    consumer._events_exchange = MagicMock()
+    consumer._events_exchange.publish = AsyncMock()
+
+    # 4-char prefix + 200-char depth number = 226 chars, well past max_length=120.
+    long_event_type = "dlq.depth.critical:depth=" + ("9" * 200)
+
+    with caplog.at_level(logging.ERROR):
+        # Must NOT raise -- the inner guard catches ValidationError.
+        await consumer._emit_feed_unhealthy(
+            event_type=long_event_type,
+            routing_key="dlq.depth",
+            body={},
+        )
+
+    # Inner guard prevented the publish (log-and-skip pattern).
+    consumer._events_exchange.publish.assert_not_called()
+    # + an ERROR-severity `Discarding feed.unhealthy event` log line was emitted.
+    discard_logs = [
+        rec for rec in caplog.records
+        if rec.levelno >= logging.ERROR
+        and "Discarding feed.unhealthy event" in rec.message
+    ]
+    assert len(discard_logs) >= 1, (
+        "inner guard must emit a Discarding ERROR log line; got 0 "
+        "(ValidationError would propagate uncaught, triggering a dlq nack-cycle)"
+    )
