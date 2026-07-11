@@ -32,6 +32,7 @@ from typing import Optional
 
 from contracts import setup_logging, FeedUnhealthy
 from fastapi import FastAPI, Response
+from pydantic import ValidationError
 
 setup_logging("opml-health")
 
@@ -83,13 +84,29 @@ def run_health_check(
                 text, url, emoji, reason = "", "", "❌", f"probe exception: {e}"
             results.append({"text": text, "url": url, "emoji": emoji, "reason": reason})
             if emoji not in ("✅", "🟡"):
-                unhealthy.append(FeedUnhealthy(
-                    event="feed.unhealthy",
-                    feed_url=url,
-                    feed_name=text,
-                    reason=f"{emoji} {reason}",
-                    ts=datetime.datetime.now(datetime.timezone.utc),
-                ))
+                # Inner try/except (Option B): the canonical Pydantic model enforces
+                # Field(max_length=120) on `reason`. If a probe's `reason` (e.g. a
+                # stdlib error chain from urllib3/requests) exceeds 120 chars, the
+                # prior exception handler (above) ONLY covers `fut.result()` -- the
+                # unguarded FeedUnhealthy(...) construction here would propagate
+                # ValidationError out of `as_completed`, terminating the thread-executor
+                # loop mid-batch and crashing the entire `run_health_check()`. Trap
+                # the ValidationError locally so a single over-long reason can't
+                # cascade-kill the remaining feeds in the batch.
+                try:
+                    unhealthy.append(FeedUnhealthy(
+                        event="feed.unhealthy",
+                        feed_url=url,
+                        feed_name=text,
+                        reason=f"{emoji} {reason}",
+                        ts=datetime.datetime.now(datetime.timezone.utc),
+                    ))
+                except ValidationError as e:
+                    log.error(
+                        "Discarding feed.unhealthy event for %s due to schema "
+                        "validation failure (reason > 120 chars? malformed ts?): %s",
+                        url, e,
+                    )
     return results, unhealthy
 
 

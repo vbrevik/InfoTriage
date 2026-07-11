@@ -21,9 +21,11 @@ It catches:
      inline class, identity check fails IMMEDIATELY.
 """
 import datetime
+import logging
 import re
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -117,3 +119,83 @@ def test_opml_health_module_uses_canonical_feed_unhealthy():
     assert isinstance(CanonicalFeedUnhealthy, type) and issubclass(
         CanonicalFeedUnhealthy, pydantic.BaseModel
     ), "Canonical FeedUnhealthy must be a Pydantic BaseModel subclass."
+
+
+def test_run_health_check_survives_validation_error_mid_batch(caplog):
+    """`run_health_check()` must NOT crash when one feed surfaces a malformed
+
+    `reason` (e.g. >120 chars from a stdlib error chain). This is the
+    Option-B inner-`try/except ValidationError` containment test.
+
+    Without the inner guard, a single over-long reason would propagate a
+    `ValidationError` out of `as_completed`, terminating the thread-executor
+    loop mid-batch and crashing the entire `run_health_check()` (leaving up to
+    `len(outlines) - 1` feeds unprobed). With the inner guard, the bad-`reason`
+    feed is logged-and-skipped at emission-time, and the loop continues.
+
+    Test strategy:
+      1. Patch `load_opml` to return a synthetic 2-outline OPML.
+      2. Patch `probe_and_classify` to return one short-reason feed + one
+         long-reason (>120 chars) feed.
+      3. Call `service.run_health_check()` (must NOT raise).
+      4. Assert: results contains BOTH feeds (loop survived).
+      5. Assert: unhealthy contains ONLY the short-reason feed (the long-
+         reason one was ValidationError-skipped at emission-time).
+      6. Assert: a `Discarding feed.unhealthy event` ERROR log line was emitted.
+    """
+    from apps.opml import _check as check
+    from apps.opml_health import service
+
+    long_reason = "LongReason_" + ("x" * 200)  # > 200 chars, exceeds Field(max_length=120)
+
+    fake_outlines = [
+        ("category-a", [
+            {"type": "rss", "text": "Good Feed", "xmlUrl": "https://good.example.invalid/feed.xml"},
+        ]),
+        ("category-b", [
+            {"type": "rss", "text": "Bad Reason Feed", "xmlUrl": "https://bad.example.invalid/feed.xml"},
+        ]),
+    ]
+
+    def fake_probe_and_classify(outline, ua, timeout):
+        if "good" in outline["xmlUrl"]:
+            return ("Good Feed", outline["xmlUrl"], "❌", "timeout")
+        # Long-reason feed — simulates a stdlib error chain exceeding 120 chars.
+        return ("Bad Reason Feed", outline["xmlUrl"], "❌", long_reason)
+
+    with caplog.at_level(logging.ERROR, logger="opml.health"):
+        # Patch `service.load_opml` and `service.probe_and_classify` -- not
+        # `apps.opml._check.load_opml` / `check.load_opml`. The service module
+        # imports these BY NAME (`from apps.opml._check import (..., load_opml,
+        # ..., probe_and_classify, ...)`), so it has its own module-namespace
+        # binding that is NOT updated when the source module is patched. This
+        # mistake is what bit the first test run: the real `load_opml` ran
+        # against the project's default `feeds.opml` and returned 70 real
+        # outlines instead of the synthetic 2.
+        with patch.object(service, "load_opml", return_value=fake_outlines):
+            with patch.object(service, "probe_and_classify", side_effect=fake_probe_and_classify):
+                # Must NOT raise -- the inner guard catches ValidationError.
+                results, unhealthy = service.run_health_check()
+
+    # Both feeds must be in results (loop survived the bad-`reason` feed).
+    assert len(results) == 2, (
+        f"run_health_check loop must process every feed; got {len(results)} / 2"
+    )
+    # Only the short-reason feed should land in unhealthy (long-reason one was
+    # ValidationError-skipped at emission-time, before it could be appended).
+    assert len(unhealthy) == 1, (
+        f"only the short-reason feed should be in unhealthy; got {len(unhealthy)} ("
+        f"unexpected -- did the inner guard stop working?)"
+    )
+    # And the surviving emit is the short-reason one (good feed).
+    assert unhealthy[0].feed_url == "https://good.example.invalid/feed.xml"
+    # And a Discarding log line was emitted.
+    discard_logs = [
+        rec for rec in caplog.records
+        if rec.levelno >= logging.ERROR
+        and "Discarding feed.unhealthy event" in rec.message
+    ]
+    assert len(discard_logs) >= 1, (
+        f"inner guard must emit a Discarding ERROR log line; got {len(discard_logs)} ("
+        f"bad-reason feed was unexpectedly allowed to emit)"
+    )
