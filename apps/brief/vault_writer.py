@@ -175,7 +175,7 @@ def render_sab_obsidian(enrichment_rows: list[dict]) -> str:
         lines.append(f"## {ccir}")
 
         # Sort by score descending
-        sorted_items = sorted(items, key=lambda x: -x.get("score", 0))[:20]
+        sorted_items = sorted(items, key=lambda x: -(x.get("score") or 0))[:20]
 
         for item in sorted_items[:10]:
             summary = item.get("summary", "")
@@ -186,7 +186,7 @@ def render_sab_obsidian(enrichment_rows: list[dict]) -> str:
             entities = extract_entities(all_text)
             summary_wikilinked = render_wikilinked(summary, entities)
 
-            lines.append(f"- **[{item.get('score', 0)}] {item.get('title', '')}**")
+            lines.append(f"- **[{item.get('score') or 0}] {item.get('title', '')}**")
             lines.append(f"  - {summary_wikilinked}")
             lines.append(f"  - {item.get('source', '')} — [les]({item.get('url', '')})")
             if entities:
@@ -250,7 +250,7 @@ def write_vault_digest(
     # Filter: items with score >= 8, or all items with CCIR (but not none)
     kept = [
         r for r in enrichment_rows
-        if r.get("score", 0) >= 8
+        if (r.get("score") or 0) >= 8
         or (r.get("ccir") or "none").lower() != "none"
     ]
 
