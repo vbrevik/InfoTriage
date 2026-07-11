@@ -227,7 +227,7 @@ to the running pipeline.
 **Plans**
 
 - [x] 07-01-FreshRSS-rss-bridge-ops — done (commit 316a20f + 06-05): FreshRSS OPML imported, NewsAPI feeds throttled to 3h TTL, `apps/ingest/RSS_BRIDGE_NOTES.md` + `tests/test_set_newsapi_ttl.py` added.
-- [ ] 07-01-PLAN.md — M1 ship-gate ops: structured logging, DLQ consumer, ops/Makefile, retire host scripts (rolled-up 07-02/07-03/07-04). See `.planning/phases/07-ops-cutover/07-01-PLAN.md`.
+- [x] 07-01-PLAN.md — M1 ship-gate ops: structured logging, DLQ consumer, ops/Makefile, retire host scripts (rolled-up 07-02/07-03/07-04). See `.planning/phases/07-ops-cutover/07-01-PLAN.md`. Implemented 2026-07-11; full pytest suite green (302 passed, 34 skipped).
 
 ### Phase 8: Entity resolution
 

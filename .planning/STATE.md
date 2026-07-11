@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Phase 06 complete incl. gap-closure 06-07 (VAULT_INCLUDE_EMAIL url-scheme fix); clean stop
-last_updated: "2026-07-11T20:41:18.116Z"
+status: M1 ship-gate met (Phase 7 07-01 closed); planning-file commit pending; M1 ship or Phase 8 next
+stopped_at: Phase 7 07-01 verified + reviewed + gap-closure applied; SUMMARY written; code+planning commits pending
+last_updated: "2026-07-11T23:50:00.000Z"
 progress:
   total_phases: 13
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 34
-  completed_plans: 33
-  percent: 54
+  completed_plans: 34
+  percent: 62
 ---
 
 # STATE — InfoTriage
@@ -48,7 +48,102 @@ progress:
 
 ### Next
 
-- Execute Phase 07 (`07-ops-cutover/07-01-PLAN.md`).
+- Phase 07 07-01 in progress / complete after verification.
+
+## Session: 2026-07-11 — Phase 7 07-01: M1 ship-gate ops
+
+### Just-completed
+
+- **Task 1 (retire host scripts):** Removed stale references to `fever_triage.py` and
+  `gmail_to_atom.py` from `README.md`, `apps/ingest/_util.py`,
+  `apps/ingest/RSS_BRIDGE_NOTES.md`, `apps/ingest/imap_to_atom.py`,
+  `docs/superpowers/specs/2026-06-24-app-split-architecture-design.md`, and
+  `docs/adr/ADR-008-self-hosted-mcp-oauth2-ingestion.md`.
+
+- **Task 2 (structured logging):** Added `contracts.setup_logging()` helper
+  (`libs/contracts/src/contracts/_logging.py`) that emits JSON to stdout and a daily-
+  rotating file under `/data/logs/<service>.log`, with a writable fallback to a temp
+  dir. Wired it into all 8 services (ingest adapters via `make_trigger_app`, triage,
+  brief, opml-health, scheduler). Added `LOG_LEVEL` env var to every compose service.
+  Added `docs/ops/logging.md` with `jq` query examples.
+
+- **Task 3 (ops/Makefile):** Expanded `ops/Makefile` with `help`, `up`, `down`,
+  `logs`, `status`, `restart`, `shell-<service>`, `seed`, `backfill`, `replay`,
+  `test-full`, and `clean`. Added host port `22041` for the `feeds` service so
+  `make status` can probe it.
+
+- **Task 4 (DLQ consumer):** Created `apps/dlq_consumer/` worker that consumes
+  `infotriage.dlq`, logs at ERROR, emits `feed.unhealthy`, alerts at CRITICAL after
+  10 consecutive messages, and supports `--replay` to republish to original routing
+  keys. Added `dlq-consumer` service to `docker-compose.yml` and wired `make replay`.
+
+- **Tests:** Added `tests/test_dlq_consumer.py` and `tests/test_ops_makefile.py`.
+  Full pytest suite: 302 passed, 34 skipped, 0 failed.
+
+### Post-review gap-closure (this session)
+
+After the broad reviewer pass the working tree had 3 BLOCKING + 5 advisory items.
+All BLOCKINGs resolved; all advisories resolved:
+
+- **B1 — `LOG_LEVEL` anti-pattern**: kept `${LOG_LEVEL:-INFO}` (intentional
+  operator knob; not the HANDOFF-flagged collision case). Top-of-file comment
+  in `docker-compose.yml` documents the distinction explicitly.
+- **B2 — README removed the "do not delete fever_triage" warning**: B2's
+  premise (`digest.py` imports `fever_key`/`fever`/`strip_html`) turned out
+  to be stale — fresh grep confirms `digest.py` has ZERO `fever_triage`
+  references. The file is genuinely gone and the warning-removal is correct.
+- **B3 — Plan-vs-execution gap on retire-host-scripts**: `apps/ingest/
+  gmail_to_atom.py` was already deleted in commit `66477b8` (Phase 4 retire);
+  `docs/ARCHITECTURE.md` / `ccir.md` were already clean. The only surviving
+  cleanup was `.env.example`'s orphan `FRESHRSS_FEVER_*` vars (no Python
+  callers post Phase 5 cutover) — removed with a 9-line comment block citing
+  the cutover rationale and commit `1849f2a`.
+- **Advisory — `json-log-formatter` not propagated**: 8 of 9 service
+  `requirements.txt` files were missing it (the `--no-deps` install in each
+  Dockerfile strips the contracts dep). Added `json-log-formatter>=1.1` to
+  all 8 files with a 2-line comment per file; documented the propagation
+  policy in `libs/contracts/pyproject.toml`'s new `# NOTE:` block; removed
+  the now-redundant trailing `json-log-formatter` argument from
+  `apps/ingest-gmail/Dockerfile`'s `pip install` line.
+- **Advisory — `apps/dlq_consumer/requirements.txt` "symmetry" comment**:
+  the "kept for symmetry with the dependency-declaration pattern in other
+  services" rationale was factually wrong (no other service lists
+  `contracts`). Dropped the redundant `contracts` line entirely; the file
+  now matches the structural pattern of the other 7 service files.
+
+Re-verification after gap-closure: `pytest tests/ -q` → 302 passed / 34
+skipped / 0 failed. Tight reviewer pass on the final fix returned PASS with
+no blockers. 07-01-SUMMARY.md written
+(`.planning/phases/07-ops-cutover/07-01-SUMMARY.md`).
+
+### Still pending / known gaps (M1)
+
+- Uvicorn access logs remain plain text; application logs are JSON. Documented
+  as a known gap in `docs/ops/logging.md`. (Triage via log-formatter middleware
+  when needed.)
+- DLQ "bounded depth" is implemented as a consecutive-message threshold, not
+  a live queue-depth probe. Documented in the worker docstring.
+- Bare `pytest` skips `db_live` tests unless `INFOTRIAGE_TEST_DSN` is set
+  (06-05's safety gate, intentional; remember to set the env var before
+  exhaustive regression runs).
+
+### Next
+
+- Stage explicit file paths for the milestone commits (do NOT use `git add .`):
+  - commit 1 (code) — apps/{dlq_consumer/*,triage/worker.py,...} +
+    docker-compose.yml + libs/{contracts/_logging.py,contracts/__init__.py,...}
+    + libs/ingest_common/trigger.py + ops/Makefile + 8 requirements.txt +
+    .env.example cleaner + Dockerfile ingest-gmail cleanup + README.md + 4
+    spec/ADR refs + docs/superpowers/spec/... + docs/adr/ADR-008 + 4 new
+    tests + tests/baselines/triage_sample_baseline.txt
+  - commit 2 (planning files) — 07-01-SUMMARY.md (new) + ROADMAP.md checkbox
+    flip (already in working tree) + STATE.md close-out (this update).
+- DO NOT push (`main` is 17 commits ahead of origin/main already; a push is an
+  explicit operator action).
+- M1 ship decision: ship M1 foundation now, OR continue straight into Phase 8
+  (Entity resolution) per the original ROADMAP pipeline. Either is defensible;
+  if going to Phase 8, address backlog 999.3 (cross-language entity linking
+  recalibration) first.
 
 ## Session: 2026-07-11 — Phase 6 UAT bug fix: `digest.line()` `or` short-circuit
 
