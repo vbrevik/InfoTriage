@@ -22,11 +22,11 @@ _EMAIL_URL_SCHEMES = ("imap://", "gmail://")
 # Simple heuristic for entity extraction - no external dependencies
 # In Phase 8, this will be replaced by proper entity resolution
 _SYSTEM_TOPICS = {
-    "norge", "norsk", "norway", "norway", "oslo", "bergen", "tromsø", " stavanger", " trondheim",
+    "norge", "norsk", "norway", "oslo", "bergen", "tromsø", "stavanger", "trondheim",
     "nato", "natos hq", "norwegian defense", "norwegian armed forces", "forsvaret",
-    "ukraine", "russia", " putin", " zelensky", " warsaw", " poland", " belarus",
-    "china", "beijing", " taiwan", " hong kong", " diplomatic",
-    "america", "usa", "united states", "washington", "clearly",
+    "ukraine", "russia", "putin", "zelensky", "warsaw", "poland", "belarus",
+    "china", "beijing", "taiwan", "hong kong", "diplomatic",
+    "america", "usa", "united states", "washington",
     "climate", "environment", "green", "sustainable", "renewable",
     "technology", "ai", "artificial intelligence", "cybersecurity", "security",
     "ukrainian", "russian", "chinese", "american", "european",
@@ -57,7 +57,7 @@ def extract_entities(text: str, known_topics: Optional[list[str]] = None) -> lis
     else:
         for topic in _SYSTEM_TOPICS:
             if topic in text_lower:
-                entities.add(topic.title())
+                entities.add(topic.strip().title())
 
     words = text.split()
     for word in words:
