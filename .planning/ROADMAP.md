@@ -25,10 +25,10 @@ urgent insertions. The all-local-LLM rule (ADR-004) is never revisited by a phas
 - [x] **Phase 3: Bus — RabbitMQ** (M1) - AMQP transport + bus client (completed 2026-06-29)
 - [x] **Phase 4: Ingest adapters + Gmail MCP** (M1) - containerize bridges + self-hosted Gmail MCP (OAuth2) (completed 2026-06-29)
 - [x] **Phase 5: Triage app** (M1) - event-driven scorer + pgvector dedup (completed 2026-07-02)
-- [x] **Phase 7: Ops + cutover** (M1) - health, DLQ, replay, retire host path (completed 2026-07-12; **M1 ship-gate met**)
 - [x] **Phase 6: Brief app** (M1) - SAB renderer + Obsidian vault-writer
 - [x] 06-01-PLAN.md — Renderer library + FastAPI serving layer (Wave 1+2) — 38 tests pass
 - [x] 06-02-PLAN.md — pgvector semantic clustering (replaced keyword-overlap) — 38/38 tests pass
+- [x] **Phase 7: Ops + cutover** (M1) - health, DLQ, replay, retire host path (completed 2026-07-12; **M1 ship-gate met**)
 - [ ] **Phase 8: Entity resolution** (M2) - Postgres + pgvector → Obsidian projection
 - [ ] **Phase 9: RAG recall** (M2) - CCIR pre-filter + thematic recall over corpus
 - [ ] **Phase 10: Wiki-LLM** (M2) - standing auto-wiki + on-demand synthesis → Obsidian
