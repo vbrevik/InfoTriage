@@ -12,11 +12,13 @@ Usage:
 items.json = [{"title": "...", "source": "...", "summary": "..."}]
 Env (or .env): LLM_BASE_URL, LLM_API_KEY, LLM_MODEL.
 """
-import json, os, sys, argparse, urllib.request, urllib.error
+import json, os, sys, argparse, logging, urllib.request, urllib.error
 
 # The triage brain lives in ccir.md (Commander's Critical Information Requirements).
 # Edit that file to retune — not this code.
 CCIR_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "ccir.md")
+
+log = logging.getLogger(__name__)
 
 def load_ccir():
     try:
@@ -136,10 +138,32 @@ SUMMARY: {it.get('summary','')}"""
     # tessoc='none' (PMESII: '"none" if ccir is "none"' / TESSOC: '"none" if ccir is "none"'
     # in the scoring prompt's disambiguation rules). Coerce LLM drift before
     # falling back to setdefault for valid CCIRs.
+    #
+    # Observability: silently coercing LLM drift would mask a prompt regression,
+    # so emit log.warning whenever the LLM actually emitted non-'none'
+    # enrichment alongside a ccir='none' row. The warning carries the
+    # pre-coercion values for audit; downstream consumers always see the
+    # clean ('none') values. Fits under Phase 7 Task 2 (structured logging).
     ccir_lower = (v.get("ccir") or "none").lower()
     if ccir_lower == "none":
+        # Capture pre-coercion values BEFORE we overwrite them so the
+        # warning can carry the actual drift signal.
+        _pre_pmesii = v.get("pmesii")
+        _pre_tessoc = v.get("tessoc")
+        coerced = (
+            _pre_pmesii not in (None, "", "none")
+            or _pre_tessoc not in (None, "", "none")
+        )
         v["pmesii"] = "none"
         v["tessoc"] = "none"
+        if coerced:
+            log.warning(
+                "triage_score enriched ccir=none with non-'none' pmesii/tessoc; "
+                "coercing to 'none' (pre-coercion: pmesii=%r tessoc=%r). "
+                "Likely cause: qwen36 drift away from ccir.md's rule "
+                "'\"none\" if ccir is \"none\"'.",
+                _pre_pmesii, _pre_tessoc,
+            )
     else:
         # ensure enrichment fields always present (LLM may omit them)
         v.setdefault("pmesii", "none")
