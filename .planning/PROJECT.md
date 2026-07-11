@@ -90,6 +90,13 @@ event-driven (`item.ingested` → mE5-large dedup → qwen36 scoring against `cc
 from production (file preserved for `digest.py` imports); host crontab has no fever entry.
 Shadow-run parity confirmed 14/14 (100%) before cutover (R6). VERIFICATION.md: 27/27 must-haves.
 
+**Phase 6 complete (2026-07-11):** `apps/brief/` is the event-driven SAB/digest product at `:22040` —
+`verdict.ready` → enrichment SELECT (LEFT JOIN `infotriage.embeddings`) → semantic pgvector
+clustering (`CLUSTER_THRESHOLD` env-wired end-to-end) → HTML SAB + markdown digest + Obsidian
+vault projection (`vault_writer.py`, default/COP/CIP views + `/vault` endpoint). Initial
+verification (2026-07-06) found 3 gaps (clustering data-flow, missing vault-writer, threshold
+wiring); gap-closure plans 06-03/06-04 landed, UAT 9/9 passed, re-verification 14/14 must-haves.
+
 ## North-star benchmark (ADR-003)
 
 | Capability | North star | InfoTriage's personal-scale shadow |
