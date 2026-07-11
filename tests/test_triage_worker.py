@@ -124,7 +124,7 @@ def test_enrichment_failure_nacks(store, bus):
 
     score = _fake_score(
         {"ccir": "PIR-1", "cnr": "II", "score": 6, "bucket": "maybe",
-         "why": "test", "pmesii": "Military", "tessoc": "Time"}
+         "why": "test", "pmesii": "Military", "tessoc": "Terror"}
     )
     with pytest.raises(RuntimeError):
         asyncio.run(process_item(item.id, store, bus, embed=lambda text: VEC_A, score=score))
@@ -143,7 +143,7 @@ def test_no_verdict_on_enrichment_failure(store, bus):
 
     score = _fake_score(
         {"ccir": "PIR-1", "cnr": "II", "score": 6, "bucket": "maybe",
-         "why": "test", "pmesii": "Military", "tessoc": "Time"}
+         "why": "test", "pmesii": "Military", "tessoc": "Terror"}
     )
     with pytest.raises(RuntimeError):
         asyncio.run(process_item(item.id, store, bus, embed=lambda text: VEC_A, score=score))
@@ -178,7 +178,7 @@ def test_score_clamped(store, bus):
     store.put_item(item_high)
     score_high = _fake_score(
         {"ccir": "PIR-1", "cnr": "II", "score": 42, "bucket": "maybe",
-         "why": "test", "pmesii": "Military", "tessoc": "Time"}
+         "why": "test", "pmesii": "Military", "tessoc": "Terror"}
     )
     asyncio.run(process_item(item_high.id, store, bus, embed=lambda text: VEC_A, score=score_high))
     enrichment_high = store.get_enrichment(item_high.id)
@@ -189,7 +189,7 @@ def test_score_clamped(store, bus):
     store.put_item(item_low)
     score_low = _fake_score(
         {"ccir": "PIR-1", "cnr": "II", "score": -3, "bucket": "maybe",
-         "why": "test", "pmesii": "Military", "tessoc": "Time"}
+         "why": "test", "pmesii": "Military", "tessoc": "Terror"}
     )
     asyncio.run(process_item(item_low.id, store, bus, embed=lambda text: VEC_B, score=score_low))
     enrichment_low = store.get_enrichment(item_low.id)
@@ -208,7 +208,7 @@ def test_dedup_skip(store, bus):
     def score(it):
         score_calls.append(it)
         return {**it, "ccir": "PIR-1", "cnr": "II", "score": 7, "bucket": "maybe",
-                "why": "must not be used", "pmesii": "Military", "tessoc": "Time"}
+                "why": "must not be used", "pmesii": "Military", "tessoc": "Terror"}
 
     asyncio.run(process_item(item.id, store, bus, embed=lambda text: VEC_A, score=score))
 
@@ -234,7 +234,7 @@ def test_dedup_distinct(store, bus):
     def score(it):
         score_calls.append(it)
         return {**it, "ccir": "PIR-1", "cnr": "II", "score": 6, "bucket": "maybe",
-                "why": "distinct", "pmesii": "Military", "tessoc": "Time"}
+                "why": "distinct", "pmesii": "Military", "tessoc": "Terror"}
 
     asyncio.run(process_item(item_a.id, store, bus, embed=lambda text: VEC_A, score=score))
     asyncio.run(process_item(item_b.id, store, bus, embed=lambda text: VEC_B, score=score))
@@ -252,7 +252,7 @@ def test_verdict_ready_fields(store, bus):
     store.put_item(item)
     score = _fake_score(
         {"ccir": "PIR-3", "cnr": "II", "score": 7, "bucket": "maybe",
-         "why": "NATO toppmote", "pmesii": "Political", "tessoc": "Organization"}
+         "why": "NATO toppmote", "pmesii": "Political", "tessoc": "Subversion"}
     )
     asyncio.run(process_item(item.id, store, bus, embed=lambda text: VEC_A, score=score))
 

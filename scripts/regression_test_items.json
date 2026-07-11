@@ -1,0 +1,22 @@
+[
+  {"title": "Russia launches massive missile strike on Ukrainian energy infrastructure", "source": "Reuters", "summary": "Russian forces struck multiple power plants across Ukraine in the largest wave of attacks this winter."},
+  {"title": "Norway approves new deep-sea mining licenses in Arctic waters", "source": "NRK", "summary": "The Norwegian parliament voted to open portions of the Arctic seabed to deep-sea mining, citing critical mineral needs."},
+  {"title": "Bellingcat identifies FSB officers behind Navalny poisoning", "source": "Bellingcat", "summary": "Open-source investigators traced the poisoning to a team of FSB chemical-weapons specialists."},
+  {"title": "NATO summit in Vilnius agrees new defense spending targets", "source": "NATO.int", "summary": "Leaders agreed to raise minimum defense spending to 2% of GDP and accelerate force modernization."},
+  {"title": "China expands rare-earth export controls amid tech war", "source": "Financial Times", "summary": "Beijing imposed new licensing requirements on gallium and germanium exports, escalating trade tensions."},
+  {"title": "Mass protests erupt in Georgia over 'foreign agent' law", "source": "Civil Georgia", "summary": "Tens of thousands gathered in Tbilisi to protest a Kremlin-inspired law targeting civil society funding."},
+  {"title": "Suspected Russian sabotage severs undersea cable in Baltic Sea", "source": "BBC", "summary": "A fiber-optic cable between Sweden and Estonia was damaged in what officials suspect was deliberate sabotage."},
+  {"title": "Iran enriches uranium to 84% purity, IAEA confirms", "source": "Al-Monitor", "summary": "The International Atomic Energy Agency reported Iran has produced uranium enriched to near weapons-grade levels."},
+  {"title": "US deploys additional F-35 squadrons to RAF Lakenheath", "source": "Defense News", "summary": "The Pentagon announced a rotational deployment of F-35A fighters to bolster NATO air policing."},
+  {"title": "OCCRP reveals offshore network linked to Russian oligarch sanctions evasion", "source": "OCCRP", "summary": "A network of shell companies in Cyprus and the UAE helped oligarchs evade EU sanctions."},
+  {"title": "Arctic ice melt opens new shipping route north of Russia", "source": "The Guardian", "summary": "Record low sea ice this summer has made the Northern Sea Route navigable for longer periods."},
+  {"title": "EU agrees 14th sanctions package targeting Russian LNG", "source": "Politico Europe", "summary": "The new package bans future investments and services related to Russian liquefied natural gas projects."},
+  {"title": "Cyberattack disrupts Norwegian hospital networks", "source": "Aftenposten", "summary": "A ransomware attack forced several hospitals to shut down IT systems and reschedule procedures."},
+  {"title": "Houthi missile strikes commercial vessel in Gulf of Aden", "source": "Crisis Group", "summary": "The Iran-backed group claimed responsibility for an attack on a Liberian-flagged container ship."},
+  {"title": "Sweden joins NATO as 32nd member", "source": "NATO.int", "summary": "Stockholm formally acceded to the North Atlantic Treaty after nearly two years of negotiations."},
+  {"title": "Local LLM runs at 120 tok/s on MacBook Pro with M3 Max", "source": "Medium", "summary": "A new speculative-decoding technique allows Qwen3.6-32B to run locally at usable speeds."},
+  {"title": "L'Oréal launches AI-powered skincare recommendation engine", "source": "MyClaw", "summary": "The beauty giant partnered with OpenAI to personalize product recommendations."},
+  {"title": "FIFA announces expanded 48-team format for 2026 World Cup", "source": "BBC Sport", "summary": "The World Cup will feature 104 matches across three host nations."},
+  {"title": "Russia withdraws from Black Sea grain deal", "source": "Reuters", "summary": "Moscow suspended participation in the UN-brokered agreement, threatening global food exports."},
+  {"title": "Norwegian intelligence warns of increased Russian SIGINT activity in Arctic", "source": "Forsvarets forum", "summary": "E-tjenesten reported a sharp rise in Russian signals intelligence collection near Svalbard."}
+]

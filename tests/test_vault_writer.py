@@ -218,5 +218,56 @@ def test_write_vault_digest_includes_email_by_default(temp_vault, monkeypatch):
 
     paths = write_vault_digest(rows, temp_vault)
 
-    assert len(paths) == 1
+    # Returns the item file plus the SAB projection
+    assert len(paths) == 2
     assert (temp_vault / "email-1.md").exists()
+    assert (temp_vault / "obsidian-sab.md").exists()
+
+
+def test_write_sab_obsidian_custom_filename(temp_vault):
+    """write_sab_obsidian supports custom filenames for view projections."""
+    rows = [
+        {
+            "item_id": "1",
+            "title": "First Article",
+            "summary": "About climate",
+            "source": "News1",
+            "url": "https://1.com",
+            "ccir": "PIR-1",
+            "score": 8,
+            "cnr": "I",
+        },
+    ]
+
+    path = write_sab_obsidian(rows, temp_vault, filename="obsidian-sab-cop.md")
+
+    assert path.exists()
+    assert path.name == "obsidian-sab-cop.md"
+    assert "PIR-1" in path.read_text()
+
+
+def test_write_vault_digest_view_projection(temp_vault):
+    """write_vault_digest can write a view projection without re-writing items."""
+    rows = [
+        {
+            "item_id": "1",
+            "title": "COP Item",
+            "summary": "Summary",
+            "source": "",
+            "url": "",
+            "ccir": "FFIR-1",
+            "score": 9,
+            "cnr": "I",
+        },
+    ]
+
+    # First write default (items + SAB)
+    paths = write_vault_digest(rows, temp_vault, write_items=True, sab_filename="obsidian-sab.md")
+    assert (temp_vault / "1.md").exists()
+    assert (temp_vault / "obsidian-sab.md").exists()
+
+    # Then write a view projection without re-writing items
+    paths = write_vault_digest(rows, temp_vault, write_items=False, sab_filename="obsidian-sab-cop.md")
+    assert (temp_vault / "obsidian-sab-cop.md").exists()
+    # Should still return the SAB path even when not writing items
+    assert any(p.name == "obsidian-sab-cop.md" for p in paths)

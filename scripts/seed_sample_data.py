@@ -55,25 +55,25 @@ def seed() -> None:
     # Sample data: list of (ccir, cnr, score, title, source, source_type, pmesii, tessoc)
     samples = [
         # CNR-I alerts (should appear in CNR slide)
-        ("PIR-1", "I", 9, "Russisk militær aktivitet øker ved ukrainsk grense", "NRK", "rss", "military", "space"),
-        ("PIR-1", "I", 8, "Ukraina melder om nye angrep i øst", "Aftenposten", "rss", "military", "time"),
-        ("PIR-3", "I", 9, "NATO øker beredskap i Øst-Europa", "VG", "rss", "military", "organization"),
+        ("PIR-1", "I", 9, "Russisk militær aktivitet øker ved ukrainsk grense", "NRK", "rss", "military", "terror"),
+        ("PIR-1", "I", 8, "Ukraina melder om nye angrep i øst", "Aftenposten", "rss", "military", "espionage"),
+        ("PIR-3", "I", 9, "NATO øker beredskap i Øst-Europa", "VG", "rss", "military", "subversion"),
 
         # Other PIR-1 items (cluster with the CNR ones)
-        ("PIR-1", "none", 7, "EU diskuterer nye sanksjoner mot Russland", "Dagens Næringsliv", "rss", "political", "organization"),
-        ("PIR-1", "none", 6, "Ukrainsk president holder tale til nasjonen", "NRK", "rss", "political", "communications"),
+        ("PIR-1", "none", 7, "EU diskuterer nye sanksjoner mot Russland", "Dagens Næringsliv", "rss", "political", "subversion"),
+        ("PIR-1", "none", 6, "Ukrainsk president holder tale til nasjonen", "NRK", "rss", "political", "sabotage"),
 
         # PIR-2 items
-        ("PIR-2", "none", 8, "Norsk militærøvelse i Barentshavet", "Forsvaret", "rss", "military", "space"),
-        ("PIR-2", "none", 7, "Arktisk råd møtes i Tromsø", "High North News", "rss", "political", "organization"),
+        ("PIR-2", "none", 8, "Norsk militærøvelse i Barentshavet", "Forsvaret", "rss", "military", "terror"),
+        ("PIR-2", "none", 7, "Arktisk råd møtes i Tromsø", "High North News", "rss", "political", "subversion"),
 
         # PIR-4 items
-        ("PIR-4", "II", 8, "Cyberangrep rammer norsk infrastruktur", "Tek.no", "rss", "infrastructure", "communications"),
-        ("PIR-4", "none", 6, "Ny malware-kampanje målretter seg nordiske bedrifter", "Digi.no", "rss", "information", "communications"),
+        ("PIR-4", "II", 8, "Cyberangrep rammer norsk infrastruktur", "Tek.no", "rss", "infrastructure", "sabotage"),
+        ("PIR-4", "none", 6, "Ny malware-kampanje målretter seg nordiske bedrifter", "Digi.no", "rss", "information", "sabotage"),
 
         # FFIR-3 items
-        ("FFIR-3", "none", 7, "Norsk forsvar investerer i droneteknologi", "Forsvaret", "rss", "military", "equipment"),
-        ("FFIR-3", "none", 6, "Forsvarsindustrien øker produksjonen", "DN", "rss", "economic", "equipment"),
+        ("FFIR-3", "none", 7, "Norsk forsvar investerer i droneteknologi", "Forsvaret", "rss", "military", "organized crime"),
+        ("FFIR-3", "none", 6, "Forsvarsindustrien øker produksjonen", "DN", "rss", "economic", "organized crime"),
     ]
 
     conn = psycopg.connect(DSN)
