@@ -34,7 +34,7 @@ urgent insertions. The all-local-LLM rule (ADR-004) is never revisited by a phas
 - [ ] **Phase 10: Wiki-LLM** (M2) - standing auto-wiki + on-demand synthesis → Obsidian
 - [ ] **Phase 11: SOCMINT + Arctic collection** (M2) - Telegram/AIS adapters via MCP pattern
 - [ ] **Phase 12: CNR alerting / dissemination** (M2) - real-time notification lane
-- [ ] **Phase 99.1: M1 closure** (urgent decimal insertion, before M2) — retroactive closure of 4 procedural gaps surfaced by `.planning/v1.0-MILESTONE-AUDIT.md` §8: (RT-1) Phase 7 missing `07-VERIFICATION.md`; (RT-2) Phase 6 + Phase 7 missing `*-VALIDATION.md`; (RT-3) Phases 00/02/04 `*-VALIDATION.md` `nyquist_compliant: false` → `true`; (RT-4) `apps/opml_health/service.py:52` inline `FeedUnhealthy` class shadow. Drives M1 audit `gaps_found → passed` before M2 begins.
+- [x] **Phase 99.1: M1 closure** (urgent decimal insertion, before M2) — retroactive closure of 4 procedural gaps surfaced by `.planning/v1.0-MILESTONE-AUDIT.md` §8: (RT-1) Phase 7 missing `07-VERIFICATION.md`; (RT-2) Phase 6 + Phase 7 missing `*-VALIDATION.md`; (RT-3) Phases 00/02/04 `*-VALIDATION.md` `nyquist_compliant: false` → `true`; (RT-4) `apps/opml_health/service.py:52` inline `FeedUnhealthy` class shadow. Drives M1 audit `gaps_found → passed` before M2 begins.
 
 Parallel, non-blocking: **SP-COP** — COP/map UI gated spike (World Monitor adopt-vs-build; ADR-005).
 Deferred: **Milestone 3** — multi-user / team server (auth, tenancy, sharing).
