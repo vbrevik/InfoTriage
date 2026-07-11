@@ -224,6 +224,86 @@ def test_write_vault_digest_includes_email_by_default(temp_vault, monkeypatch):
     assert (temp_vault / "obsidian-sab.md").exists()
 
 
+def test_gmail_row_excluded_when_email_disabled(temp_vault, monkeypatch):
+    """Production gmail rows (source='gmail', url='gmail://...') must be excluded
+    from the vault when VAULT_INCLUDE_EMAIL=0."""
+    monkeypatch.setenv("VAULT_INCLUDE_EMAIL", "0")
+    rows = [{
+        "item_id": "gmail-1",
+        "title": "Gmail Item",
+        "summary": "Summary",
+        "source": "gmail",
+        "url": "gmail://message/abc123",
+        "ccir": "PIR-1",
+        "score": 9,
+        "cnr": "I",
+    }]
+
+    write_vault_digest(rows, temp_vault)
+
+    assert not (temp_vault / "gmail-1.md").exists()
+    assert "Gmail Item" not in (temp_vault / "obsidian-sab.md").read_text()
+
+
+def test_imap_row_excluded_when_email_disabled(temp_vault, monkeypatch):
+    """Production imap rows (source=<mailbox name>, url='imap://...') must be
+    excluded from the vault when VAULT_INCLUDE_EMAIL=0."""
+    monkeypatch.setenv("VAULT_INCLUDE_EMAIL", "0")
+    rows = [{
+        "item_id": "imap-1",
+        "title": "Imap Item",
+        "summary": "Summary",
+        "source": "Telegraph Ukraine",
+        "url": "imap://mail.example.com/msg-1",
+        "ccir": "PIR-2",
+        "score": 9,
+        "cnr": "I",
+    }]
+
+    write_vault_digest(rows, temp_vault)
+
+    assert not (temp_vault / "imap-1.md").exists()
+    assert "Imap Item" not in (temp_vault / "obsidian-sab.md").read_text()
+
+
+def test_non_email_row_not_excluded_when_email_disabled(temp_vault, monkeypatch):
+    """The VAULT_INCLUDE_EMAIL toggle must not drop non-email rows."""
+    monkeypatch.setenv("VAULT_INCLUDE_EMAIL", "0")
+    rows = [{
+        "item_id": "rss-1",
+        "title": "RSS Item",
+        "summary": "Summary",
+        "source": "NRK",
+        "url": "https://nrk.no/article-1",
+        "ccir": "PIR-1",
+        "score": 9,
+        "cnr": "I",
+    }]
+
+    write_vault_digest(rows, temp_vault)
+
+    assert (temp_vault / "rss-1.md").exists()
+
+
+def test_gmail_row_included_by_default(temp_vault, monkeypatch):
+    """Gmail rows are included when VAULT_INCLUDE_EMAIL is unset (default)."""
+    monkeypatch.delenv("VAULT_INCLUDE_EMAIL", raising=False)
+    rows = [{
+        "item_id": "gmail-1",
+        "title": "Gmail Item",
+        "summary": "Summary",
+        "source": "gmail",
+        "url": "gmail://message/abc123",
+        "ccir": "PIR-1",
+        "score": 9,
+        "cnr": "I",
+    }]
+
+    write_vault_digest(rows, temp_vault)
+
+    assert (temp_vault / "gmail-1.md").exists()
+
+
 def test_write_sab_obsidian_custom_filename(temp_vault):
     """write_sab_obsidian supports custom filenames for view projections."""
     rows = [
