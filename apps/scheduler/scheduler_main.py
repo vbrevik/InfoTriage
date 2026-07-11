@@ -17,7 +17,9 @@ import time
 import httpx
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from contracts import setup_logging
 
+setup_logging("scheduler")
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------

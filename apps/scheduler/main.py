@@ -7,12 +7,10 @@ until interrupted. Graceful shutdown on KeyboardInterrupt or SystemExit.
 import logging
 import time
 
+from contracts import setup_logging
 from scheduler_main import build_scheduler
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-)
+setup_logging("scheduler")
 log = logging.getLogger(__name__)
 
 

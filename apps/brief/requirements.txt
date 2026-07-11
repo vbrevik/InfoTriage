@@ -9,3 +9,6 @@ pydantic>=2.0
 PyYAML>=6.0
 fastapi>=0.115
 uvicorn>=0.30
+# contracts.setup_logging is invoked at module level; json-log-formatter is a
+# contracts runtime dep that's stripped by --no-deps in the Dockerfile. (Phase 7)
+json-log-formatter>=1.1

@@ -9,12 +9,10 @@ import sys
 from typing import Any
 
 import httpx
+from contracts import setup_logging
 from fastapi import FastAPI, Response
 
-logging.basicConfig(
-    format="%(message)s",
-    level=logging.INFO,
-)
+setup_logging("opml-health-admin")
 log = logging.getLogger("opml.health.admin")
 
 

@@ -101,6 +101,6 @@ If you add sites to `opml/feeds.opml` that have native RSS, prefer that — brid
 
 rss-bridge (this file) is one of three ingest paths. The other two are:
 
-- [`bridge/imap_to_atom.py`](imap_to_atom.py) — multi-IMAP mailboxes (Gmail / Outlook / Fastmail / ProtonMail / custom domain). One runner, per-account provider dispatch. Read-only.
-- [`bridge/yt_to_atom.py`](yt_to_atom.py) — YouTube channels → optional audio transcription → Atom feed. Read-only of channels.
-- [`bridge/gmail_to_atom.py`](gmail_to_atom.py) — single-account Gmail bridge (pre-existing). Use either this OR a `name="gmail"` entry in `imap_to_atom.py`; not both against the same Gmail account (`data/feeds/gmail.xml` collision).
+- [`apps/ingest/imap_to_atom.py`](imap_to_atom.py) — multi-IMAP mailboxes (Gmail / Outlook / Fastmail / ProtonMail / custom domain). One runner, per-account provider dispatch. Read-only.
+- [`apps/ingest/yt_to_atom.py`](yt_to_atom.py) — YouTube channels → optional audio transcription → Atom feed. Read-only of channels.
+- The legacy Gmail IMAP bridge has been retired; Gmail is now ingested via the `ingest-gmail` container using OAuth2/MCP (ADR-008).

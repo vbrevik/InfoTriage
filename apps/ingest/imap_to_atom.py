@@ -32,7 +32,7 @@ Notes:
 - **provider="gmail"** uses Gmail's proprietary search (`X-GM-RAW`). Gmail query syntax: `newer_than:7d`, `from:x@y`, `subject:foo`, etc.
 - **provider="imap"** uses standard RFC 3501 SEARCH keywords (`SINCE`, `BEFORE`, `FROM`, `SUBJECT`, `BODY`, `TEXT`, etc.). Outlook/Fastmail/ProtonMail IMAP accept this. Gmail-style compound syntax (e.g. `received>=01-Jan-2024 subject:foo`) is silently dropped.
 - **MAILBOXES (as a JSON array starting with `[`) is not loaded from `.env`** — the loader only handles `KEY=VALUE` lines and skips anything that doesn't fit. Set via shell `export MAILBOXES='[…]'` or write `.mailboxes.json`.
-- **Filename collision:** if `name="gmail"`, this script writes `data/feeds/gmail.xml` — the same file the pre-existing `bridge/gmail_to_atom.py` produces. Avoid by giving IMAP Gmail a different `name` (e.g. `name="gmail-multi"`), or run only one of the two scripts against Gmail.
+- **Filename collision:** if `name="gmail"`, this script writes `data/feeds/gmail.xml`. Avoid by giving IMAP Gmail a different `name` (e.g. `name="gmail-multi"`). Gmail is otherwise ingested via the `ingest-gmail` container using OAuth2/MCP (ADR-008).
 """
 import os, sys, json, email, imaplib, datetime
 from email.header import decode_header

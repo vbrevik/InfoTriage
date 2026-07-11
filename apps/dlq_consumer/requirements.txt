@@ -1,13 +1,4 @@
-fastapi
-uvicorn
-aio-pika
-psycopg[binary]
-pgvector
-numpy
-pydantic
-PyYAML
-httpx
-feedgen>=0.3.1
+aio-pika>=9.6
 # contracts.setup_logging is invoked at module level; json-log-formatter is a
 # contracts runtime dep that's stripped by --no-deps in the Dockerfile. (Phase 7)
 json-log-formatter>=1.1

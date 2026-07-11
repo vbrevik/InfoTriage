@@ -1,0 +1,26 @@
+# InfoTriage digest
+
+🔥 **[9] IRGC seizes oil tanker in Strait of Hormuz amid rising tensions**
+    Crisis Group — IRGC-agent angrep i Hormuz, eskalering
+
+🔥 **[9] Suspected sabotage cuts undersea cable between Norway and Finland**
+    NRK — Sabotasje mot kritisk norsk infrastruktur, varsle straks
+
+🔥 **[8] Bellingcat identifies GRU officer behind Skripal attack via passport leak**
+    Bellingcat — OSINT-identifisering av GRU-offiser bak Skripal-angrepet
+
+🔥 **[8] Norway orders 52 Leopard 2A7 tanks in largest defence purchase in decades**
+    Forsvarets forum — Norsk forsvarsanskaffelse av stridsvogner
+
+🔥 **[7] Mass protests expected at 2026 World Cup over US immigration policy**
+    BBC Sport Football — Protesttrussel mot VM 2026-arenaer
+
+🤔 **[6] Run Claude Code Locally on a Mac: 65 tok/s with 4-bit Qwen3.6-27B + DFlash**
+    Medium — Lokal AI-kjøring på Mac, relevant for egen teknologikapabilitet
+
+🗑️ **[0] L'Oréal Builds AI Beauty Engine with OpenAI**
+    MyClaw — Kommerciell AI-nyhet, ingen sikkerhetsrelevans
+
+🗑️ **[0] MAMMOTION robotic lawn mowers on sale for Prime Day**
+    HowToGeek — Reklame for forbrukerteknologi, ingen CCIR
+

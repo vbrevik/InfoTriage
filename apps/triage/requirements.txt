@@ -12,3 +12,6 @@ feedgen>=0.3.1
 # module level too — both already vetted deps, see apps/ingest-imap (Rule 3 fix).
 pydantic>=2.0
 PyYAML>=6.0
+# contracts.setup_logging is invoked at module level; json-log-formatter is a
+# contracts runtime dep that's stripped by --no-deps in the Dockerfile. (Phase 7)
+json-log-formatter>=1.1

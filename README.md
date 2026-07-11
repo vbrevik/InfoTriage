@@ -62,14 +62,6 @@ dedups via mE5-large embedding similarity, and persists the result to
 retune what gets kept; it covers tech + defense/geopolitics + Norway + world news.
 Too narrow a profile = it nukes everything (learned that the hard way).
 
-**Retired:** `apps/triage/fever_triage.py` was the production scoring path
-(FreshRSS Fever-API polling + host crontab) before the event-driven triage
-container existed. It is **no longer invoked** as a scoring path — the crontab
-entry that ran it has been removed (R6, shadow-run parity confirmed via
-`scripts/shadow_run.py`). The file itself is preserved because
-`apps/triage/digest.py` still imports `fever_key`/`fever`/`strip_html` from it;
-do not delete it.
-
 ### This FreshRSS instance (local throwaway)
 
 - Web UI: http://localhost:8088 — login **admin** / **InfoTriageLocal23**

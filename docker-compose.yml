@@ -1,5 +1,13 @@
 # infotriage — local, free info-triage hub. All on the Mac, no cloud.
 # FreshRSS = aggregator/store · rss-bridge = sites→RSS · feeds = static Atom feed server.
+#
+# LOG_LEVEL convention: `${LOG_LEVEL:-INFO}` across every InfoTriage container is
+# the intentional operator knob for structured-logging verbosity. This is the
+# same-named var on the host and in the container — the value means the same
+# thing in both contexts, so it's safe for Compose's auto .env substitution.
+# (The HANDOFF-documented anti-pattern is for vars whose host and container
+# meanings DIFFER, e.g. `LLM_BASE_URL` = host:127.0.0.1 vs container:
+# host.docker.internal:8000 — see below for the hardcoded container values).
 services:
   freshrss:
     image: freshrss/freshrss:latest
@@ -8,6 +16,7 @@ services:
     ports:
       - "8088:80"            # http://localhost:8088  (web UI + setup)
     environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       TZ: Europe/Oslo
       # Gentle global cadence so we never hammer a source. FreshRSS fetches feeds
       # one at a time; at 30-min cycles even GDELT (limit 1 req / 5 s) is safe.
@@ -45,6 +54,8 @@ services:
     image: halverneus/static-file-server:latest
     container_name: infotriage-feeds
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:22041:80"   # Atom feed server: localhost:22041
     environment:
       FOLDER: /web
       PORT: "80"
@@ -89,6 +100,7 @@ services:
       - "127.0.0.1:22001:5672"   # AMQP: localhost:22001 → container:5672
       - "127.0.0.1:22002:15672"  # Management UI: localhost:22002 → container:15672
     environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-infotriage}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-infotriage_rmq}
     volumes:
@@ -117,6 +129,7 @@ services:
       - path: .env
         required: false   # .env is gitignored; present on host, not in repo
     environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       INFOTRIAGE_PG_DSN: ${INFOTRIAGE_PG_DSN:-postgresql://infotriage:infotriage_dev@postgres:5432/infotriage}
       INFOTRIAGE_AMQP_DSN: ${INFOTRIAGE_AMQP_DSN:-amqp://infotriage:infotriage_rmq@rabbitmq:5672}
       INFOTRIAGE_BLOB_ROOT: /data/blobs
@@ -151,6 +164,7 @@ services:
       - path: .env
         required: false   # .env is gitignored; present on host, not in repo
     environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       INFOTRIAGE_PG_DSN: ${INFOTRIAGE_PG_DSN:-postgresql://infotriage:infotriage_dev@postgres:5432/infotriage}
       INFOTRIAGE_AMQP_DSN: ${INFOTRIAGE_AMQP_DSN:-amqp://infotriage:infotriage_rmq@rabbitmq:5672}
       INFOTRIAGE_BLOB_ROOT: /data/blobs
@@ -194,6 +208,7 @@ services:
       - path: .env
         required: false   # .env is gitignored; present on host, not in repo
     environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       INFOTRIAGE_PG_DSN: ${INFOTRIAGE_PG_DSN:-postgresql://infotriage:infotriage_dev@postgres:5432/infotriage}
       INFOTRIAGE_AMQP_DSN: ${INFOTRIAGE_AMQP_DSN:-amqp://infotriage:infotriage_rmq@rabbitmq:5672}
       INFOTRIAGE_BLOB_ROOT: /data/blobs
@@ -238,6 +253,7 @@ services:
       - path: .env
         required: false   # .env is gitignored; present on host, not in repo
     environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       INFOTRIAGE_PG_DSN: ${INFOTRIAGE_PG_DSN:-postgresql://infotriage:infotriage_dev@postgres:5432/infotriage}
       INFOTRIAGE_AMQP_DSN: ${INFOTRIAGE_AMQP_DSN:-amqp://infotriage:infotriage_rmq@rabbitmq:5672}
       INFOTRIAGE_BLOB_ROOT: /data/blobs
@@ -272,6 +288,7 @@ services:
       - path: .env
         required: false   # .env is gitignored; present on host, not in repo
     environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       PORT: "3000"
       CLIENT_ID: ${GMAIL_OAUTH2_CLIENT_ID}
       CLIENT_SECRET: ${GMAIL_OAUTH2_CLIENT_SECRET}
@@ -296,6 +313,7 @@ services:
       - path: .env
         required: false   # .env is gitignored; present on host, not in repo
     environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       INFOTRIAGE_PG_DSN: ${INFOTRIAGE_PG_DSN:-postgresql://infotriage:infotriage_dev@postgres:5432/infotriage}
       INFOTRIAGE_AMQP_DSN: ${INFOTRIAGE_AMQP_DSN:-amqp://infotriage:infotriage_rmq@rabbitmq:5672}
       INFOTRIAGE_BLOB_ROOT: /data/blobs
@@ -330,6 +348,7 @@ services:
       - path: .env
         required: false   # .env is gitignored; present on host, not in repo
     environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       INFOTRIAGE_PG_DSN: ${INFOTRIAGE_PG_DSN:-postgresql://infotriage:infotriage_dev@postgres:5432/infotriage}
       INFOTRIAGE_AMQP_DSN: ${INFOTRIAGE_AMQP_DSN:-amqp://infotriage:infotriage_rmq@rabbitmq:5672}
       INFOTRIAGE_BLOB_ROOT: /data/blobs
@@ -364,6 +383,7 @@ services:
       - path: .env
         required: false   # .env is gitignored; present on host, not in repo
     environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       SCHEDULE_IMAP: ${SCHEDULE_IMAP:-0 */2 * * *}
       SCHEDULE_YOUTUBE: ${SCHEDULE_YOUTUBE:-0 */4 * * *}
       SCHEDULE_GMAIL: ${SCHEDULE_GMAIL:-0 */2 * * *}
@@ -397,6 +417,7 @@ services:
       - path: .env
         required: false
     environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       INFOTRIAGE_PG_DSN: ${INFOTRIAGE_PG_DSN:-postgresql://infotriage:infotriage_dev@postgres:5432/infotriage}
       INFOTRIAGE_AMQP_DSN: ${INFOTRIAGE_AMQP_DSN:-amqp://infotriage:infotriage_rmq@rabbitmq:5672}
       INFOTRIAGE_OPML_HEALTH_PORT: "22032"
@@ -414,6 +435,25 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+    networks: [infotriage]
+
+  dlq-consumer:
+    build:
+      context: .
+      dockerfile: apps/dlq_consumer/Dockerfile
+    container_name: infotriage-dlq-consumer
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      INFOTRIAGE_AMQP_DSN: ${INFOTRIAGE_AMQP_DSN:-amqp://infotriage:infotriage_rmq@rabbitmq:5672}
+    volumes:
+      - ./data:/data
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     networks: [infotriage]
 
 networks:

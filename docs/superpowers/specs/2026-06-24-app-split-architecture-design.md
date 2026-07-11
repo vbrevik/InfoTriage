@@ -121,7 +121,7 @@ the ingestion *pattern*, not a one-off.
 
 - **Gmail reality (verified 2026-06-24):** the account has 2-Step Verification ON and app
   passwords are hard-blocked (Advanced Protection / policy) — IMAP+app-password is a dead end.
-  The legacy `bridge/gmail_to_atom.py` IMAP path is therefore **retired** for this account.
+  The legacy Gmail IMAP bridge is therefore **retired** for this account.
 - **Proven path:** Gmail read via OAuth2 MCP works live — a one-time pull through the claude.ai
   Gmail connector produced a valid `data/feeds/gmail.xml` (20 entries) with no app password.
 - **Runtime path (planned):** `ingest-gmail` adapter → **self-hosted Gmail MCP server** (its own

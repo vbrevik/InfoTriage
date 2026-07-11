@@ -9,7 +9,7 @@ COPY libs/store /build/store
 COPY libs/ingest_common /build/ingest_common
 RUN pip install --no-deps /build/contracts /build/store /build/ingest_common
 
-# 2. Install adapter requirements (includes all transitive deps for the above)
+# 2. Install adapter requirements (json-log-formatter is listed in requirements.txt — Phase 7 fix)
 COPY apps/ingest-gmail/requirements.txt .
 RUN pip install -r requirements.txt
 

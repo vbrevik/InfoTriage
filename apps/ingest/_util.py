@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""bridge/_util.py — shared helpers for the three bridge/* entry points.
+"""apps/ingest/_util.py — shared helpers for the bridge entry points.
 
 Routed:
-- bridge/gmail_to_atom.py   (4 call sites: title / id / author / summary)
-- bridge/imap_to_atom.py    (4 call sites, inside write_atom)
-- bridge/yt_to_atom.py      (2 call sites: title + summary)
+- apps/ingest/imap_to_atom.py    (4 call sites, inside write_atom)
+- apps/ingest/yt_to_atom.py      (2 call sites: title + summary)
 
-Why a helper instead of three inline ``html.escape(...)`` calls?
+Why a helper instead of two inline ``html.escape(...)`` calls?
   1. Defense-in-depth — one place owns the Atom-XML escape contract. A future
      policy change (e.g. ``quote=False``, custom ``safe=``) flips for all
      three bridges simultaneously.

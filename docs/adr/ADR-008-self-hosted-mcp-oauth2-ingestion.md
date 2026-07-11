@@ -10,8 +10,8 @@ R1–R5 but is a required ADR deliverable). Continues the ADR lineage in `docs/A
 
 **Context.** InfoTriage ingests from many sources. Some rich sources require **OAuth2** rather than a
 static credential. The target account (Gmail) has **2-Step Verification ON and app passwords
-hard-blocked** (Advanced Protection / policy), so the legacy IMAP + app-password path
-(`bridge/gmail_to_atom.py`) is a dead end and is **retired** for this account. A headless-safe,
+hard-blocked** (Advanced Protection / policy), so the legacy IMAP + app-password path is a dead
+end and is **retired** for this account. A headless-safe,
 durable ingestion path is needed that does not depend on an interactive session.
 
 ---
@@ -40,7 +40,7 @@ MCP servers** running as containers in the stack. The ingest adapter is a thin *
 - **Pattern, not a special case.** New OAuth2 sources are added by standing up another self-hosted
   MCP server + a thin client adapter — uniform across sources.
 - **Phase 4 scope:** containerize the bridges + the self-hosted Gmail MCP server; retire the legacy
-  IMAP `gmail_to_atom.py` for the Gmail account; emit ingested items onto the bus as `item.ingested`
+  Gmail IMAP bridge for the Gmail account; emit ingested items onto the bus as `item.ingested`
   (ADR-007).
 - The interactive claude.ai connector remains a useful verification/dev tool but is explicitly **not**
   part of the production runtime.

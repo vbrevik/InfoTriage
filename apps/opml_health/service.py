@@ -30,7 +30,10 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from contracts import setup_logging
 from fastapi import FastAPI, Response
+
+setup_logging("opml-health")
 
 # --- health-check core (re-uses apps/opml/_check.py helpers) ---
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))

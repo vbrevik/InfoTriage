@@ -23,6 +23,7 @@ import logging
 from collections.abc import Callable, Coroutine
 from typing import Any
 
+from contracts import setup_logging
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
@@ -51,6 +52,8 @@ def make_trigger_app(
           in_flight=False and both proceed past the gate.
         - The flag is cleared in a finally block, so crashes never wedge the lock.
     """
+    setup_logging(name)
+
     app = FastAPI(title=name)
 
     # Single-element dict used as a mutable flag (closure-friendly without nonlocal)

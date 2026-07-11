@@ -3,3 +3,6 @@
 # httpx.Client (SYNC) only — APScheduler 3.x jobs run in threads, no event loop.
 apscheduler>=3.11,<4
 httpx>=0.27
+# contracts.setup_logging is invoked at module level; json-log-formatter is a
+# contracts runtime dep that's stripped by --no-deps in the Dockerfile. (Phase 7)
+json-log-formatter>=1.1

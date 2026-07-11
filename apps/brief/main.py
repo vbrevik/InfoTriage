@@ -30,6 +30,9 @@ from apps.brief.html_renderer import build_html
 from apps.brief.renderer import render_list
 from apps.brief.vault_writer import render_sab_obsidian
 from apps.brief.views import filter_rows
+from contracts import setup_logging
+
+setup_logging("brief")
 
 # Default SAB cutoff now comes from BRIEF_WINDOW_HOURS (rolling window, default 24h).
 # OSLO timezone is used for the period label.
@@ -291,5 +294,4 @@ async def vault(
 if __name__ == "__main__":
     import uvicorn
 
-    logging.basicConfig(level=logging.INFO)
     uvicorn.run(app, host="127.0.0.1", port=22040)

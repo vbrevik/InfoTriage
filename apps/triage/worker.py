@@ -20,10 +20,11 @@ import os
 import urllib.request
 from pathlib import Path
 
-from contracts import RabbitMQBus, VerdictReady
+from contracts import RabbitMQBus, VerdictReady, setup_logging
 from store import PostgresStore
 from triage_score import score_item
 
+setup_logging("triage")
 log = logging.getLogger(__name__)
 
 HEALTH_HOST = "0.0.0.0"
@@ -234,5 +235,4 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
     asyncio.run(main())
