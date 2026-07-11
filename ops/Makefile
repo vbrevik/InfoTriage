@@ -5,6 +5,12 @@ COMPOSE := docker compose
 # Directory of this Makefile (ops/), used to locate compose files regardless of
 # where make is invoked from.
 OPS_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+# Capture the absolute path of THIS Makefile at parse time so `$(MAKE) -f ...`
+# sub-invocations can forward the -f flag explicitly. Make does NOT propagate
+# -f via MAKEFLAGS by design, so recursive make without this would search for a
+# top-level Makefile in the current directory and fail with
+# `No rule to make target `test-full''. (Phase 7 07-03 bug-fix follow-up.)
+OPS_MAKEFILE := $(abspath $(lastword $(MAKEFILE_LIST)))
 ROOT_DIR := $(abspath $(OPS_DIR)/..)
 SCRIPTS_DIR := $(ROOT_DIR)/scripts
 SERVICES := freshrss rssbridge feeds postgres rabbitmq ingest-imap ingest-youtube ingest-gmail ingest-obsidian triage brief scheduler opml-health dlq-consumer
@@ -88,7 +94,7 @@ replay: ## Replay dead-letter queue messages back to original queues
 test-safe: ## Run scripts/check_test_dsn.sh first, then make test-full
 	@bash $(SCRIPTS_DIR)/check_test_dsn.sh
 	@echo "DSN smoke check passed; running full pytest..."
-	$(MAKE) test-full
+	$(MAKE) -f $(OPS_MAKEFILE) test-full
 
 test-full: ## Run the full pytest suite against a throwaway test Postgres container
 	$(COMPOSE) -f $(OPS_DIR)/../docker-compose.test.yml up -d --wait
