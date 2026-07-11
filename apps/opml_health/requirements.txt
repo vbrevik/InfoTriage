@@ -2,3 +2,10 @@ json-log-formatter>=1.1
 httpx>=0.25
 fastapi>=0.104
 uvicorn>=0.24
+# contracts.__init__ eagerly imports ._codec (PyYAML) and ._bus_rabbitmq (aio-pika)
+# even when callers only want setup_logging/LOGGING_CONFIG. The opml health/admin
+# service only needed httpx+fastapi+uvicorn+json-log-formatter until Phase 7 07-02
+# wired in the LOGGING_CONFIG import; the missing transitive deps then crashed the
+# container on first run. (Phase 7 07-03 runtime-deps follow-up.)
+PyYAML>=6.0
+aio-pika>=9.6

@@ -7,15 +7,20 @@ name = "contracts"
 version = "0.1.0"
 description = "InfoTriage shared schemas, codec, and bus interface"
 requires-python = ">=3.11"
-# NOTE: `json-log-formatter` is a contracts.setup_logging runtime dep. Since
-# every apps/* Dockerfile installs this lib with `--no-deps`, the dep does NOT
-# propagate to consumers. Each apps/*/requirements.txt MUST re-list
-# `json-log-formatter>=1.1` to keep structured-logging active. (Phase 7 follow-up
-# fix: 8 of 9 service requirements.txt files were missing it before.)
+
+# Contracts declared transitive deps. All 4 are pulled in eagerly by
+# `contracts/__init__.py` (see: _events → pydantic, _codec → PyYAML,
+# _bus_rabbitmq → aio_pika, _logging → json-log-formatter). Every apps/*
+# Dockerfile installs contracts with `--no-deps`, so the dep list does NOT
+# propagate to consumers. Each apps/*/requirements.txt MUST hand-list the
+# same four deps to avoid ModuleNotFoundError on first run. (Phase 7 07-03
+# follow-up: 3 services — dlq-consumer, opml-health, scheduler — were
+# missing transitive entries and crash-looped immediately.)
 dependencies = [
     "pydantic>=2.0",
     "PyYAML>=6.0",
     "json-log-formatter>=1.1",
+    "aio-pika>=9.6",
 ]
 
 [tool.setuptools.packages.find]

@@ -32,7 +32,7 @@ import datetime
 import json
 import logging
 import os
-from urllib.parse import urlparse
+from urllib.parse import quote as _quote_vhost, urlparse
 
 import aio_pika
 import httpx
@@ -216,7 +216,11 @@ class DLQConsumer:
         )
         mgmt_vhost = mgmt_vhost or os.environ.get("RABBITMQ_MGMT_VHOST", "/")
 
-        full_url = f"{mgmt_url.rstrip('/')}/api/queues/{mgmt_vhost}/{DLQ_NAME}"
+                # The default vhost "/" MUST be URL-encoded as %2F per the RabbitMQ
+        # mgmt-API contract; an unencoded literal "/" yields the malformed
+        # path `/api/queues///<queue>` and a 404. Use safe='' so every char
+        # is encoded (no slashes leak through). (Phase 7 07-03 fix.)
+        full_url = f"{mgmt_url.rstrip('/')}/api/queues/{_quote_vhost(mgmt_vhost, safe='')}/{DLQ_NAME}"
         auth = (mgmt_user, mgmt_pass)
 
         try:
