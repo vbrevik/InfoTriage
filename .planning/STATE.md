@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: M1 ship-gate met (Phase 7 07-01 closed); planning-file commit pending; M1 ship or Phase 8 next
-stopped_at: Phase 7 07-01 verified + reviewed + gap-closure applied; SUMMARY written; code+planning commits pending
-last_updated: "2026-07-11T23:50:00.000Z"
+status: M1 ship-gate met (Phase 7 07-01..07-04 closed); M1 ship or Phase 8 next
+stopped_at: Phase 7 07-02..07-04 closed and verified live; planning sweep complete (this commit)
+last_updated: "2026-07-12T00:00:00.000Z"
 progress:
   total_phases: 13
   completed_phases: 8
@@ -17,6 +17,31 @@ progress:
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-07-12 — Phase 7 07-02..07-04 closure (M1 ship-gate docs)
+
+### Just-completed
+
+- **07-02** (committed `591034d`): closed the 3 M1 known gaps from the 07-01 review — uvicorn JSON access logs via shared `LOGGING_CONFIG` (`libs/contracts/src/contracts/uvicorn-log-config.json` + `uvicorn_log_config.py` wrapper); live RabbitMQ-mgmt queue-depth probe (`apps/dlq_consumer/worker.py`, periodic GET, `feed.unhealthy` on `messages >= DLQ_DEPTH_CRITICAL_N`); `INFOTRIAGE_TEST_DSN` shell-smoke gate (`scripts/check_test_dsn.sh` + `make test-safe`). Pytest 319/0/34. See `.planning/phases/07-ops-cutover/07-02-SUMMARY.md`.
+
+- **07-03** (committed `3da4932` + docs `428f8a9`): live-stack follow-up. After 07-02 made every InfoTriage service actively execute `from contracts import setup_logging` at module-init, three services (`dlq-consumer`, `opml-health`, `scheduler`) crash-looped on missing transitive contracts deps (`pydantic` / `PyYAML` / `aio-pika`). Closed via per-`requirements.txt` hand-listing + `libs/contracts/pyproject.toml` `aio-pika` addition + TOML-grammar fix + `apps/dlq_consumer/worker.py` vhost URL-encoding fix (the `///` → `%2F` mgmt-API correction). Pytest 0 failures. 2-pass code review PASS. See `.planning/phases/07-ops-cutover/07-03-SUMMARY.md`.
+
+- **`b4ee46a` Makefile recursion fix**: detected when running `make -f ops/Makefile test-safe` end-to-end — `$(MAKE) test-full` sub-call failed because Make does NOT propagate `-f` via MAKEFLAGS. Captured the resolved path at parse time via `OPS_MAKEFILE := $(abspath $(lastword $(MAKEFILE_LIST)))` and forwarded `-f $(OPS_MAKEFILE)` explicitly. Full test-safe chain now exits 0 (DSN smoke + 351 pytest pass + teardown).
+
+- **07-04** (committed `f17e644`): `tests/test_dep_list_superset.py` cross-check — every dep declared in `libs/contracts/pyproject.toml` MUST be re-listed in every `apps/*/requirements.txt` that consumes contracts. Detection = union of direct Python import ∪ Dockerfile `libs/contracts`-install ∪ transitive sibling-lib walk. Caught a real defect on first run: `apps/opml_health/requirements.txt` was missing `pydantic>=2.0` since the 07-03 partial patch; bug fixed in the same commit. 2-pass code review PASS. Pytest 328/0/34 (baseline preserved). See `.planning/phases/07-ops-cutover/07-04-SUMMARY.md`.
+
+### M1 ship-gate status
+
+All Phase 7 sub-plans (`07-01` through `07-04`) shipped. Full pytest suite green on the way out (328 pass, 34 skip, 0 fail). `make -f ops/Makefile test-safe` runs the full chain (DSN smoke + pytest container + teardown) and exits 0. **Phase 7 → M1 ship-gate satisfied.**
+
+Local-main sync state:
+- `afab4d9` + `023d9b2` (07-01 ship) → ON `origin/main`
+- `591034d` (07-02 feat), `3da4932` (07-03 fix), `428f8a9` (07-03 docs), `b4ee46a` (Makefile fix), `f17e644` (07-04) → AWAITING PUSH (next-session decision: push, OR begin Phase 8 first).
+- This planning-file sweep commit closes the planning portion of that bundle.
+
+### Next
+
+- **M1 ship or Phase 8 decision** (defensible either way): push the 5 unpushed commits + finalize milestone, OR begin Phase 8 (Entity Resolution) immediately. If going to Phase 8 first, address backlog 999.3 (cross-language entity linking revalidation on mE5-large) per the spike PARTIAL finding.
 
 ## Session: 2026-07-11 — 06-07 gap closure: VAULT_INCLUDE_EMAIL url-scheme fix
 
@@ -48,7 +73,7 @@ progress:
 
 ### Next
 
-- Phase 07 07-01 in progress / complete after verification.
+- See Session: 2026-07-12 (the new top-of-file entry) for the current Phase-7-closed state. The "07-01 in progress" stale-pointer is now resolved.
 
 ## Session: 2026-07-11 — Phase 7 07-01: M1 ship-gate ops
 

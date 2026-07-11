@@ -90,6 +90,8 @@ event-driven (`item.ingested` → mE5-large dedup → qwen36 scoring against `cc
 from production (file preserved for `digest.py` imports); host crontab has no fever entry.
 Shadow-run parity confirmed 14/14 (100%) before cutover (R6). VERIFICATION.md: 27/27 must-haves.
 
+**Phase 7 complete (2026-07-12):** M1 ship-gate met. `apps/dlq_consumer/` live with consecutive-msg counter + live RabbitMQ-mgmt depth probe (formats URLs as `/api/queues/%2F/infotriage.dlq` via `quote(vhost, safe='')`); uvicorn JSON access logs across all 5 uvicorn-running services via shared `LOGGING_CONFIG` (`disable_existing_loggers: false` so `setup_logging()`'s daily-rotating file handler survives); `scripts/check_test_dsn.sh` shell gate + `make test-safe` chains DSN smoke → pytest container → teardown. `tests/test_dep_list_superset.py` (Phase 7 07-04) cross-checks `libs/contracts/pyproject.toml` declared deps ⊇ every consumer `requirements.txt`. Pytest 328/0/34. Local main is 5 commits ahead of origin/main pending push (07-02/07-03-fix/07-03-docs/Makefile-recursion-fix/07-04-test).
+
 **Phase 6 complete (2026-07-11):** `apps/brief/` is the event-driven SAB/digest product at `:22040` —
 `verdict.ready` → enrichment SELECT (LEFT JOIN `infotriage.embeddings`) → semantic pgvector
 clustering (`CLUSTER_THRESHOLD` env-wired end-to-end) → HTML SAB + markdown digest + Obsidian

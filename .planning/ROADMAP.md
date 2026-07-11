@@ -25,10 +25,10 @@ urgent insertions. The all-local-LLM rule (ADR-004) is never revisited by a phas
 - [x] **Phase 3: Bus — RabbitMQ** (M1) - AMQP transport + bus client (completed 2026-06-29)
 - [x] **Phase 4: Ingest adapters + Gmail MCP** (M1) - containerize bridges + self-hosted Gmail MCP (OAuth2) (completed 2026-06-29)
 - [x] **Phase 5: Triage app** (M1) - event-driven scorer + pgvector dedup (completed 2026-07-02)
+- [x] **Phase 7: Ops + cutover** (M1) - health, DLQ, replay, retire host path (completed 2026-07-12; **M1 ship-gate met**)
 - [x] **Phase 6: Brief app** (M1) - SAB renderer + Obsidian vault-writer
 - [x] 06-01-PLAN.md — Renderer library + FastAPI serving layer (Wave 1+2) — 38 tests pass
 - [x] 06-02-PLAN.md — pgvector semantic clustering (replaced keyword-overlap) — 38/38 tests pass
-- [ ] **Phase 7: Ops + cutover** (M1) - health, DLQ, replay, retire host path
 - [ ] **Phase 8: Entity resolution** (M2) - Postgres + pgvector → Obsidian projection
 - [ ] **Phase 9: RAG recall** (M2) - CCIR pre-filter + thematic recall over corpus
 - [ ] **Phase 10: Wiki-LLM** (M2) - standing auto-wiki + on-demand synthesis → Obsidian
@@ -228,6 +228,10 @@ to the running pipeline.
 
 - [x] 07-01-FreshRSS-rss-bridge-ops — done (commit 316a20f + 06-05): FreshRSS OPML imported, NewsAPI feeds throttled to 3h TTL, `apps/ingest/RSS_BRIDGE_NOTES.md` + `tests/test_set_newsapi_ttl.py` added.
 - [x] 07-01-PLAN.md — M1 ship-gate ops: structured logging, DLQ consumer, ops/Makefile, retire host scripts (rolled-up 07-02/07-03/07-04). See `.planning/phases/07-ops-cutover/07-01-PLAN.md`. Implemented 2026-07-11; full pytest suite green (302 passed, 34 skipped).
+- [x] 07-02 (committed `591034d`) — close 3 M1 known gaps: uvicorn JSON access logs via shared `LOGGING_CONFIG` (`libs/contracts/src/contracts/uvicorn-log-config.json` + Python wrapper); live RabbitMQ-mgmt DLQ depth probe (`apps/dlq_consumer/worker.py`, periodic GET, `feed.unhealthy` on `messages >= DLQ_DEPTH_CRITICAL_N`); `INFOTRIAGE_TEST_DSN` shell-smoke (`scripts/check_test_dsn.sh` + `make test-safe`). Pytest 319/0/34 baseline. See `.planning/phases/07-ops-cutover/07-02-SUMMARY.md`.
+- [x] 07-03 (committed `3da4932` + docs `428f8a9`) — live-stack follow-up. After 07-02 made every service `from contracts import setup_logging` actively run at module-init, 3 services crashed on missing transitive contracts deps. Closed via per-`requirements.txt` hand-listing + `libs/contracts/pyproject.toml` `aio-pika` addition + TOML-grammar fix + `apps/dlq_consumer/worker.py` vhost URL-encoding (the `///` → `%2F` mgmt-API fix). Pytest 0 failures; 2-pass review PASS. See `.planning/phases/07-ops-cutover/07-03-SUMMARY.md`.
+- [x] `b4ee46a` — Makefile `-f` forwarding fix (post-07-03 smoke-test catch). Captured `OPS_MAKEFILE := $(abspath $(lastword $(MAKEFILE_LIST)))` at parse time so `make test-safe`'s sub-make forwards `-f`. Full `make -f ops/Makefile test-safe` now exits 0.
+- [x] 07-04 (committed `f17e644`) — `tests/test_dep_list_superset.py` cross-check. Asserts every `[project].dependencies` entry in `libs/contracts/pyproject.toml` is re-listed in every `apps/*/requirements.txt` that consumes contracts. Detection = union of direct Python import ∪ Dockerfile `libs/contracts`-install ∪ transitive sibling-lib walk. Caught `apps/opml_health/requirements.txt` missing `pydantic>=2.0` on first run — fix landed in the same commit. Pytest 328/0/34. See `.planning/phases/07-ops-cutover/07-04-SUMMARY.md`.
 
 ### Phase 8: Entity resolution
 
