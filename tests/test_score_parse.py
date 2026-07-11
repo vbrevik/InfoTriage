@@ -7,6 +7,7 @@ Covers the three payload shapes the LLM can return:
   C: garbage with no braces → fallback dict
 """
 import json
+import logging
 
 import triage_score  # resolved via apps/triage on pythonpath
 
@@ -197,3 +198,59 @@ def test_tessoc_organized_crime_low_score_maybe():
     assert v["bucket"] == "maybe"
     assert v["pmesii"] == "Economic"
     assert v["tessoc"] == "Organized Crime"
+
+
+# -- caplog regression: ccir='none' coercion emits log.warning on drift ----
+
+
+def test_ccir_none_dirty_emits_log_warning(caplog):
+    """ccir=none + non-'none' pmesii/tessoc → triage_score emits log.warning.
+
+    Regression guard for the observability fix that closes the 243008d
+    post-push reviewer's flagged gap (silent coercion masking qwen36
+    prompt drift). Asserts the WARNING-level record carries the PRE-
+    coercion pmesii/tessoc values so the operator can spot drift on
+    the wire before downstream consumers see the cleaned data.
+    """
+    payload = json.dumps({"ccir": "none", "cnr": "none",
+                          "pmesii": "Military", "tessoc": "Espionage",
+                          "score": 4, "why": "not ccir"})
+    with caplog.at_level(logging.WARNING, logger=triage_score.log.name):
+        _score_with(payload)
+    drift_warnings = [
+        r for r in caplog.records
+        if r.levelno == logging.WARNING
+        and "ccir=none" in r.message
+        and "Military" in r.message
+        and "Espionage" in r.message
+    ]
+    assert drift_warnings, (
+        f"expected triage_score WARNING with pre-coercion values, "
+        f"got {[(r.levelname, r.message) for r in caplog.records]}"
+    )
+
+
+def test_ccir_none_clean_stays_silent(caplog):
+    """ccir=none + already-clean enrichment must NOT emit log.warning.
+
+    Regression guard for the same observability fix: when the LLM
+    emits ccir=none alongside already-clean pmesii='none'/tessoc='none',
+    no coercion actually moves the values, so no warning should fire.
+    (The test_garbage_returns_fallback path hits the same ccir=none
+    branch with already-clean values but via the bootstrap dict,
+    not through a real LLM payload.)
+    """
+    payload = json.dumps({"ccir": "none", "cnr": "none",
+                          "pmesii": "none", "tessoc": "none",
+                          "score": 0, "why": "irrelevant"})
+    with caplog.at_level(logging.WARNING, logger=triage_score.log.name):
+        _score_with(payload)
+    drift_warnings = [
+        r for r in caplog.records
+        if r.levelno == logging.WARNING
+        and "triage_score enriched" in r.message
+    ]
+    assert not drift_warnings, (
+        f"expected SILENT on clean ccir=none, "
+        f"got {[(r.levelname, r.message) for r in drift_warnings]}"
+    )
