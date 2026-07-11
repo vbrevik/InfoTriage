@@ -9,3 +9,8 @@ uvicorn>=0.24
 # container on first run. (Phase 7 07-03 runtime-deps follow-up.)
 PyYAML>=6.0
 aio-pika>=9.6
+# contracts.__init__ eagerly imports ._events (pydantic BaseModel FeedUnhealthy),
+# ._codec (PyYAML frontmatter), and ._bus_rabbitmq (aio_pika). opml_health/admin.py
+# `from contracts import setup_logging` brings the whole package in. Phase 7
+# 07-03 missed this entry; the 07-04 dep-list-superset pytest now flags it.
+pydantic>=2.0
