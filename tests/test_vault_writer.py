@@ -45,7 +45,7 @@ def test_extract_entities_with_known_topics():
     entities = extract_entities(text, known_topics=known_topics)
 
     assert "NATO" in entities
-    assert "Norge" in entities or "norge" not in text or "Norge" not in entities
+    assert "Norge" not in entities  # "norge" absent from text
 
 
 def test_render_wikilinked():
