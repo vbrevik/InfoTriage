@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: 06-05 + 06-06 complete; SAB UI polish + FreshRSS/NewsAPI ops done
+status: 06-05 + 06-06 complete; SAB UI polish + FreshRSS/NewsAPI ops done; Phase 6 UAT bug-fix landed
 stopped_at: null
-last_updated: "2026-07-10T00:00:00.000Z"
+last_updated: "2026-07-11T00:00:00.000Z"
 progress:
   total_phases: 13
   completed_phases: 7
@@ -17,6 +17,51 @@ progress:
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-07-11 — Phase 6 UAT bug fix: `digest.line()` `or` short-circuit
+
+### Just-completed
+
+- **Root-caught renderer regression in `apps/brief/renderer.py`.** The
+  `render_brief()` CCIR-iteration path called `digest.line()`
+  (`f"- {v.get('why') or v['title']}..."` from `apps/triage/digest.py`),
+  which short-circuits `title` (and silently drops `score`) whenever
+  `why` is truthy. Visible in the brief app as `- <why>  [les](<url>)`
+  under any CAT_II/ROUTINE section.
+- **Trigger:** re-running the test suite after the COP/CIP view-filter
+  work landed. `tests/test_brief_consumer.py::test_process_verdict_renders_default_cop_cip_files`
+  failed with `AssertionError: assert 'COP Item' in '# InfoTriage · SAB\n_1 saker · ~10 min_\n\n## FFIR-1 · Norsk forsvar & sikkerhetspolitikk\n- Test why  [les](http://example.com)\n'`
+  — note the missing `**[9] COP Item**` prefix.
+- **Fix:** replaced the single `lines.append(_digest_line(lead, extra))`
+  call with inline formatting (matches the existing CAT_I section's
+  style: flag + score + title + why + extra + url). Also deleted
+  pre-existing dead code `_group_by_ccir()` (defined but never called;
+  return shape was broken — it returned a `dict` over a concatenated
+  key seq).
+- **Regression test added:** `tests/test_brief_renderer.py::TestRenderBriefIncludesAllItemFields`
+  — two test methods asserting title/score/why all appear for CAT_II
+  items, and title+score for `Routine` (no-CCIR) items.
+- **Live proof confirmed:** rendered a CAT_II item with
+  `why="Krigsøkonomi under press"`, `title="Russland varsler nye
+  sanksjoner"`, `score=7` through the live `render_brief()` path.
+  Output: `## PIR-1 · Russland / Ukraina\n- **[7] Russland varsler nye
+  sanksjoner** · Krigsøkonomi under press  [les](http://example.com)` —
+  all three fields present.
+- **Full pytest suite:** 280 passed, 34 skipped.
+- **Live UAT re-confirmed:** `uat_test6_cluster_threshold.py` and
+  `uat_test8_semantic.py` both pass after the fix.
+
+### Next
+
+- Continue **Phase 6 UAT** (Tests 4, 5, 7, 9 still pending live
+  verification — the renderer fix unblocks them, but the live
+  republish-to-q.brief / vault-mount / email-in-vault checks still
+  need to be run end-to-end).
+- Commit the uncommitted view-filter pipeline (consumer.py / main.py
+  / vault_writer.py / html_renderer.py) + TESSOC taxonomy work
+  (sab_html.py / triage_score.py / ccir.md per ADR-010) + UAT scripts
+  (uat_test6, uat_test8, seed_sample_data) as a separate focused
+  milestone commit.
 
 ## Session: 2026-07-10 — SAB UI polish + FreshRSS/NewsAPI ops
 

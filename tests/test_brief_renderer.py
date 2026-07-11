@@ -40,7 +40,7 @@ def _make_item(
     source: str = "TestSource",
     url: str = "http://example.com",
     pmesii: str = "Military",
-    tessoc: str = "Equipment",
+    tessoc: str = "Sabotage",
 ) -> dict:
     """Factory for enrichment row dicts."""
     return {
@@ -292,6 +292,50 @@ class TestCnrGrouping(unittest.TestCase):
 
 
 # ---- CCIR_ORDER verification ------------------------------------------------
+
+
+class TestRenderBriefIncludesAllItemFields(unittest.TestCase):
+    """Regression: CAT_II/ROUTINE item lines must include title, score, AND why.
+
+    Previously render_brief() called `digest.line()` in the CCIR-iteration path,
+    which formats as `f"- {why or title}  [les](url)"` — when `why` is truthy,
+    `or` short-circuits and `title` is dropped. The rendered line was:
+    `- <why>  [les](<url>)` — no score, no title.
+    """
+
+    def test_cat_ii_line_includes_title_score_and_why(self):
+        items = [
+            _make_item(
+                item_id="cat-ii-1",
+                ccir="PIR-1",
+                cnr="II",
+                score=7,
+                title="Russland varsler nye sanksjoner",
+                why="Krigsøkonomi under press",
+            ),
+        ]
+        output = render_brief(items)
+        # Title must be present (the bug dropped it).
+        self.assertIn("Russland varsler nye sanksjoner", output)
+        # Score must be present (the bug dropped it via the `_digest_line` path).
+        self.assertIn("[7]", output)
+        # Why must be present (still useful to the operator).
+        self.assertIn("Krigsøkonomi under press", output)
+
+    def test_routine_no_ccir_line_includes_title(self):
+        items = [
+            _make_item(
+                item_id="routine-1",
+                ccir="none",
+                cnr="none",
+                score=3,
+                title="Lokal nyhet utenriks",
+                why="Bakgrunn på saken",
+            ),
+        ]
+        output = render_brief(items)
+        self.assertIn("Lokal nyhet utenriks", output)
+        self.assertIn("[3]", output)
 
 
 class TestCcirOrder(unittest.TestCase):

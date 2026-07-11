@@ -25,7 +25,7 @@ from typing import Optional
 
 # Import CCIR_ORDER from digest.py — never redefine here
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "triage"))
-from digest import CCIR_ORDER, line as _digest_line  # noqa: E402
+from digest import CCIR_ORDER  # noqa: E402
 from apps.brief.clustering import cluster_items_in_memory, EnrichedItem  # noqa: E402
 
 # LLM import for BLUF synthesis
@@ -77,27 +77,6 @@ def _group_by_cnr_and_ccir(rows: list[dict], ccir_order: list[tuple[str, str]]) 
         "CAT_II": cat_ii,
         "ROUTINE": routine,
     }
-
-
-def _group_by_ccir(rows: list[dict], ccir_order: list[tuple[str, str]]) -> dict[str, list[dict]]:
-    """Group rows by CCIR section, preserving CCIR_ORDER."""
-    title_map = dict(ccir_order)
-    by_ccir: dict[str, list[dict]] = {}
-    for r in rows:
-        key = (r.get("ccir") or "none").upper()
-        by_ccir.setdefault(key, []).append(r)
-    # Return in CCIR_ORDER, then any extras
-    ordered: list[dict] = []
-    for cid, _ in ccir_order:
-        if cid in by_ccir:
-            ordered.extend(by_ccir[cid])
-    # Add any CCIRs not in the order
-    for cid, items in by_ccir.items():
-        if not any(cid == co[0] for co in ccir_order):
-            ordered.extend(items)
-    return dict(zip(ccir_order + tuple(cid for cid in by_ccir if cid not in dict(ccir_order)),
-                    [by_ccir.get(ccid, []) for ccid, _ in ccir_order] +
-                    [by_ccir[cid] for cid in by_ccir if cid not in dict(ccir_order)]))
 
 
 def _rows_to_enriched_items(rows: list[dict]) -> list[EnrichedItem]:
@@ -234,7 +213,14 @@ def render_brief(
                 lead = max(cl["items"], key=lambda i: i.get("score", 0))
                 srcs = sorted({i.get("source", "") for i in cl["items"]})
                 extra = f"  _({len(cl['items'])} kilder)_" if len(cl["items"]) > 1 else ""
-                lines.append(_digest_line(lead, extra))
+                flag = "🚩 " if any(i.get("cnr") == "I" for i in cl["items"]) else ""
+                why_str = f" · {lead.get('why', '')}" if lead.get("why") else ""
+                # Inline format (NOT digest.line(): it uses `why or title`,
+                # dropping the title whenever why is truthy).
+                lines.append(
+                    f"- {flag}**[{lead.get('score')}] {lead.get('title','')}**{why_str}{extra}"
+                    f"  [les]({lead.get('url','')})"
+                )
             lines.append("")
     
     # Routine without CCIR
