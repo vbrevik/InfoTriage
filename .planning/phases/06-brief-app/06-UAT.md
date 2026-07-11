@@ -1,9 +1,9 @@
 ---
-status: diagnosed
+status: resolved
 phase: 06-brief-app
 source: 06-01-SUMMARY.md, 06-02-SUMMARY.md, 06-03-SUMMARY.md, 06-04-SUMMARY.md, 06-05-SUMMARY.md, 06-06-SUMMARY.md
 started: 2026-07-11T21:00:00Z
-updated: 2026-07-11T21:45:00Z
+updated: 2026-07-11T22:45:00Z
 ---
 
 ## Current Test
@@ -91,7 +91,8 @@ skipped: 0
 ## Gaps
 
 - truth: "VAULT_INCLUDE_EMAIL=0 excludes email-sourced items from vault output"
-  status: failed
+  status: resolved
+  resolution: "Plan 06-07 (commits d7dba4a/8ef54ee): exclusion now matches url schemes _EMAIL_URL_SCHEMES=('imap://','gmail://') against r['url'] instead of source field. 4 production-shaped regression tests added; re-verification passed 15/15 (06-VERIFICATION.md)."
   reason: "User-run live test: production email rows carry source='gmail' with the imap URI in the url field, but the exclusion filter matches source.startswith('imap://') — it can never fire on real data. Exclusion currently works only for the synthetic source='imap://…' shape."
   severity: major
   test: 6

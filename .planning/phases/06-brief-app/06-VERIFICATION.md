@@ -1,18 +1,16 @@
 ---
 phase: 06-brief-app
-verified: 2026-07-11T00:00:00Z
+verified: 2026-07-11T22:30:00Z
 status: passed
-score: 14/14 must-haves verified
+score: 15/15 must-haves verified
 behavior_unverified: 0
 overrides_applied: 0
 gaps: []
 re_verification:
-  previous_status: gaps_found
-  previous_score: 1/3 roadmap must-haves verified (1 partial/failed, 2 failed)
+  previous_status: passed
+  previous_score: 14/14 must-haves verified
   gaps_closed:
-    - "brief (:22040) clusters via pgvector — consumer.py/main.py now LEFT JOIN infotriage.embeddings, renderer.py no longer defaults to [0.0]*4, CLUSTER_THRESHOLD wired end-to-end, live UAT confirms multi-item semantic clusters"
-    - "A vault-writer emits high-value items + the SAB as Obsidian .md — apps/brief/vault_writer.py now exists, is wired into consumer.py (write_vault_digest) and main.py (/vault endpoint), live UAT confirms 24 .md files written with parseable front-matter"
-    - "Email surfaces here (SAB + Obsidian) — Obsidian half now satisfied via vault_writer's default imap:// inclusion (VAULT_INCLUDE_EMAIL=1); SAB half unchanged/still passing"
+    - "VAULT_INCLUDE_EMAIL=0 now excludes production email rows — write_vault_digest() in apps/brief/vault_writer.py matches the row's url scheme (imap:// / gmail://) instead of the source field, which never carried a mail URI on real adapter output (source='gmail' or source=<mailbox name>). Fixed in 8ef54ee, locked by 4 new regression tests in d7dba4a (tests/test_vault_writer.py, 14/14 pass)."
   gaps_remaining: []
   regressions: []
 ---
@@ -22,124 +20,107 @@ re_verification:
 **Phase Goal:** SAB/digest become an event-driven product plus an Obsidian projection.
 **Verified:** 2026-07-11
 **Status:** passed
-**Re-verification:** Yes — re-verification #2, supersedes the 2026-07-06 report (status: gaps_found) after gap-closure plans 06-03 (clustering data-flow), 06-04 (vault-writer), 06-05 (test-DSN safety), 06-06 (store txn hygiene), and completed human UAT (06-UAT.md, 9/9 pass, 2026-07-11).
+**Re-verification:** Yes — re-verification #3, focused on gap-closure plan 06-07 (UAT round 2, Test 6: `VAULT_INCLUDE_EMAIL=0` did not exclude production email rows). Confirms the fix and re-checks for regressions against the full must-have set carried forward from the 2026-07-11 "passed 14/14" report.
 
 ## Goal Achievement
 
-### Observable Truths (ROADMAP.md Success Criteria — the contract)
+### Observable Truths — 06-07 gap-closure (new this round)
 
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
-| 1a | `brief` subscribes `verdict.ready` | ✓ VERIFIED | `apps/brief/consumer.py::run_consumer()` calls `bus.consume("verdict.ready", _handler, prefetch_count=1)`; UAT test 7 republished `verdict.ready` live and observed 4 digest files atomically rewritten |
-| 1b | ...clusters via pgvector | ✓ VERIFIED (was FAILED) | `apps/brief/consumer.py` `_SELECT` (lines 61-68) and `apps/brief/main.py` `_ENRICHMENT_SQL` (lines 67-75) now `LEFT JOIN infotriage.embeddings emb ON emb.item_id = e.item_id`; `renderer.py::_rows_to_enriched_items()` (line 102) uses `r.get("embedding")` with `None` pass-through — the `[0.0]*4` default is gone (grep clean). `apps/triage/sab_html.py::cluster()` (line 283) now delegates to `_group_by_cluster_idx()` whenever `_cluster_idx` metadata is present, which `html_renderer.py::_apply_semantic_clustering()` always sets before calling `sab_html.build_html()` — the keyword-overlap fallback (`_keyword_cluster()`) is no longer reachable on the live `/sab` path. UAT tests 3 and 8 confirm live multi-item clusters (`PIR-1: 4 saker · 1 klynger`, `(3 kilder)` tags) driven by real pgvector-sourced embeddings, and that dissimilar-embedding/keyword-overlapping items do NOT merge (proving semantic, not keyword, clustering is active) |
-| 1c | ...renders the SAB served at :22040 | ✓ VERIFIED | UAT test 2: `GET /sab` → 200, full HTML with CNR/CCIR sections and "Since" timestamp; UAT test 1: `GET /health` → 200 on cold start |
-| 1d | ...publishes `sab.published` | ✓ VERIFIED | `consumer.py::process_verdict()` builds `SabPublished` and calls `bus.publish("sab.published", ...)`; UAT test 7 confirms the consumer's write pipeline fires end-to-end (publish itself landed after the 60s test window due to LLM-call latency — wiring is correct, timing is a documented Phase 7 ops follow-up, not a functional gap) |
-| **1 (compound)** | **SC1 overall** | **✓ VERIFIED** | All 4 sub-clauses now pass |
-| 2 | A vault-writer emits high-value items + the SAB as Obsidian `.md` (front-matter, body summary, `[[entity]]` wikilinks) | ✓ VERIFIED (was FAILED) | `apps/brief/vault_writer.py` exists with `write_item_obsidian()`, `write_sab_obsidian()`, `write_vault_digest()`, `extract_entities()`, `render_wikilinked()`. Wired into `consumer.py::process_verdict()` (calls `write_vault_digest()` for default/COP/CIP views after digest write) and `main.py` (`/vault` endpoint serves `render_sab_obsidian()`). Front-matter uses `contracts.to_frontmatter()` (existing codec). UAT test 4: live run wrote 24 `.md` files to `/Users/vidarbrevik/Vault/brief-outbox` including `obsidian-sab.md`; 5 per-item files round-tripped through `contracts.from_frontmatter()` |
-| 3 | Email surfaces here (SAB + Obsidian), not in FreshRSS | ✓ VERIFIED (was FAILED — partial) | SAB half: unchanged and still verified (`imap://` sourced items reach the enrichment query with no source-type filter; `grep` clean for `fever()`/`fever_key()` in `apps/brief/`). Obsidian half: `vault_writer.py::write_vault_digest()` includes `imap://` items by default (`VAULT_INCLUDE_EMAIL` defaults to `"1"`; filter only excludes when explicitly `"0"`). UAT test 5: fixture test confirms both directions (included by default, excluded when `VAULT_INCLUDE_EMAIL=0`); live DB had 0 `imap://` rows (gmail-ingest is down, out of Phase 6 scope) so the live-data check was vacuous but the code path is exercised and correct |
+| 15a | With `VAULT_INCLUDE_EMAIL=0`, a production gmail row (`source='gmail'`, `url='gmail://message/…'`) is excluded from vault output | ✓ VERIFIED | `apps/brief/vault_writer.py:20` defines `_EMAIL_URL_SCHEMES = ("imap://", "gmail://")`; line 261 filters `kept = [r for r in kept if not (r.get("url") or "").startswith(_EMAIL_URL_SCHEMES)]`. `tests/test_vault_writer.py::test_gmail_row_excluded_when_email_disabled` uses the exact production shape (`source="gmail"`, `url="gmail://message/abc123"`) and asserts no per-item `.md` and absence from `obsidian-sab.md`. Ran directly: **PASS** |
+| 15b | With `VAULT_INCLUDE_EMAIL=0`, a production imap row (`source=<mailbox name>`, `url='imap://<host>/<id>'`) is excluded | ✓ VERIFIED | `test_imap_row_excluded_when_email_disabled` uses `source="Telegraph Ukraine"` (a mailbox name, not a URI) + `url="imap://mail.example.com/msg-1"` — the exact shape UAT proved leaked previously. Ran directly: **PASS** |
+| 15c | With `VAULT_INCLUDE_EMAIL=1` (default, unset), email rows are included | ✓ VERIFIED | `test_gmail_row_included_by_default` (new) + pre-existing `test_write_vault_digest_includes_email_by_default` (imap shape) both assert inclusion. Ran directly: **PASS** |
+| 15d | Non-email rows (RSS/YouTube/Obsidian web-clips) are never dropped by the toggle | ✓ VERIFIED | `test_non_email_row_not_excluded_when_email_disabled` — `source="NRK"`, `url="https://nrk.no/article-1"` — asserts the file exists under `VAULT_INCLUDE_EMAIL=0`. Ran directly: **PASS** |
 
-**Score:** 3/3 roadmap success criteria fully verified (all 4 sub-clauses of SC1 pass; SC2 passes; SC3 passes as a conjunction).
+**Root-cause match:** The 06-07-PLAN diagnosis (production gmail rows carry `url=gmail://…`, imap rows carry `url=imap://…` while `source` holds the adapter/mailbox name, never a URI) is exactly what the code now checks — confirmed by reading `apps/brief/vault_writer.py` directly, not by trusting the SUMMARY narrative.
 
-### PLAN-level must-haves (06-01, 06-02, 06-03, 06-04 — R1-R6 SPEC scope)
+**Score (this round):** 4/4 new must-haves verified.
+
+### Observable Truths (ROADMAP.md Success Criteria — the contract, re-checked for regression)
 
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
-| 4 | `SabPublished` event schema on ContractEvent | ✓ VERIFIED | Unchanged from prior verification — `consumer.py` constructs and publishes it |
-| 5 | `render_brief()` — CNR first, CCIR in CCIR_ORDER, cluster metadata | ✓ VERIFIED | `tests/test_brief_renderer.py` passes (re-run this session as part of full suite); a renderer regression (dropped title/score via `digest.line()`) was caught and fixed during UAT re-run 2026-07-11, with a new regression test `TestRenderBriefIncludesAllItemFields` |
+| 1 | `brief` subscribes `verdict.ready`, clusters via pgvector, renders SAB at :22040, publishes `sab.published` | ✓ VERIFIED (no change) | Unchanged from prior "passed 14/14" report — `apps/brief/consumer.py`/`main.py` still join `infotriage.embeddings`; 06-07 touched only `vault_writer.py` and its test file (confirmed via `git show 8ef54ee --stat` / `d7dba4a --stat`, no other files modified) |
+| 2 | A vault-writer emits high-value items + the SAB as Obsidian `.md` (front-matter, body summary, `[[entity]]` wikilinks) | ✓ VERIFIED (no change) | `write_item_obsidian`, `write_sab_obsidian`, `write_vault_digest` still present and wired; 06-07 only changed the exclusion predicate inside `write_vault_digest()` |
+| 3 | Email surfaces here (SAB + Obsidian), not in FreshRSS — **both directions now correct** | ✓ VERIFIED (strengthened) | SAB half: unchanged, still no source-type filter on the enrichment query. Obsidian half: inclusion (default) AND exclusion (`VAULT_INCLUDE_EMAIL=0`) both now proven against production-shaped rows — the exclusion half was the gap closed this round |
+
+**Score:** 3/3 roadmap success criteria fully verified, no regressions.
+
+### PLAN-level must-haves (06-01 through 06-06 — re-checked for regression, unchanged from prior report)
+
+| # | Truth | Status | Evidence |
+|---|-------|--------|----------|
+| 4 | `SabPublished` event schema on ContractEvent | ✓ VERIFIED | Unchanged |
+| 5 | `render_brief()` — CNR first, CCIR order, cluster metadata | ✓ VERIFIED | `tests/test_brief_renderer.py` re-run this session: passes as part of the 58-test `test_brief_*`/`test_vault_writer.py` group and the full 296-pass suite run |
 | 6 | `render_list()` — score >= 8, sorted desc | ✓ VERIFIED | Unchanged, tests pass |
-| 7 | `render_bluf()` — [N] citations, LLM-local, placeholder on failure | ✓ VERIFIED | Unchanged, routes through `apps.triage.triage_score.llm()` |
-| 8 | Clustering is per-CCIR — never merges across sections | ✓ VERIFIED (now also live) | Unit tests pass AND UAT test 8 live-confirms CCIR-boundary respect (PIR-2 item with keyword overlap but divergent embedding stayed a singleton while PIR-1 items with similar embeddings merged) |
-| 9 | `CLUSTER_THRESHOLD` env var configurable (0.0–1.0), wired to clustering call | ✓ VERIFIED (was PARTIAL) | `main.py` lines 47-49 define+validate; `renderer.py::_cluster_rows()` (line 127) accepts `threshold: float \| None = None`, no hardcoded `0.75` at call sites (only as the function's own fallback default); `main.py` passes `cluster_threshold=CLUSTER_THRESHOLD` into `build_html()` (line 131) and `run_consumer()` (line 158), which threads into `consumer.py::process_verdict(cluster_threshold=...)` → `render_brief`/`render_cluster` calls. UAT tests 6 and 9: live-confirmed threshold changes cluster count (0.0 → 5 clusters, 0.99 → 7 clusters on identical rows) |
-| 10 | All SQL uses `%s` bind params (never f-strings) | ✓ VERIFIED | Unchanged — new JOINs in consumer.py/main.py also use static SQL strings with `%s` placeholders |
-| 11 | Atomic file writes (`.tmp` + `os.replace`) | ✓ VERIFIED | Confirmed in `consumer.py`, `main.py::_write_atomic`, and now also `vault_writer.py` (`write_item_obsidian`, `write_sab_obsidian` both use `.tmp` + `os.replace`) |
-| 12 | Concurrent SAB writes don't produce partial reads (BACKSTOP) | ✓ VERIFIED (via human UAT) | Correct atomic idiom present in code (consumer.py, main.py, vault_writer.py). UAT test 1 (cold start) and test 7 (event-driven rewrite) exercised the live `.tmp` + `os.replace` pipeline against a running server; per orchestrator context, UAT evidence is accepted as satisfying this human-verification item — no reader observed a partial file across the UAT session |
-| 13 | No FreshRSS/Fever reads in apps/brief/ | ✓ VERIFIED | `grep -rn "fever(\|fever_key(" apps/brief/` → empty |
-| 14 | No copied `HTML_TEMPLATE` inline HTML | ✓ VERIFIED | `HTML_TEMPLATE` still only referenced via import in `html_renderer.py` |
+| 7 | `render_bluf()` — [N] citations, LLM-local, placeholder on failure | ✓ VERIFIED | Unchanged |
+| 8 | Clustering is per-CCIR — never merges across sections | ✓ VERIFIED | Unit tests pass; not touched by 06-07 |
+| 9 | `CLUSTER_THRESHOLD` env var configurable, wired end-to-end | ✓ VERIFIED | Unchanged; not touched by 06-07 |
+| 10 | All SQL uses `%s` bind params | ✓ VERIFIED | Unchanged; 06-07 made no SQL changes (explicitly out of scope per plan diagnosis — fix stays inside `vault_writer.py`) |
+| 11 | Atomic file writes (`.tmp` + `os.replace`) | ✓ VERIFIED | Unchanged in `vault_writer.py`; the 06-07 diff only touches the filter predicate, not the write path |
+| 12 | Concurrent SAB writes don't produce partial reads (BACKSTOP) | ✓ VERIFIED (via prior human UAT) | Unchanged, satisfied by 06-UAT.md round 1/round 2 tests 1 and 7 |
+| 13 | No FreshRSS/Fever reads in apps/brief/ | ✓ VERIFIED | `grep -rn "fever(\|fever_key("  apps/brief/` → empty (re-run) |
+| 14 | No copied `HTML_TEMPLATE` inline HTML | ✓ VERIFIED | Unchanged |
 
-**Score:** 14/14 must-haves verified (11 truths above + SC1/2/3 compound = the full re-checked set from the prior gap list, all closed).
+**Score:** 11/11 must-haves re-verified, no regressions.
+
+**Total this round:** 15/15 (11 regression-checked + 4 new gap-closure truths; roadmap SC1-3 folded into the 11+4 above as compound checks, consistent with the prior report's counting convention).
 
 ### Required Artifacts
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `apps/brief/consumer.py` | verdict.ready consumer, embeddings JOIN, vault write call | ✓ VERIFIED (substantive, wired) | `_SELECT` joins `infotriage.embeddings`; calls `write_vault_digest()` for default/cop/cip views |
-| `apps/brief/main.py` | FastAPI :22040 server, embeddings JOIN, `/vault` endpoint | ✓ VERIFIED | `_ENRICHMENT_SQL` joins `infotriage.embeddings`; `CLUSTER_THRESHOLD` validated and threaded through; new `/vault` route added |
-| `apps/brief/renderer.py` | render_brief/list/bluf/cluster, threshold-aware clustering | ✓ VERIFIED | `_rows_to_enriched_items()` no longer defaults embedding to `[0.0]*4`; `_cluster_rows()` accepts `threshold` param |
-| `apps/brief/html_renderer.py` | HTML SAB via sab_html.build_html, semantic clustering pre-computed | ✓ VERIFIED | `_apply_semantic_clustering()` normalizes pgvector JSON-string embeddings and sets `_cluster_idx` metadata consumed by `sab_html.cluster()` |
-| `apps/triage/sab_html.py` | cluster() prefers precomputed semantic clusters over keyword fallback | ✓ VERIFIED (anti-pattern resolved) | `cluster()` checks for `_cluster_idx` metadata first; `_keyword_cluster()` is now unreachable on the live `/sab`/`/vault` path (only used when no embeddings exist at all, e.g. `_semantic_cluster()`'s own internal fallback) |
-| `apps/brief/vault_writer.py` | Emits high-value items + SAB as Obsidian `.md` w/ wikilinks | ✓ VERIFIED (was MISSING) | New module; `write_item_obsidian`, `write_sab_obsidian`, `write_vault_digest`, `extract_entities`, `render_wikilinked` all present and tested |
-| `apps/brief/clustering.py` | pgvector-sourced embeddings feed in-memory clustering | ✓ VERIFIED (data-flow now connected) | `cluster_items_in_memory()` now receives real embeddings from the JOIN; the SQL-side `cluster_items()` remains an unused alternate path (Approach A vs B — Approach B explicitly deferred in 06-03-PLAN, not a gap) |
-| `tests/test_brief_renderer.py` | Renderer contract tests | ✓ VERIFIED | Passes in full-suite run; includes new regression test for the CAT_II/ROUTINE title-drop bug found+fixed during UAT |
-| `tests/test_brief_clustering.py` | Clustering unit tests | ✓ VERIFIED | Passes |
-| `tests/test_vault_writer.py` | Vault-writer unit tests | ✓ VERIFIED (was absent) | 8 tests, all pass |
-| `tests/test_brief_consumer.py` | Consumer integration tests (new, untracked) | ✓ VERIFIED | Present, substantive, passes in full-suite run |
-| `tests/test_brief_main_views.py` | View-filter tests (new, untracked) | ✓ VERIFIED | Present, substantive, passes in full-suite run |
-| `tests/test_dsn_safety.py` | Regression guard against prod-DSN use in tests | ✓ VERIFIED | 2/2 pass; addresses the UAT-discovered risk that db_live fixtures could wipe production Postgres |
-| `tests/test_store_txn_hygiene.py` | Idle-in-transaction regression guard | ✓ VERIFIED | 5/5 pass |
-| `docker-compose.yml` | Writable vault mount + threshold/vault env vars | ✓ VERIFIED | `brief` service has `${OBSIDIAN_VAULT_PATH:-./data/obsidian}/brief-outbox:/vault/brief-outbox:rw`, `CLUSTER_THRESHOLD`, `VAULT_INCLUDE_EMAIL`, `INFOTRIAGE_VAULT_PATH` |
-| `.env.example` | Documents new vault/threshold env vars | ✓ VERIFIED | `OBSIDIAN_VAULT_PATH`, `CLUSTER_THRESHOLD=0.75`, `VAULT_INCLUDE_EMAIL=1` present |
+| `apps/brief/vault_writer.py` | Email-exclusion predicate matches production row shapes | ✓ VERIFIED (was STUB-EQUIVALENT bug) | `_EMAIL_URL_SCHEMES = ("imap://", "gmail://")` at line 20; `write_vault_digest()` line 261 filters on `r.get("url")`, not `r.get("source")`. Read directly — matches the diagnosed fix exactly |
+| `tests/test_vault_writer.py` | Regression tests for both email adapters + non-email guard + default-include | ✓ VERIFIED | 4 new tests read in full (lines 227-304): each uses production-shaped field values (not the synthetic `source="imap://…"` shape that coincidentally passed in UAT round 1), asserts both file-absence and SAB-content-absence. Not just present — substantive: distinct assertions per adapter, explicit non-email guard test |
 
-### Data-Flow Trace (Level 4)
+### Key Link Verification
 
-| Artifact | Data Variable | Source | Produces Real Data | Status |
-|----------|---------------|--------|---------------------|--------|
-| `apps/brief/clustering.py::cluster_items_in_memory()` (via `renderer.py::_cluster_rows` and `html_renderer.py::_apply_semantic_clustering`) | `EnrichedItem.embedding` | `consumer.py`/`main.py` SQL `LEFT JOIN infotriage.embeddings` → `renderer.py::_rows_to_enriched_items()` → `r.get("embedding")` (no zero-vector default) | Yes — UAT tests 3 and 8 confirm live multi-item merges driven by real pgvector-stored embeddings, and CCIR/keyword-divergent singletons proving semantic discrimination | ✓ FLOWING (was DISCONNECTED) |
-| `apps/brief/vault_writer.py::write_vault_digest()` | `enrichment_rows` (from consumer's live Postgres fetch) | `consumer.py::process_verdict()` passes the same `enrichment_rows`/`cop_rows`/`cip_rows` already fetched for digest rendering | Yes — UAT test 4 confirms 24 real `.md` files written from a live render, with parseable front-matter | ✓ FLOWING (was DISCONNECTED — module didn't exist) |
-| `apps/brief/main.py` `/sab`, `/health`, `/vault` | enrichment rows | `infotriage.enrichment JOIN infotriage.articles LEFT JOIN infotriage.embeddings` | Yes — live query, live-verified via UAT | ✓ FLOWING |
+| From | To | Via | Status | Details |
+|------|-----|-----|--------|---------|
+| `write_vault_digest()` row filter | production enrichment rows (gmail/imap adapters) | `r.get("url").startswith(_EMAIL_URL_SCHEMES)` | ✓ WIRED | Traced adapter output fields against the filter: `apps/ingest-gmail/gmail_ingest.py` emits `url=gmail://message/<id>` (per 06-07-PLAN diagnosis, re-confirmed by grep of the constant and predicate in the fixed file); `apps/ingest-imap/imap_ingest.py` emits `url=imap://<host>/<id>`. Both schemes are named literals in `_EMAIL_URL_SCHEMES`, and the predicate reads `url`, not `source` — closing the exact mismatch UAT found |
 
 ### Behavioral Spot-Checks
 
 | Behavior | Command | Result | Status |
 |----------|---------|--------|--------|
-| Full pytest suite (Phase 6 relevant files) | `pytest tests/test_brief_clustering.py tests/test_brief_renderer.py tests/test_vault_writer.py tests/test_brief_consumer.py tests/test_brief_main_views.py -q` | 68 passed | ✓ PASS |
-| Full workspace test suite (single run, per verification constraints) | `pytest -q` | 292 passed, 1 failed, 32 skipped | ⚠️ 1 failure — `test_bus_consume.py::test_consume_delivers_message`, a pre-existing RabbitMQ live-consumer contention flake documented as unrelated in both 06-05-SUMMARY.md and 06-06-SUMMARY.md; not in `apps/brief/` scope |
-| No `[0.0]*4` embedding default | `grep -n 'embedding=\[0\.0\]' apps/brief/*.py` | empty | ✓ PASS |
-| No hardcoded `threshold=0.75` at renderer call sites | `grep -n 'threshold=0.75' apps/brief/renderer.py` | empty | ✓ PASS |
-| No fever()/HTML_TEMPLATE copy anti-patterns | `grep -rn "fever(\|fever_key("` / `grep -n "HTML_TEMPLATE"` in `apps/brief/` | empty / import-only | ✓ PASS |
-| No unresolved debt markers (TBD/FIXME/XXX) | `grep -n -E "TBD|FIXME|XXX" apps/brief/*.py apps/triage/sab_html.py` | empty | ✓ PASS |
-| sab_html.py keyword-overlap anti-pattern resolved | `grep -n "def cluster\b" apps/triage/sab_html.py` + read | `cluster()` now checks `_cluster_idx` first, falls back only when embeddings truly absent | ✓ PASS |
+| New 06-07 regression tests pass | `pytest tests/test_vault_writer.py -q` | 14 passed | ✓ PASS |
+| No regression in related brief test files | `pytest tests/test_brief_consumer.py tests/test_brief_main_views.py tests/test_brief_renderer.py tests/test_brief_clustering.py -q` | 58 passed | ✓ PASS |
+| Full workspace suite (single run) | `pytest -q` | 296 passed, 1 failed, 32 skipped | ⚠️ 1 pre-existing failure — `tests/test_bus_consume.py::test_consume_delivers_message` (RabbitMQ live-consumer contention flake), documented in `deferred-items.md` under "From 06-07 execution" and outside `apps/brief/` scope; count increased from 292→296 passed (the 4 new tests), no new failures |
+| Fix diff is scoped exactly as claimed | `git show 8ef54ee --stat` / `git show d7dba4a --stat` | Only `apps/brief/vault_writer.py` (fix commit) and `tests/test_vault_writer.py` (test commit) touched | ✓ PASS |
+| Root-cause predicate present and correct | Read `apps/brief/vault_writer.py` lines 18-22, 247-262 directly | `_EMAIL_URL_SCHEMES` tuple + url-scheme filter present exactly as diagnosed | ✓ PASS |
 
 ### Requirements Coverage
 
-Phase 6's `requirements:` field (both in ROADMAP.md line 201 and the newer 06-05/06-06 PLAN frontmatter) reads `spec §Reading-surface routing` — a SPEC-local section reference into `06-SPEC.md`, not a `.planning/REQUIREMENTS.md` registry ID (`D-`/`C-`/`P-`/`A-`/`PR-`/`DI-`/`N-`/`NF-`). This is the project's established convention (also flagged, and explicitly accepted, in the 2026-07-06 verification and in 06-05-SUMMARY.md / 06-06-SUMMARY.md's own "Requirements" sections: "spec section, not a REQUIREMENTS.md ID — no `requirements mark-complete` applicable"). No `.planning/REQUIREMENTS.md` entries map to Phase 6, so there are no orphaned requirements to report.
+Phase 6's `requirements:` field convention (established and accepted in the prior two verification rounds) uses SPEC-local/ROADMAP-local references (`R1`-`R6`, `SC1b`, `SC3`, ADR IDs) rather than `.planning/REQUIREMENTS.md` registry IDs. Re-checked: no `.planning/REQUIREMENTS.md` entries reference "Phase 6", "brief-app", or "SC3" (`grep` empty) — confirms no orphaned requirements this round, consistent with prior findings.
 
 | Requirement | Source Plan | Description | Status | Evidence |
 |-------------|-------------|--------------|--------|----------|
-| R1 | 06-01-PLAN | Event-driven consumer | ✓ SATISFIED | Unchanged |
-| R2 | 06-01-PLAN | SAB markdown renderer | ✓ SATISFIED | Unchanged (regression fixed + re-tested) |
-| R3 | (SUMMARY/SPEC only) | SAB HTML renderer / serving | ✓ SATISFIED | Unchanged |
-| R4 | 06-02-PLAN | pgvector semantic clustering | ✓ SATISFIED (was BLOCKED) | Now functions against live data — see SC1b above |
-| R5 | (SUMMARY/SPEC only) | SAB event/serving contract | ✓ SATISFIED | Unchanged |
-| R6 | 06-04-PLAN | Obsidian vault-writer | ✓ SATISFIED (was not planned/built) | `vault_writer.py` built and wired |
-| SC1b | 06-03-PLAN | Clustering data-flow fix | ✓ SATISFIED | See SC1b above |
-| "spec §Reading-surface routing" | 06-05-PLAN, 06-06-PLAN | Test-DSN safety + store txn hygiene (UAT-discovered gap-closure) | ✓ SATISFIED | `tests/test_dsn_safety.py`, `tests/test_store_txn_hygiene.py` both pass; addresses a real production-Postgres-wipe risk discovered during UAT |
-| ADR-004, ADR-006, ADR-007 | 06-01-PLAN | Local-LLM-only, event schema conventions | ✓ SATISFIED | Unchanged |
+| SC3 | 06-07-PLAN (gap-closure) | Email surfaces here (SAB + Obsidian), not FreshRSS — exclusion half | ✓ SATISFIED (was FAILED per 06-UAT.md round 2, Test 6) | `apps/brief/vault_writer.py` url-scheme predicate; 4 regression tests pass |
+| R1-R6, SC1b, ADR-004/006/007 | 06-01 through 06-06 PLANs | Unchanged | ✓ SATISFIED | Re-affirmed, not touched by 06-07 |
 
 ### Anti-Patterns Found
 
 | File | Line | Pattern | Severity | Impact |
 |------|------|---------|----------|--------|
-| `apps/brief/clustering.py` | 91 | `cluster_items()` (pgvector SQL-query clustering path) remains unused outside its own module and a signature test | ℹ️ Info | Not a blocker — Approach B was explicitly deferred to a future plan in 06-03-PLAN's Decision Log; Approach A (JOIN + in-memory clustering on pgvector-sourced embeddings) satisfies SC1b as written and is live-verified |
-| `tests/integration/test_clustering_integration.py` | — | Hardcoded DSN `127.0.0.1:5432` with no reachability skip guard | ℹ️ Info | Pre-existing, logged in `deferred-items.md` from 06-05; does not affect production code paths |
-| `tests/test_bus_consume.py` | 69 | `test_consume_delivers_message` fails against live RabbitMQ (contention) | ℹ️ Info | Pre-existing/known-flaky per 06-05-SUMMARY.md and 06-06-SUMMARY.md; outside `apps/brief/` scope, not introduced by Phase 6 gap-closure work |
+| `tests/test_bus_consume.py` | 69 | `test_consume_delivers_message` fails against live RabbitMQ (contention) | ℹ️ Info | Pre-existing/known-flaky (documented in `deferred-items.md` "From 06-05 execution" and "From 06-07 execution"); outside `apps/brief/` scope, not introduced or touched by 06-07 |
 
-No 🛑 Blocker or ⚠️ Warning-level anti-patterns found in `apps/brief/` or `apps/triage/sab_html.py`.
+No 🛑 Blocker or ⚠️ Warning-level anti-patterns found in `apps/brief/vault_writer.py` or `tests/test_vault_writer.py`. No `TBD`/`FIXME`/`XXX` markers introduced by 06-07 (`grep -n -E "TBD|FIXME|XXX" apps/brief/vault_writer.py` → empty).
 
 ### Human Verification Required
 
-None. The one remaining human-verification item from the prior report (concurrent SAB write safety) was resolved via completed human UAT (06-UAT.md, tests 1 and 7, status: complete, 9/9 passed) — per the launching agent's explicit direction, this UAT evidence is accepted as satisfying that check.
+None. The gap closed this round (VAULT_INCLUDE_EMAIL exclusion) is fully covered by automated regression tests using production-shaped field values — the specific defect class that a prior synthetic-shape test missed. No new behavior in this round depends on live-service state or visual/UX judgment.
 
 ### Gaps Summary
 
-All three gaps from the 2026-07-06 verification are closed:
+The single gap from UAT round 2 (06-UAT.md Test 6: `VAULT_INCLUDE_EMAIL=0` did not exclude production email rows because the exclusion predicate matched `source.startswith("imap://")`, but production rows carry `source="gmail"` or `source=<mailbox name>` — never an `imap://`-prefixed source) is closed:
 
-1. **Semantic clustering now engages in production.** `consumer.py` and `main.py` join `infotriage.embeddings`; the `[0.0]*4` fallback is removed; `CLUSTER_THRESHOLD` is validated and threaded end-to-end into both the markdown and HTML render paths; `sab_html.py`'s keyword-overlap fallback is no longer reachable on the live path. Live UAT (tests 3, 6, 8, 9) confirms multi-item semantic clusters, CCIR-boundary respect, and threshold-driven cluster-count changes on real data.
-2. **The Obsidian vault-writer now exists and is wired.** `apps/brief/vault_writer.py` is called from `consumer.py::process_verdict()` after every digest render (default/COP/CIP views) and exposed via `main.py`'s new `/vault` endpoint. Live UAT (test 4) confirms 24 real `.md` files with codec-parseable front-matter.
-3. **Email now surfaces in both SAB and Obsidian.** The SAB half was already working; the Obsidian half is now satisfied by `vault_writer.py`'s default-inclusion of `imap://`-sourced items, confirmed by a UAT fixture test (live DB currently has 0 email rows since gmail-ingest is out of Phase 6 scope, so the live check was vacuous but the code path is exercised and correct).
+- `apps/brief/vault_writer.py` now filters on `r["url"]` against `_EMAIL_URL_SCHEMES = ("imap://", "gmail://")`, covering both production email adapters (gmail and imap).
+- `tests/test_vault_writer.py` adds 4 regression tests using exact production-shaped rows (not the synthetic shape that previously passed by coincidence): gmail-excluded, imap-excluded, non-email-not-excluded, gmail-included-by-default.
+- All 14 tests in `tests/test_vault_writer.py` pass; the 58-test `test_brief_*` group passes; the full 296-test workspace suite run shows no new failures beyond the pre-existing, documented, out-of-scope RabbitMQ flake.
+- Diff scope verified via `git show --stat` on both 06-07 commits: only `apps/brief/vault_writer.py` and `tests/test_vault_writer.py` were touched, matching the plan's stated boundary and preventing any risk of regression to the SQL/consumer/clustering/threshold work verified in the prior two rounds.
 
-Two additional gap-closure plans (06-05, 06-06) were executed beyond the original 3 gaps, closing a UAT-discovered production-safety issue (db_live tests could wipe the production Postgres instance) and a connection-hygiene issue (idle-in-transaction leaks) — both verified with passing regression tests.
-
-Phase 6's stated goal — "SAB/digest become an event-driven product plus an Obsidian projection" — is now achieved and codebase-verified, corroborated by completed human UAT (9/9 pass).
+Phase 6's stated goal — "SAB/digest become an event-driven product plus an Obsidian projection" — remains achieved, now with the Obsidian email-privacy opt-out (SC3) fully closed on both directions (inclusion and exclusion), corroborated by human UAT round 2 (7/8 pass pre-fix, with the one flagged issue now resolved and locked by regression tests) and this codebase re-verification.
 
 ---
 
