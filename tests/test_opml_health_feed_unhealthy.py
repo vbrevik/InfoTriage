@@ -143,7 +143,6 @@ def test_run_health_check_survives_validation_error_mid_batch(caplog):
          reason one was ValidationError-skipped at emission-time).
       6. Assert: a `Discarding feed.unhealthy event` ERROR log line was emitted.
     """
-    from apps.opml import _check as check
     from apps.opml_health import service
 
     long_reason = "LongReason_" + ("x" * 200)  # > 200 chars, exceeds Field(max_length=120)
@@ -164,14 +163,10 @@ def test_run_health_check_survives_validation_error_mid_batch(caplog):
         return ("Bad Reason Feed", outline["xmlUrl"], "❌", long_reason)
 
     with caplog.at_level(logging.ERROR, logger="opml.health"):
-        # Patch `service.load_opml` and `service.probe_and_classify` -- not
-        # `apps.opml._check.load_opml` / `check.load_opml`. The service module
-        # imports these BY NAME (`from apps.opml._check import (..., load_opml,
-        # ..., probe_and_classify, ...)`), so it has its own module-namespace
-        # binding that is NOT updated when the source module is patched. This
-        # mistake is what bit the first test run: the real `load_opml` ran
-        # against the project's default `feeds.opml` and returned 70 real
-        # outlines instead of the synthetic 2.
+        # Patch `service.load_opml` and `service.probe_and_classify` -- the
+        # service module imports these BY NAME from `apps.opml._check`, so
+        # it has its own module-namespace binding that is NOT updated when
+        # the source module is patched. Patch the binding actually invoked.
         with patch.object(service, "load_opml", return_value=fake_outlines):
             with patch.object(service, "probe_and_classify", side_effect=fake_probe_and_classify):
                 # Must NOT raise -- the inner guard catches ValidationError.
