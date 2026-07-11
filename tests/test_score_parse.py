@@ -98,3 +98,49 @@ def test_missing_enrichment_fallback():
     assert v["pmesii"] == "none"
     assert v["tessoc"] == "none"
     assert v["bucket"] == "read"
+
+
+# -- prompt-contract regression: ccir='none' forces pmesii/tessoc to 'none' ---
+
+
+def test_ccir_none_forces_pmesii_and_tessoc_none():
+    """Prompt contract: ccir='none' forces pmesii='none' AND tessoc='none'.
+
+    Per apps/triage/triage_score.py scoring prompt's disambiguation:
+      PMESII: '"none" if ccir is "none" (irrelevant items have no operational domain).'
+      TESSOC: '"none" if ccir is "none".'
+
+    Regression guard: if a future prompt rewrite drops or weakens either of
+    those two lines, OR if the LLM drifts and emits a non-'none' pmesii/
+    tessoc alongside a 'none' ccir, score_item must coerce. Without this
+    guard a stray Military/Espionage tag leaks into the rest of the
+    pipeline (filter_rows, sab_html.py TESSOC distribution, view filters)
+    for items that the scorer itself said are not CCIR-relevant.
+    """
+    payload = json.dumps({"ccir": "none", "cnr": "none",
+                          "pmesii": "Military", "tessoc": "Espionage",
+                          "score": 4, "why": "not ccir"})
+    v = _score_with(payload)
+    assert v["ccir"] == "none"
+    # Contract: ccir='none' → no PMESII domain, no TESSOC actor
+    assert v["pmesii"] == "none"
+    assert v["tessoc"] == "none"
+    # And bucket must reflect the ccir=none skip path
+    assert v["bucket"] == "skip"
+
+
+def test_ccir_none_both_pmesii_and_tessoc_emitted_both_coerced():
+    """Same contract: LLM emits BOTH pmesii and tessoc for a 'none' ccir.
+
+    Mirrors the synthetic case where either enrichment field leaks
+    alongside a 'none' ccir — the contract coercion should still take
+    precedence over the setdefault fallback for BOTH fields.
+    """
+    payload = json.dumps({"ccir": "none", "cnr": "none",
+                          "pmesii": "Information", "tessoc": "Sabotage",
+                          "score": 0, "why": "irrelevant"})
+    v = _score_with(payload)
+    assert v["ccir"] == "none"
+    assert v["pmesii"] == "none"
+    assert v["tessoc"] == "none"
+    assert v["bucket"] == "skip"

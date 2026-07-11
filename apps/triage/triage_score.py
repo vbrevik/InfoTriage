@@ -132,11 +132,20 @@ SUMMARY: {it.get('summary','')}"""
         v = json.loads(raw[s:e+1])
     except Exception:
         v = {"ccir": "none", "cnr": "none", "pmesii": "none", "tessoc": "none", "score": 0, "why": "uleselig modell-svar"}
-    # ensure enrichment fields always present (LLM may omit them)
-    v.setdefault("pmesii", "none")
-    v.setdefault("tessoc", "none")
+    # Prompt-contract enforcement: ccir='none' forces pmesii='none' AND
+    # tessoc='none' (PMESII: '"none" if ccir is "none"' / TESSOC: '"none" if ccir is "none"'
+    # in the scoring prompt's disambiguation rules). Coerce LLM drift before
+    # falling back to setdefault for valid CCIRs.
+    ccir_lower = (v.get("ccir") or "none").lower()
+    if ccir_lower == "none":
+        v["pmesii"] = "none"
+        v["tessoc"] = "none"
+    else:
+        # ensure enrichment fields always present (LLM may omit them)
+        v.setdefault("pmesii", "none")
+        v.setdefault("tessoc", "none")
     # derive bucket for the Fever loop: CCIR match = keep, else skip
-    ccir = (v.get("ccir") or "none").lower()
+    ccir = ccir_lower
     v["bucket"] = "skip" if ccir == "none" else ("read" if v.get("cnr") == "I"
                                                  or v.get("score", 0) >= 7 else "maybe")
     return {**it, **v}
