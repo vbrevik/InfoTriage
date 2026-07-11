@@ -14,6 +14,11 @@ from typing import Optional
 
 from contracts import to_frontmatter
 
+# Production email adapters signal email via the row's url scheme, not source:
+# gmail rows carry url=gmail://..., imap rows carry url=imap://... while their
+# source field holds the adapter/mailbox name (e.g. "gmail" or "Telegraph Ukraine").
+_EMAIL_URL_SCHEMES = ("imap://", "gmail://")
+
 # Simple heuristic for entity extraction - no external dependencies
 # In Phase 8, this will be replaced by proper entity resolution
 _SYSTEM_TOPICS = {
@@ -249,9 +254,11 @@ def write_vault_digest(
         or (r.get("ccir") or "none").lower() != "none"
     ]
 
-    # Exclude email items if VAULT_INCLUDE_EMAIL=0
+    # Exclude email items if VAULT_INCLUDE_EMAIL=0. The url scheme is the
+    # reliable email signal (see _EMAIL_URL_SCHEMES comment above); web-clip/
+    # RSS/YouTube rows keep their http(s)/other schemes and are unaffected.
     if not include_email:
-        kept = [r for r in kept if not (r.get("source") or "").startswith("imap://")]
+        kept = [r for r in kept if not (r.get("url") or "").startswith(_EMAIL_URL_SCHEMES)]
 
     paths: list[Path] = []
 
