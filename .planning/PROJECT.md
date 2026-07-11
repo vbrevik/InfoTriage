@@ -96,6 +96,8 @@ clustering (`CLUSTER_THRESHOLD` env-wired end-to-end) → HTML SAB + markdown di
 vault projection (`vault_writer.py`, default/COP/CIP views + `/vault` endpoint). Initial
 verification (2026-07-06) found 3 gaps (clustering data-flow, missing vault-writer, threshold
 wiring); gap-closure plans 06-03/06-04 landed, UAT 9/9 passed, re-verification 14/14 must-haves.
+UAT round 2 (2026-07-11) found `VAULT_INCLUDE_EMAIL=0` matched the wrong field; gap-closure 06-07
+fixed exclusion to url schemes (`imap://`/`gmail://`), final re-verification 15/15 must-haves.
 
 ## North-star benchmark (ADR-003)
 
