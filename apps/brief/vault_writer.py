@@ -80,11 +80,11 @@ def render_wikilinked(text: str, entities: list[str]) -> str:
         Wikilinked text with markdown links
     """
     result = text
-    for entity in entities:
-        # Escape special regex characters in entity
-        escaped_entity = re.escape(entity)
-        # Replace with wikilink
-        result = result.replace(entity, f"[[{entity}]]")
+    # Longest-first so prefix entities ("Ukraine") don't corrupt longer forms
+    # ("Ukrainian"); word boundaries + lookarounds skip text already wikilinked.
+    for entity in sorted(entities, key=len, reverse=True):
+        pattern = r'(?<!\[)\b' + re.escape(entity) + r'\b(?!\])'
+        result = re.sub(pattern, f"[[{entity}]]", result)
     return result
 
 
