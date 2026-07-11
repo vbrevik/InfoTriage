@@ -30,7 +30,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from contracts import setup_logging
+from contracts import setup_logging, FeedUnhealthy
 from fastapi import FastAPI, Response
 
 setup_logging("opml-health")
@@ -47,43 +47,6 @@ from apps.opml._check import (  # noqa: E402
 )
 
 log = logging.getLogger("opml.health")
-
-# --- event model (inline, avoids contracts import cost) ---
-class FeedUnhealthy:
-    """Simplified FeedUnhealthy for local emission."""
-
-    def __init__(
-        self,
-        feed_url: str,
-        feed_name: str,
-        reason: str,
-        last_ok_at: Optional[datetime.datetime] = None,
-        ts: Optional[datetime.datetime] = None,
-    ):
-        self.feed_url = feed_url
-        self.feed_name = feed_name
-        self.reason = reason[:120]
-        self.last_ok_at = last_ok_at
-        self.ts = ts or datetime.datetime.now(datetime.timezone.utc)
-
-    def to_dict(self) -> dict:
-        ts = self.ts
-        if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=datetime.timezone.utc)
-        d = {
-            "event": "feed.unhealthy",
-            "feed_url": self.feed_url,
-            "feed_name": self.feed_name,
-            "reason": self.reason,
-            "ts": ts.isoformat(),
-        }
-        if self.last_ok_at:
-            lo = self.last_ok_at
-            if lo.tzinfo is None:
-                lo = lo.replace(tzinfo=datetime.timezone.utc)
-            d["last_ok_at"] = lo.isoformat()
-        return d
-
 
 # --- health-check dispatcher ---
 def run_health_check(
@@ -121,9 +84,11 @@ def run_health_check(
             results.append({"text": text, "url": url, "emoji": emoji, "reason": reason})
             if emoji not in ("✅", "🟡"):
                 unhealthy.append(FeedUnhealthy(
+                    event="feed.unhealthy",
                     feed_url=url,
                     feed_name=text,
-                    reason=f"{emoji} {reason}",
+                    reason=f"{emoji} {reason}"[:120],
+                    ts=datetime.datetime.now(datetime.timezone.utc),
                 ))
     return results, unhealthy
 
@@ -132,7 +97,6 @@ def run_health_check(
 async def emit_unhealthy_events(unhealthy: list[FeedUnhealthy]) -> None:
     """Publish each unhealthy event to q.ops via RabbitMQ bus."""
     from libs.contracts.src.contracts._bus_rabbitmq import RabbitMQBus
-    from libs.contracts.src.contracts._events import FeedUnhealthy as ContractEvent
 
     amqp_url = os.environ.get(
         "INFOTRIAGE_OPML_HEALTH_RABBITMQ_URL",
@@ -142,7 +106,7 @@ async def emit_unhealthy_events(unhealthy: list[FeedUnhealthy]) -> None:
     try:
         await bus.connect()
         for evt in unhealthy:
-            d = evt.to_dict()
+            d = evt.model_dump(mode="json")
             item_id = d.get("item_id", f"uh-{abs(hash(d['feed_url'])) % (10**12)}")
             await bus.publish("feed.unhealthy", item_id=item_id, payload={
                 "event": "feed.unhealthy",
