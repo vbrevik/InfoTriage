@@ -573,7 +573,7 @@ def render_nav(verdicts):
         )
     return rows
 
-def build_html(verdicts, period, with_bluf=True, generated_at=None):
+def build_html(verdicts, period, with_bluf=True, generated_at=None, cutoff_epoch=None):
     total = len(verdicts)
     ks = kept(verdicts)
     ccir_count = len(ks)
@@ -585,6 +585,8 @@ def build_html(verdicts, period, with_bluf=True, generated_at=None):
         by.setdefault((v.get("ccir") or "none").upper(), []).append(v)
 
     gen_ts = generated_at or stamp(oslo_now())
+    if cutoff_epoch is None:
+        cutoff_epoch = int(default_cutoff().timestamp())
 
     # Latest data fetch time from verdicts
     latest_fetch_ts = ""
@@ -598,7 +600,7 @@ def build_html(verdicts, period, with_bluf=True, generated_at=None):
     opml_sources = parse_opml_sources()
     last_by_source = aggregate_source_timestamps(verdicts)
     source_status_card = render_source_status_card(
-        opml_sources, last_by_source, int(cutoff.timestamp()), gen_ts
+        opml_sources, last_by_source, cutoff_epoch, gen_ts
     )
 
     # Build slide index and slides
@@ -1441,6 +1443,62 @@ HTML_TEMPLATE = """\
   ::-webkit-scrollbar-track {{ background: transparent; }}
   ::-webkit-scrollbar-thumb {{ background: var(--border); border-radius: 3px; }}
 
+  /* ═══ WINDOW SELECTOR ═══ */
+  .window-selector {{
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 6px;
+    margin-bottom: 28px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  }}
+  .window-selector .ws-btn {{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-decoration: none;
+    border: 1px solid transparent;
+    background: transparent;
+    transition: all 0.15s ease;
+    cursor: pointer;
+  }}
+  .window-selector .ws-btn:hover {{
+    color: var(--text);
+    background: var(--bg-hover);
+    border-color: var(--border-accent);
+  }}
+  .window-selector .ws-btn.active {{
+    color: var(--text-bright);
+    background: var(--blue-dim);
+    border-color: var(--blue);
+    box-shadow: 0 0 12px var(--blue-dim);
+  }}
+  .window-selector .ws-btn .ws-badge {{
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: var(--amber-dim);
+    color: var(--amber);
+    border: 1px solid var(--amber);
+    white-space: nowrap;
+  }}
+  .window-selector .ws-btn.active .ws-badge {{
+    background: var(--amber);
+    color: var(--bg);
+  }}
+
   /* ═══ SOURCE STATUS CARD ═══ */
   .source-status-card {{
     position: fixed;
@@ -1554,6 +1612,21 @@ HTML_TEMPLATE = """\
 <section class="slide title-slide" id="sab-title">
   <div class="slide-inner">
     <div class="classification">FOUO</div>
+    <nav class="window-selector" aria-label="Velg tidsvindu">
+      <a class="ws-btn" href="/sab?window=24h" data-window="24h" title="Siste 24 timer">
+        <span>🕒</span>
+        <span>24h</span>
+      </a>
+      <a class="ws-btn" href="/sab?window=72h" data-window="72h" title="Siste 72 timer — helgestandard">
+        <span>📅</span>
+        <span>72h</span>
+        <span class="ws-badge">helg</span>
+      </a>
+      <a class="ws-btn" href="/sab?window=168h" data-window="168h" title="Siste uke">
+        <span>🗓️</span>
+        <span>1 uke</span>
+      </a>
+    </nav>
     <h1>InfoTriage · Situational Awareness Brief</h1>
     <div class="subtitle">
       <span>📅 {period}</span>
@@ -1840,6 +1913,19 @@ HTML_TEMPLATE = """\
   slides[0].classList.add('visible');
   updateUI();
 
+  // Highlight active window selector button based on URL
+  (function setActiveWindow() {{
+    const params = new URLSearchParams(window.location.search);
+    const windowParam = params.get('window') || '24h';
+    document.querySelectorAll('.window-selector .ws-btn').forEach(btn => {{
+      if (btn.dataset.window === windowParam) {{
+        btn.classList.add('active');
+      }} else {{
+        btn.classList.remove('active');
+      }}
+    }});
+  }})();
+
   // Collapse source status card by default on small screens
   if (window.innerWidth < 768) {{
     const sourceCard = document.getElementById('sourceStatusCard');
@@ -1883,7 +1969,8 @@ def main():
         print("no verdicts in window — writing empty-state page", file=sys.stderr)
 
     gen_ts = stamp(oslo_now())
-    html = build_html(verdicts, period, with_bluf=not args.no_bluf, generated_at=gen_ts)
+    html = build_html(verdicts, period, with_bluf=not args.no_bluf, generated_at=gen_ts,
+                      cutoff_epoch=int(cutoff.timestamp()))
 
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     tmp = args.out + ".tmp"

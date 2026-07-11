@@ -118,6 +118,7 @@ async def _render_sab(since: datetime.datetime, with_bluf: bool) -> str:
     return await asyncio.to_thread(
         build_html, rows, _period_label(since), with_bluf,
         cluster_threshold=CLUSTER_THRESHOLD,
+        cutoff_epoch=int(since.timestamp()),
     )
 
 

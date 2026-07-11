@@ -8,16 +8,16 @@ updated: 2026-07-09T14:00:00Z
 
 ## Current Test
 
-number: 1
-name: Cold Start Smoke Test
+number: 2
+name: View SAB via FastAPI /sab endpoint
 expected: |
-  Kill any running services. Clear ephemeral state. Start the application stack from scratch 
-  (docker compose up -d). Server boots without errors, seed/migration completes, and a primary 
-  query (GET /health on brief:22040) returns live data.
+  Server responds to GET /sab with HTML page, displays CNR alerts at top, CCIR sections with
+  clusters, and includes "Since" timestamp. Container is healthy at /health.
 result: pass
 evidence: |
-  2026-07-10: docker compose down -v succeeded; docker compose up -d brought the stack back.
-  GET http://localhost:22040/health returned {"status":"ok","service":"brief"}.
+  2026-07-10: GET http://localhost:22040/sab returned a valid HTML document with title
+  "InfoTriage · SAB — siden 2026-07-10 12:05". Fixed a NameError ('cutoff' undefined) in
+  apps/triage/sab_html.py by threading cutoff_epoch through build_html().
 
 ## Tests
 
@@ -34,7 +34,19 @@ evidence: |
 
 ### 2. View SAB via FastAPI /sab endpoint
 expected: Server responds to GET /sab with HTML page, displays CNR alerts at top, CCIR sections with clusters, and includes "Since" timestamp. Container is healthy at /health.
-result: pending
+result: pass
+evidence: |
+  - GET http://localhost:22040/sab returned HTTP 200 with a complete HTML document.
+  - Title includes "Since" timestamp: `InfoTriage · SAB — siden 2026-07-10 12:05`.
+  - HTML contains slide sections: title, CNR, PIR-1, PIR-2, PIR-3, PIR-4, FFIR-3, filtered, BLUF, stats.
+  - CNR alert (`🚩 CNR — varsle straks`) is rendered at the top when CNR-I items exist.
+  - CCIR sections are rendered only when matching items exist in the window.
+  - Seeded 11 sample articles/enrichments/embeddings via `scripts/seed_sample_data.py` to
+    populate CNR alerts and CCIR sections.
+  - Fixed `NameError: name 'cutoff' is not defined` in `apps/triage/sab_html.py` by adding
+    `cutoff_epoch` parameter to `build_html()` and threading it through
+    `apps/brief/html_renderer.py` → `apps/brief/main.py`.
+  - Full pytest suite: 275 passed, 2 skipped after the fix.
 
 ### 3. Clustering shows multi-item semantic groups
 expected: At least one CCIR section contains 2+ items grouped together via pgvector clustering (not just singletons). Keyword-overlap fallback is NOT used.
@@ -67,9 +79,9 @@ result: pending
 ## Summary
 
 total: 9
-passed: 1
+passed: 2
 issues: 0
-pending: 8
+pending: 7
 skipped: 0
 
 ## Gaps
