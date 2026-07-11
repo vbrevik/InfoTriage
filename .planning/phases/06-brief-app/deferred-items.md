@@ -7,3 +7,11 @@
   to the INFOTRIAGE_TEST_DSN pattern in a follow-up.
 - **tests/test_bus_consume.py / tests/test_bus_rabbitmq.py** — 4 failures against RabbitMQ
   :22001 (timeout / assertion). Pre-existing, unrelated to DSN safety work.
+
+## From 06-07 execution (2026-07-11)
+
+- **tests/test_bus_consume.py::test_consume_delivers_message** — still fails
+  (`asyncio.exceptions.CancelledError`) in the full-suite run after 06-07's vault_writer.py
+  fix. RabbitMQ live-consumer contention (q.triage/q.brief consumers eat test messages),
+  unrelated to vault_writer.py/06-07 scope. Not fixed — out of scope per plan boundary
+  (files_modified: apps/brief/vault_writer.py, tests/test_vault_writer.py only).

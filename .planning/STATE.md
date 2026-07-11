@@ -2,21 +2,53 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 06 verified complete (re-verification passed 14/14, UAT 9/9); Phase 07 next — execute 07-01
+status: Phase 06 complete incl. gap-closure 06-07 (VAULT_INCLUDE_EMAIL url-scheme fix, UAT round-2 Test 6 closed); Phase 07 next — execute 07-01
 stopped_at: null
-last_updated: "2026-07-11T19:10:38.100Z"
+last_updated: "2026-07-11T20:23:29.230Z"
 progress:
   total_phases: 13
   completed_phases: 7
-  total_plans: 33
-  completed_plans: 32
-  percent: 54
+  total_plans: 34
+  completed_plans: 33
+  percent: 97
 ---
 
 # STATE — InfoTriage
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-07-11 — 06-07 gap closure: VAULT_INCLUDE_EMAIL url-scheme fix
+
+### Just-completed
+
+- **06-07-PLAN.md COMPLETE** (commits `d7dba4a` test, `8ef54ee` fix): fixed the
+  UAT round-2 Test 6 gap. `write_vault_digest()`'s `VAULT_INCLUDE_EMAIL=0`
+  exclusion predicate tested `source.startswith("imap://")` — production gmail
+  rows carry `source="gmail"` and production imap rows carry `source=<mailbox
+  name>`, so neither adapter's rows were ever caught and email content leaked
+  into the Obsidian vault even with the operator's opt-out set.
+
+- **Fix**: added `_EMAIL_URL_SCHEMES = ("imap://", "gmail://")` and rekeyed the
+  exclusion on `r["url"]` instead of `r["source"]` — `url` reliably carries the
+  mail transport URI for both adapters
+  (`gmail://message/...`, `imap://<host>/<id>`); `source_type` isn't in scope
+  (consumer.py's SELECT omits it from the row dict).
+
+- **TDD**: RED confirmed first (both `*_row_excluded_when_email_disabled`
+  tests failed against the pre-fix predicate), then GREEN (all 14 tests in
+  `tests/test_vault_writer.py` pass, plus `tests/test_brief_consumer.py`
+  unaffected). Full-suite `pytest tests/ -q`: 296 passed, 1 pre-existing
+  unrelated failure (`test_bus_consume.py::test_consume_delivers_message`,
+  RabbitMQ live-consumer contention — logged to deferred-items.md, out of
+  scope).
+
+- ROADMAP SC3 (email opt-out) is now fully closed. Phase 06 has all 7 plans
+  complete (`06-01`..`06-07`).
+
+### Next
+
+- Execute Phase 07 (`07-ops-cutover/07-01-PLAN.md`).
 
 ## Session: 2026-07-11 — Phase 6 UAT bug fix: `digest.line()` `or` short-circuit
 
@@ -586,8 +618,8 @@ untouched this session, still needs separate investigation.
 
 ## Session
 
-**Last session:** 2026-07-11T20:45:00Z
-**Stopped at:** Phase 06 verified complete (re-verification 14/14, UAT 9/9); clean stop
+**Last session:** 2026-07-11T20:23:29.221Z
+**Stopped at:** Phase 06 complete incl. gap-closure 06-07 (VAULT_INCLUDE_EMAIL url-scheme fix); clean stop
 **Resume file:** .planning/phases/07-ops-cutover/07-01-PLAN.md
 
 ## Performance Metrics
@@ -601,6 +633,7 @@ untouched this session, still needs separate investigation.
 | Phase 05 P03 | 22min | 3 tasks | 3 files |
 | Phase 05 P04 | continuation | 3 tasks | 3 files |
 | Phase 06 P05 | 15min | 2 tasks | 7 files |
+| Phase 06-brief-app P07 | 3min | 2 tasks | 2 files |
 
 ## Decisions
 
@@ -613,3 +646,4 @@ untouched this session, still needs separate investigation.
 - [Phase 05]: 05-03: process_item runs async with per-call asyncio.to_thread (not a sync function run as a whole via asyncio.to_thread) so bus.publish always executes on the consumer's event loop, avoiding aio-pika cross-event-loop bugs
 - [Phase 05]: 05-04: requirements.txt needs feedgen/pydantic/PyYAML beyond aio-pika/psycopg/pgvector — libs/store and libs/contracts are installed --no-deps and import these at module level
 - [Phase 05]: 05-04: intfloat/multilingual-e5-large not yet registered on host oMLX — worker.py's get_embedding() will 404 until set up; tracked as a Phase 5 follow-up, non-blocking for 05-04. **RESOLVED 2026-07-01**: registered at ~/.omlx/models/multilingual-e5-large (standard HF safetensors via mlx-embeddings' native XLMRobertaModel support), verified 200/1024-dim from host and from inside infotriage-triage.
+- [Phase ?]: 06-07: excluded email by matching r['url'] against _EMAIL_URL_SCHEMES (imap://, gmail://) instead of r['source'] -- source_type isn't available to vault_writer.py's row shape, url-scheme is the reliable in-scope signal

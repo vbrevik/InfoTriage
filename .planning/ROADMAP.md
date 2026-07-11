@@ -205,12 +205,12 @@ to the running pipeline.
   2. A vault-writer emits high-value items + the SAB as Obsidian `.md` (front-matter via codec; body summary; `[[entity]]` wikilinks).
   3. Email surfaces here (SAB + Obsidian), not in FreshRSS.
 
-**Plans**: 6 executed + 1 gap-closure planned
+**Plans**: 7/7 plans complete
 
 - [x] 06-05-PLAN.md — db_live test DSN safety: require INFOTRIAGE_TEST_DSN, no prod fallback, regression guard + throwaway test DB (W1)
 - [x] 06-06-PLAN.md — PostgresStore read-path txn hygiene: end read txn (rollback) + idle-in-transaction backstop + regression test (W2)
 - [x] 06-UAT prep — SAB UI polish (source status card, hide empty CCIR slides), FreshRSS OPML import, NewsAPI 3h TTL, TTL docs + test (W3)
-- [ ] 06-07-PLAN.md — gap closure (UAT Test 6, SC3): fix VAULT_INCLUDE_EMAIL=0 exclusion to match production email rows by url scheme (imap:// + gmail://) + regression test (W1)
+- [x] 06-07-PLAN.md — gap closure (UAT Test 6, SC3): fix VAULT_INCLUDE_EMAIL=0 exclusion to match production email rows by url scheme (imap:// + gmail://) + regression test (W1)
 
 ### Phase 7: Ops + cutover
 
