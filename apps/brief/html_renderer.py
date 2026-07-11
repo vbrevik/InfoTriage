@@ -14,6 +14,7 @@ sab_html's CNR slide matches on cnr == "I", which RAW satisfies directly.
 
 Pure library: no HTTP, no Docker, no file IO — main.py owns serving and writes.
 """
+import json
 import os
 import sys
 
@@ -71,6 +72,15 @@ def _apply_semantic_clustering(verdicts: list[dict], threshold: float = 0.75) ->
     items_by_ccir: dict[str, list[EnrichedItem]] = {}
     for v in verdicts:
         emb = v.get("embedding")
+        # psycopg may return pgvector vectors as JSON strings or Vector objects;
+        # normalize to a plain list so cosine distance works.
+        if isinstance(emb, str) and emb.startswith("["):
+            try:
+                emb = json.loads(emb)
+            except ValueError:
+                emb = None
+        elif hasattr(emb, "to_list"):
+            emb = emb.to_list()
         if not isinstance(emb, list) or not emb:
             emb = None
         item = EnrichedItem(
@@ -96,7 +106,7 @@ def _apply_semantic_clustering(verdicts: list[dict], threshold: float = 0.75) ->
     for cid, items in items_by_ccir.items():
         if not items:
             continue
-        clusters = cluster_items_in_memory(items, threshold=0.75)
+        clusters = cluster_items_in_memory(items, threshold=threshold)
         for cluster_idx, cluster in enumerate(clusters):
             for item in cluster:
                 # Find the original verdict to add cluster metadata

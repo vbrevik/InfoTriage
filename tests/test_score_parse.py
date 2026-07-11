@@ -27,12 +27,12 @@ def _score_with(llm_raw, item=None):
 def test_wellformed_json():
     """Clean JSON → parsed fields, bucket=read (score >= 7)."""
     payload = json.dumps({"ccir": "FFIR-3", "cnr": "II", "pmesii": "Information",
-                          "tessoc": "Skills", "score": 7, "why": "test"})
+                          "tessoc": "Espionage", "score": 7, "why": "test"})
     v = _score_with(payload)
     assert v["ccir"] == "FFIR-3"
     assert v["cnr"] == "II"
     assert v["pmesii"] == "Information"
-    assert v["tessoc"] == "Skills"
+    assert v["tessoc"] == "Espionage"
     assert v["score"] == 7
     assert v["bucket"] == "read"
 
@@ -42,12 +42,12 @@ def test_wellformed_json():
 def test_codefence_json():
     """JSON wrapped in ```json ... ``` → same as well-formed."""
     inner = json.dumps({"ccir": "FFIR-3", "cnr": "II", "pmesii": "Information",
-                        "tessoc": "Skills", "score": 7, "why": "test"})
+                        "tessoc": "Espionage", "score": 7, "why": "test"})
     payload = f"```json\n{inner}\n```"
     v = _score_with(payload)
     assert v["ccir"] == "FFIR-3"
     assert v["pmesii"] == "Information"
-    assert v["tessoc"] == "Skills"
+    assert v["tessoc"] == "Espionage"
     assert v["score"] == 7
     assert v["bucket"] == "read"
 
@@ -71,11 +71,11 @@ def test_garbage_returns_fallback():
 def test_low_score_maybe():
     """CCIR hit with score < 7 and cnr != I → bucket=maybe."""
     payload = json.dumps({"ccir": "PIR-1", "cnr": "II", "pmesii": "Military",
-                          "tessoc": "Equipment", "score": 4, "why": "test"})
+                          "tessoc": "Sabotage", "score": 4, "why": "test"})
     v = _score_with(payload)
     assert v["bucket"] == "maybe"
     assert v["pmesii"] == "Military"
-    assert v["tessoc"] == "Equipment"
+    assert v["tessoc"] == "Sabotage"
 
 
 # -- bonus: cnr I → bucket=read regardless of score ---------------------
@@ -83,11 +83,11 @@ def test_low_score_maybe():
 def test_cnr_one_forces_read():
     """CAT I → bucket=read even at low score."""
     payload = json.dumps({"ccir": "PIR-1", "cnr": "I", "pmesii": "Military",
-                          "tessoc": "Equipment", "score": 3, "why": "test"})
+                          "tessoc": "Sabotage", "score": 3, "why": "test"})
     v = _score_with(payload)
     assert v["bucket"] == "read"
     assert v["pmesii"] == "Military"
-    assert v["tessoc"] == "Equipment"
+    assert v["tessoc"] == "Sabotage"
 
 
 def test_missing_enrichment_fallback():

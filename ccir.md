@@ -11,23 +11,23 @@ hardkodet parser mot denne filen. Edit freely — add/remove/retune.
 
 - **PIR-1 Russland/Ukraina** — krigsutvikling, frontlinjer, eskalering/de-eskalering,
   vestlig våpenstøtte, sanksjoner, russisk mobilisering og økonomi.
-  `PMESII: Military, Economic` · `TESSOC: Equipment, Skills, Time`
+  `PMESII: Military, Economic` · `TESSOC: Espionage, Sabotage, Subversion`
 - **PIR-2 Nordområdene & Arktis** — militær aktivitet, russisk og alliert
   tilstedeværelse, Svalbard, ubåt-/maritim aktivitet, GIUK-gapet, nordlig sjørute.
-  `PMESII: Military, Infrastructure` · `TESSOC: Space, Time`
+  `PMESII: Military, Infrastructure` · `TESSOC: Espionage, Sabotage`
 - **PIR-3 NATO & europeisk sikkerhet** — alliansevedtak, toppmøter, styrkeoppbygging,
   forsvarsbudsjetter, Sverige/Finland, østflanken.
-  `PMESII: Political, Military` · `TESSOC: Organization, Skills`
+  `PMESII: Political, Military` · `TESSOC: Subversion, Espionage`
 - **PIR-4 Hybrid- & cybertrusler** — sabotasje mot infrastruktur (sjøkabler, kraft,
   gass), påvirknings-/informasjonsoperasjoner, cyberangrep — særlig mot Norge/Norden.
   **Infrastrukturpostur:** også strategisk infrastrukturutvikling — nye kabeltraseer,
   energinettkapasitet, LNG-terminaler, nordlig sjørute-utvikling, arktisk logistikk,
   GIUK-gap-overvåking, havne- og forsyningsbasestatus. Både trusselbildet *og*
   den sivile/militære infrastrukturens sårbarhet og utvikling.
-  `PMESII: Information, Infrastructure` · `TESSOC: Communications, Equipment, Space`
+  `PMESII: Information, Infrastructure` · `TESSOC: Sabotage, Subversion, Espionage`
 - **PIR-5 Stormaktsrivalisering** — Kina, USAs sikkerhetspolitikk og vendinger som
   påvirker europeisk/nordisk sikkerhet, Midtøsten når det har strategisk vekt.
-  `PMESII: Political, Economic` · `TESSOC: Organization, Communications`
+  `PMESII: Political, Economic` · `TESSOC: Espionage, Subversion`
 
 - **PIR-6 OSINT & etterforskning** — åpne kilder for
   krigsforbrytelsesdokumentasjon, sanksjonsomgåelse, identifisering av aktører
@@ -35,16 +35,16 @@ hardkodet parser mot denne filen. Edit freely — add/remove/retune.
   granskingssaker i sivil/politisk sfære. Primær kildegruppe: Bellingcat, OCCRP.
   Tett kobling til PIR-1 (Russland/Ukraina), PIR-4 (Hybrid/sabotasje) og
   PIR-5 (Stormakter); overlap er forventet og en sak kan trigge flere PIR-er.
-  `PMESII: Information` · `TESSOC: Communications, Skills`
+  `PMESII: Information` · `TESSOC: Organized Crime, Espionage, Sabotage`
 
 ## FFIR — Friendly Force Information Requirements (eget: Norge, hjemmebane)
 
 - **FFIR-1 Norsk forsvar & sikkerhetspolitikk** — regjerings-/stortingsvedtak, forsvars-
   budsjett, anskaffelser, Forsvaret, totalforsvar, beredskap, etterretningstjenestene.
-  `PMESII: Military, Political` · `TESSOC: Organization, Skills, Equipment`
+  `PMESII: Military, Political` · `TESSOC: Espionage, Sabotage`
 - **FFIR-2 Norsk politikk & samfunn** — saker av strategisk/nasjonal betydning
   (ikke kjendis/sport/livsstil).
-  `PMESII: Political, Social` · `TESSOC: Organization, Communications`
+  `PMESII: Political, Social` · `TESSOC: Subversion`
 - **FFIR-3 Egen teknologikapabilitet** — *egen* plattform og spark-stack for
   lokal AI og analysearbeid:
   - **Mac-basert**: Qwen/MLX/Ollama, kvantisering, lokale Claude Code-arbeidsflyter,
@@ -59,7 +59,7 @@ hardkodet parser mot denne filen. Edit freely — add/remove/retune.
     DGX Spark», «Apple Silicon vs Grace Blackwell») så lenge vinklingen er
     «hva kan *jeg* kjøre lokalt». Hvis vinklingen er geopolitisk (f.eks.
     Kinas chip-exports, USAs eksportkontroll), faller saken tilbake til PIR-5.
-  `PMESII: Information` · `TESSOC: Skills, Communications, Equipment`
+  `PMESII: Information` · `TESSOC: Espionage, Sabotage`
 
 ## SIR — Specific Intelligence Requirements (tidsavgrenset, oppheves ved endt hendelse)
 
@@ -68,7 +68,7 @@ hardkodet parser mot denne filen. Edit freely — add/remove/retune.
   atomprogram-status; sanksjonspress og effekten på europeisk energi/sikkerhet.
   Tidsavgrenset: aktiv så lenge den diplomatiske/militære spenningskurven er skarp.
   Kildegruppe: Crisis Group, Al-Monitor, FDD Long War Journal, US State Dept.
-  `PMESII: Military, Political, Economic` · `TESSOC: Equipment, Organization, Time`
+  `PMESII: Military, Political, Economic` · `TESSOC: Terror, Sabotage, Espionage`
 - **SIR-2 Sport — VM 2026 (FIFA)** — sikkerhets- og geopolitisk dimensjon ved
   Fotball-VM 2026 (vertsnasjoner USA/Canada/Mexico): kritisk infrastruktur, protester
   /boikott, politisk ladede kamper (Iran, Saudi-Arabia), terrortrusler, store
@@ -83,7 +83,7 @@ hardkodet parser mot denne filen. Edit freely — add/remove/retune.
   SIR-2-seksjonen utvides eller carve-out-regelen endres, oppdater også
   scorer-promptens regel + eksempler i `triage_score.py:score_item`. Kildegruppe:
   BBC Sport Football, ESPN FC, Reuters Sports, Google News WC2026.
-  `PMESII: Political, Social, Infrastructure` · `TESSOC: Organization, Space, Communications`
+  `PMESII: Political, Social, Infrastructure` · `TESSOC: Terror, Organized Crime, Subversion`
 - **SIR-3 NATO-toppmøtet i Ankara (Tyrkia)** — alt om toppmøtet: agenda, vedtak
   og kommunikeer; deltakelse/fravær av stats- og regjeringssjefer; Tyrkias
   vertskapsrolle og posisjonering (Sverige/Finland-relasjoner, S-400/F-35,
@@ -93,7 +93,7 @@ hardkodet parser mot denne filen. Edit freely — add/remove/retune.
   PIR-3 for generell NATO-utvikling. Tidsavgrenset: aktiv til toppmøtet er
   avsluttet og oppfølgingsvedtak er rapportert.
   Kildegruppe: NATO.int, Reuters, Anadolu/AA, Al-Monitor, Hurriyet Daily News.
-  `PMESII: Political, Military` · `TESSOC: Organization, Time, Space`
+  `PMESII: Political, Military` · `TESSOC: Terror, Subversion`
 
 ## CNR — Commander's Notification Requirements (varslingsterskler)
 
@@ -111,34 +111,48 @@ hardkodet parser mot denne filen. Edit freely — add/remove/retune.
 
 ## PMESII — operasjonelle domener (analytisk berikelse)
 
-Hvert saker kan tilordnes én primær PMESII-domene. Disse brukes som et
-analytisk berikelseslag på toppen av CCIR — ikke som erstatning.
+PMESII kategoriserer domener i det operasjonelle miljøet (operational
+environment domains). Rammeverket er etablert i NATO fellesdoktrine:
+**Political, Military, Economic, Social, Infrastructure, Information** (NATO
+*Allied Joint Publication* 01, *Allied Joint Doctrine*; se også AJP-5, *Allied
+Joint Doctrine for Planning*). Disse brukes som et analytisk berikelseslag på
+toppen av CCIR — ikke som erstatning.
+
+> 💡 **Vedlikeholdere:** Se
+> [`.planning/research/pmesii-hybrid-definitions.md`](.planning/research/pmesii-hybrid-definitions.md)
+> for bakgrunn om hvorfor definisjonene er *hybride* (NATO-doktrine + konkrete
+> OSINT-eksempler) og hvordan de ble validert.
 
 | Domene | Omfang | Eksempel-CCIR |
 |---|---|---|
-| **Political** 🏛️ | Diplomati, traktater, regjeringspolitikk, valg, sanksjoner som politisk verktøy | PIR-3, PIR-5, FFIR-2 |
-| **Military** ⚔️ | Krig, forsvarsstyrke, troppbevegelser, våpensystemer, militære operasjoner | PIR-1, PIR-2, PIR-3, FFIR-1 |
-| **Economic** 💰 | Sanksjonseffekt, handelskrig, budsjetter, finansmarkeder, energimarkeder | PIR-1, PIR-5 |
-| **Social** 👥 | Protester, uro, opinion, demografi, kulturelle/sportslige arrangementer med politisk dimensjon | FFIR-2, SIR-2 |
-| **Information** 📡 | Cyberoperasjoner, OSINT-etterforskning, propaganda, hybrid påvirkning, mediamanipulering | PIR-4, PIR-6, FFIR-3 |
-| **Infrastructure** 🌉 | Undersjøiske kabler, rørledninger, logistikknettverk, kraftnett, transport, maritime ruter | PIR-2, PIR-4, SIR-2 |
+| **Political** 🏛️ | Maktstrukturer og diplomati; traktater, regjeringspolitikk, valg, sanksjoner som politisk verktøy | PIR-3, PIR-5, FFIR-2 |
+| **Military** ⚔️ | Forsvarskapabiliteter og krigføring; forsvarsstyrke, troppbevegelser, våpensystemer, militære operasjoner | PIR-1, PIR-2, PIR-3, FFIR-1 |
+| **Economic** 💰 | Ressursproduksjon og markeder; sanksjonseffekt, handelskrig, budsjetter, finansmarkeder, energimarkeder | PIR-1, PIR-5 |
+| **Social** 👥 | Demografisk og kulturell sammensetning; protester, uro, opinion, kulturelle/sportslige arrangementer med politisk dimensjon | FFIR-2, SIR-2 |
+| **Information** 📡 | Informasjonsflyt og -systemer; cyberoperasjoner, OSINT-etterforskning, propaganda, hybrid påvirkning, mediamanipulering | PIR-4, PIR-6, FFIR-3 |
+| **Infrastructure** 🌉 | Essensielle fasiliteter; undersjøiske kabler, rørledninger, logistikknettverk, kraftnett, transport, maritime ruter | PIR-2, PIR-4, SIR-2 |
 
 NB: En sak kan berøre flere domener, men scoreren velger det éne primære.
 PMESII-taggene er LLM-assigned (ikke statisk mapping fra CCIR) fordi PIR-1 f.eks.
 kan være Military (frontlinjer) eller Economic (sanksjoner) avhengig av saken.
 
-## TESSOC — operasjonelle variabler (analytisk berikelse)
+## TESSOC — trusselaktører (analytisk berikelse)
 
-TESSOC beskriver det operasjonelle miljøet. Sammen med PMESII gir det to
-uavhengige analytiske akser per sak.
+TESSOC kategoriserer primære trusselaktører og deres metoder. Akronymet er
+etablert i britisk/nato militær etterretningsdoktrine: **Terror, Espionage,
+Subversion, Sabotage and Organized Crime** (UK *Joint Doctrine Publication*
+2-00, *Intelligence, Counter-Intelligence and Security Support to Joint
+Operations*; se også Davies & Steward, 2024, "The Trouble with TESSOC",
+*Defence Studies*, for en kritisk gjennomgang). InfoTriage bruker TESSOC som
+operativt analyserammeverk uavhengig av den akademiske debatten. Sammen med
+PMESII gir det to uavhengige analytiske akser per sak.
 
-| Variabel | Omfang | Eksempel-CCIR |
+| Kategori | Omfang | Eksempel-CCIR |
 |---|---|---|
-| **Time** ⏳ | Tidsfaktorer — sesong, frister, eskaleringsvinduer, tidskritiske hendelser | PIR-1, PIR-2 |
-| **Equipment** 🔧 | Våpensystemer, teknologiplattformer, materiell, maskinvare | PIR-1, PIR-4, SIR-1 |
-| **Space** 🗺️ | Terrenge, geografi, fysisk miljø, havområder, luftrom, arktiske forhold | PIR-2, PIR-4, SIR-2 |
-| **Skills** 🎓 | Evner, trening, beredskap, doktrine, taktikk | PIR-1, PIR-3, PIR-6 |
-| **Organization** 🏢 | Kommandostruktur, enhetsoppsett, allianseformasjoner, institusjonelle ordninger | PIR-3, PIR-5, FFIR-1, FFIR-2, SIR-2 |
-| **Communications** 📶 | C4ISR, informasjonsflyt, nettverk, mediekanaler, signaler | PIR-4, PIR-5, PIR-6, FFIR-2, SIR-2 |
+| **Terror** 💣 | Terrorisme, voldelig ekstremisme, angrep mot sivile eller symbolske mål. | SIR-1, SIR-2 |
+| **Espionage** 🕵️ | Spionasje, etterretningsinnhenting, fordekt informasjonssamling (statlig/ikke-statlig). | PIR-1, PIR-2, PIR-4 |
+| **Subversion** 🎭 | Undergraving, påvirkningsoperasjoner, destabilisering, femtekolonne-aktivitet. | PIR-4, PIR-5 |
+| **Sabotage** ⚡ | Tilsiktet ødeleggelse eller forstyrrelse av infrastruktur, logistikk eller systemer. | PIR-4, FFIR-1 |
+| **Organized Crime** 🏴‍☠️ | Kriminelle nettverk, smugling, hvitvasking, korrupsjon, sanksjonsomgåelse. | PIR-6, SIR-2 |
 
-NB: En sak velger én primær TESSOC-variabel, LLM-assigned.
+NB: En sak velger én primær TESSOC-kategori, LLM-assigned.

@@ -69,22 +69,21 @@ Tier quick-reference (full descriptions in ccir.md above):
 - SIR-2 Sport — VM 2026 (FIFA) — sikkerhets-/geopolitisk dimensjon; CARVE-OUT løfter over CNR-Routine
 - "none" if the item answers no CCIR at all.
 
-PMESII domain (choose the ONE primary operational domain this item falls under):
-- Political: Diplomacy, treaties, government policy, elections, sanctions as policy instrument.
-- Military: Warfare, defense posture, troop movements, weapons systems, military operations.
-- Economic: Sanctions impact, trade wars, defence budgets, financial markets, energy markets.
-- Social: Protests, civil unrest, public opinion, demographics, cultural/sporting events with political dimension.
-- Information: Cyber operations, OSINT investigations, propaganda, hybrid influence, media manipulation.
-- Infrastructure: Undersea cables, pipelines, logistics networks, energy grid, transport, maritime routes.
+PMESII operational environment domain (choose the ONE primary domain this item falls under):
+- Political: Power structures and diplomacy; treaties, government policy, elections, sanctions as policy instrument.
+- Military: Defense capabilities and warfare; posture, troop movements, weapons systems, military operations.
+- Economic: Resource production and markets; sanctions impact, trade wars, defence budgets, financial markets, energy markets.
+- Social: Demographic and cultural composition; protests, civil unrest, public opinion, cultural/sporting events with political dimension.
+- Information: Information flow and systems; cyber operations, OSINT investigations, propaganda, hybrid influence, media manipulation.
+- Infrastructure: Essential facilities; undersea cables, pipelines, logistics networks, energy grid, transport, maritime routes.
 - "none" if ccir is "none" (irrelevant items have no operational domain).
 
-TESSOC operational variable (choose the ONE primary operational variable):
-- Time: Temporal factors — timing, season, deadlines, escalation windows, time-sensitive events.
-- Equipment: Weapons systems, technology platforms, materiel, hardware capabilities.
-- Space: Terrain, geography, physical environment, sea areas, airspace, Arctic conditions.
-- Skills: Capabilities, training, expertise, readiness, doctrine, tactics.
-- Organization: Command structure, unit composition, alliance formations, institutional arrangements.
-- Communications: C4ISR, information flow, networks, media channels, signals, connectivity.
+TESSOC threat actor (UK/NATO counterintelligence framework, JDP 2-00 — choose the ONE primary threat actor type):
+- Terror: Terrorism, violent extremism, attacks against civilians or symbolic targets.
+- Espionage: Spying, intelligence collection, covert information gathering by state or non-state actors.
+- Subversion: Undermining authority, influence operations, destabilization, fifth-column activity.
+- Sabotage: Deliberate destruction or disruption of infrastructure, logistics, or capabilities.
+- Organized Crime: Criminal networks, trafficking, money laundering, racketeering, corruption.
 - "none" if ccir is "none".
 
 Disambiguation guide — when an item could match multiple tiers:
@@ -96,24 +95,24 @@ Disambiguation guide — when an item could match multiple tiers:
 
 Worked examples:
 1. "Bellingcat identifies Russian officer behind Bucha massacre using phone metadata"
-   → {{"ccir": "PIR-6", "cnr": "II", "pmesii": "Information", "tessoc": "Communications", "score": 8, "why": "OSINT-identifisering av krigsforbryter"}}
+   → {{"ccir": "PIR-6", "cnr": "II", "pmesii": "Information", "tessoc": "Espionage", "score": 8, "why": "OSINT-identifisering av krigsforbryter"}}
 2. "OCCRP: Shell companies helped oligarchs evade EU sanctions"
-   → {{"ccir": "PIR-6", "cnr": "II", "pmesii": "Economic", "tessoc": "Organization", "score": 7, "why": "Sanksjonsomgåelse via skallselskaper"}}
+   → {{"ccir": "PIR-6", "cnr": "II", "pmesii": "Economic", "tessoc": "Organized Crime", "score": 7, "why": "Sanksjonsomgåelse via skallselskaper"}}
 3. "IRGC-linked militia launches rockets at US base in Syria"
-   → {{"ccir": "SIR-1", "cnr": "I", "pmesii": "Military", "tessoc": "Equipment", "score": 9, "why": "IRGC-proxy angriper amerikansk base"}}
+   → {{"ccir": "SIR-1", "cnr": "I", "pmesii": "Military", "tessoc": "Terror", "score": 9, "why": "IRGC-proxy angriper amerikansk base"}}
 4. "Iran enriches uranium to 84% — IAEA report"
-   → {{"ccir": "SIR-1", "cnr": "I", "pmesii": "Military", "tessoc": "Equipment", "score": 9, "why": "Atomprogram-oppgradering, høy beredskap"}}
+   → {{"ccir": "SIR-1", "cnr": "I", "pmesii": "Military", "tessoc": "Espionage", "score": 9, "why": "Atomprogram-oppgradering, høy beredskap"}}
 5. "FIFA confirms World Cup 2026 will use expanded 48-team format"
-   → {{"ccir": "SIR-2", "cnr": "II", "pmesii": "Social", "tessoc": "Organization", "score": 5, "why": "VM 2026 format-oppdatering"}}
+   → {{"ccir": "SIR-2", "cnr": "II", "pmesii": "Social", "tessoc": "none", "score": 5, "why": "VM 2026 format-oppdatering"}}
 6. "Threat of mass protests at US World Cup venues over immigration policy"
-   → {{"ccir": "SIR-2", "cnr": "II", "pmesii": "Social", "tessoc": "Organization", "score": 7, "why": "Protest-trussel mot VM-arenaer"}}
+   → {{"ccir": "SIR-2", "cnr": "II", "pmesii": "Social", "tessoc": "Terror", "score": 7, "why": "Protest-trussel mot VM-arenaer"}}
 7. "NATO summit agrees 2% GDP defence spending floor"
-   → {{"ccir": "PIR-3", "cnr": "II", "pmesii": "Political", "tessoc": "Organization", "score": 7, "why": "NATO-toppmøte, forsvarsbudsjetter"}}
+   → {{"ccir": "PIR-3", "cnr": "II", "pmesii": "Political", "tessoc": "none", "score": 7, "why": "NATO-toppmøte, forsvarsbudsjetter"}}
 8. "Sony releases new PlayStation update"
    → {{"ccir": "none", "cnr": "none", "pmesii": "none", "tessoc": "none", "score": 0, "why": "Forbrukerteknologi, ingen CCIR"}}
 
 Return ONLY JSON:
-{{"ccir": "<PIR-1 | PIR-2 | PIR-3 | PIR-4 | PIR-5 | PIR-6 | FFIR-1 | FFIR-2 | FFIR-3 | SIR-1 | SIR-2 | none>", "cnr": "<I | II | none>", "pmesii": "<Political | Military | Economic | Social | Information | Infrastructure | none>", "tessoc": "<Time | Equipment | Space | Skills | Organization | Communications | none>",
+{{"ccir": "<PIR-1 | PIR-2 | PIR-3 | PIR-4 | PIR-5 | PIR-6 | FFIR-1 | FFIR-2 | FFIR-3 | SIR-1 | SIR-2 | none>", "cnr": "<I | II | none>", "pmesii": "<Political | Military | Economic | Social | Information | Infrastructure | none>", "tessoc": "<Terror | Espionage | Subversion | Sabotage | Organized Crime | none>",
   "score": 0-10, "why": "<=12 words, in Norwegian>"}}
 Rules:
 - ccir = the ONE requirement it best answers, or "none" if it answers none.

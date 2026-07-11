@@ -148,19 +148,15 @@ def write_item_obsidian(item: dict, vault_path: Path) -> Path:
     return filepath
 
 
-def write_sab_obsidian(enrichment_rows: list[dict], vault_path: Path) -> Path:
-    """Write a projection of the SAB (or summary) to Obsidian.
+def render_sab_obsidian(enrichment_rows: list[dict]) -> str:
+    """Render the Obsidian SAB projection markdown for the given rows.
 
     Args:
         enrichment_rows: List of enrichment row dicts
-        vault_path: Directory path where the vault lives
 
     Returns:
-        Path to the written file (obsidian-sab.md)
+        Markdown string
     """
-    vault_path.mkdir(parents=True, exist_ok=True)
-    filepath = vault_path / "obsidian-sab.md"
-
     # Group items by CCIR
     by_ccir = {}
     for r in enrichment_rows:
@@ -192,7 +188,29 @@ def write_sab_obsidian(enrichment_rows: list[dict], vault_path: Path) -> Path:
                 lines.append(f"  - **Emner**: {', '.join(entities)}")
             lines.append("")
 
-    file_content = "\n".join(lines)
+    return "\n".join(lines)
+
+
+def write_sab_obsidian(
+    enrichment_rows: list[dict],
+    vault_path: Path,
+    *,
+    filename: str = "obsidian-sab.md",
+) -> Path:
+    """Write a projection of the SAB (or summary) to Obsidian.
+
+    Args:
+        enrichment_rows: List of enrichment row dicts
+        vault_path: Directory path where the vault lives
+        filename: Optional filename for the SAB projection (default: obsidian-sab.md)
+
+    Returns:
+        Path to the written file
+    """
+    vault_path.mkdir(parents=True, exist_ok=True)
+    filepath = vault_path / filename
+
+    file_content = render_sab_obsidian(enrichment_rows)
     tmp_path = filepath.with_suffix(".tmp")
     tmp_path.write_text(file_content, encoding="utf-8")
     os.replace(tmp_path, filepath)
@@ -200,12 +218,20 @@ def write_sab_obsidian(enrichment_rows: list[dict], vault_path: Path) -> Path:
     return filepath
 
 
-def write_vault_digest(enrichment_rows: list[dict], vault_path: Optional[Path] = None) -> list[Path]:
+def write_vault_digest(
+    enrichment_rows: list[dict],
+    vault_path: Optional[Path] = None,
+    *,
+    write_items: bool = True,
+    sab_filename: str = "obsidian-sab.md",
+) -> list[Path]:
     """Write all high-extraction items to the vault.
 
     Args:
         enrichment_rows: List of enrichment row dicts
         vault_path: Directory path (defaults to ENV var INFOTRIAGE_VAULT_PATH, "data/obsidian")
+        write_items: Whether to write individual item files (default: True)
+        sab_filename: Optional filename for the SAB projection (default: obsidian-sab.md)
 
     Returns:
         List of paths to written files
@@ -227,16 +253,19 @@ def write_vault_digest(enrichment_rows: list[dict], vault_path: Optional[Path] =
     if not include_email:
         kept = [r for r in kept if not (r.get("source") or "").startswith("imap://")]
 
-    # Write individual items
-    paths = []
-    for item in kept:
-        try:
-            path = write_item_obsidian(item, vault_path)
-            paths.append(path)
-        except Exception as e:
-            print(f"Error writing item {item.get('item_id')}: {e}", flush=True)
+    paths: list[Path] = []
+
+    # Write individual items only once (default view)
+    if write_items:
+        for item in kept:
+            try:
+                path = write_item_obsidian(item, vault_path)
+                paths.append(path)
+            except Exception as e:
+                print(f"Error writing item {item.get('item_id')}: {e}", flush=True)
 
     # Write SAB projection
-    write_sab_obsidian(kept, vault_path)
+    write_sab_obsidian(kept, vault_path, filename=sab_filename)
+    paths.append(vault_path / sab_filename)
 
     return paths

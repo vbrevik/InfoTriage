@@ -55,8 +55,11 @@ PMESII_ICONS = {
 }
 
 TESSOC_ICONS = {
-    "time": "⏳", "equipment": "🔧", "space": "🗺️",
-    "skills": "🎓", "organization": "🏢", "communications": "📶",
+    "terror": "💣",
+    "espionage": "🕵️",
+    "subversion": "🎭",
+    "sabotage": "⚡",
+    "organized crime": "🏴‍☠️",
 }
 
 # Placeholder text shown when a CCIR has no items in the current window
@@ -726,9 +729,9 @@ def build_html(verdicts, period, with_bluf=True, generated_at=None, cutoff_epoch
         )
     pmesii_dist_html = f'<div class="pmesii-dist">{pmesii_cards}</div>' if pmesii_cards else ""
 
-    # TESSOC operational variable distribution
+    # TESSOC threat-actor distribution
     tessoc_counts = Counter((v.get("tessoc") or "none").lower() for v in ks)
-    tessoc_vars = ["time", "equipment", "space", "skills", "organization", "communications"]
+    tessoc_vars = ["terror", "espionage", "subversion", "sabotage", "organized crime"]
     max_tessoc = max((tessoc_counts.get(d, 0) for d in tessoc_vars), default=1) or 1
     tessoc_cards = ""
     for var in tessoc_vars:
@@ -737,9 +740,13 @@ def build_html(verdicts, period, with_bluf=True, generated_at=None, cutoff_epoch
             continue
         icon = TESSOC_ICONS.get(var, "")
         pct = round(cnt / max_tessoc * 100)
-        tessoc_color_map = {"time": "var(--amber)", "equipment": "var(--red)",
-                            "space": "var(--blue)", "skills": "var(--green)",
-                            "organization": "var(--purple)", "communications": "var(--cyan)"}
+        tessoc_color_map = {
+            "terror": "var(--red)",
+            "espionage": "var(--blue)",
+            "subversion": "var(--purple)",
+            "sabotage": "var(--amber)",
+            "organized crime": "var(--green)",
+        }
         color = tessoc_color_map.get(var, "var(--text-dim)")
         tessoc_cards += (
             f'<div class="pmesii-dist-card">'
@@ -1690,7 +1697,7 @@ HTML_TEMPLATE = """\
     </ul>
     <h3 style="font-family:var(--sans);font-size:16px;font-weight:600;color:var(--text-bright);margin-top:32px;margin-bottom:4px;">PMESII — operasjonelle domener</h3>
     {pmesii_dist}
-    <h3 style="font-family:var(--sans);font-size:16px;font-weight:600;color:var(--text-bright);margin-top:24px;margin-bottom:4px;">TESSOC — operasjonelle variabler</h3>
+    <h3 style="font-family:var(--sans);font-size:16px;font-weight:600;color:var(--text-bright);margin-top:24px;margin-bottom:4px;">TESSOC — trusselaktører</h3>
     {tessoc_dist}
     <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-top:24px;text-align:center;">
       qwen36-ud-4bit · oMLX :8000/v1 · ADR-004 ✅<br>

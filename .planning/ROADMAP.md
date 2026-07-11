@@ -225,11 +225,8 @@ to the running pipeline.
 
 **Plans**
 
-- [ ] 07-01-PLAN.md — FreshRSS/rss-bridge ops: OPML import, per-feed TTL hygiene, rate-limit documentation (W1)
-- [ ] 07-02-PLAN.md — opml-health container + DLQ consumer (W2)
-- [ ] 07-03-PLAN.md — Structured container logging + ops Makefile hardening (W3)
-- [ ] 07-04-PLAN.md — Retire host-run scripts and legacy Gmail IMAP bridge (W4)
-- [ ] 07-05-PLAN.md — End-to-end M1 ship verification / UAT sign-off (W5)
+- [x] 07-01-FreshRSS-rss-bridge-ops — done (commit 316a20f + 06-05): FreshRSS OPML imported, NewsAPI feeds throttled to 3h TTL, `apps/ingest/RSS_BRIDGE_NOTES.md` + `tests/test_set_newsapi_ttl.py` added.
+- [ ] 07-01-PLAN.md — M1 ship-gate ops: structured logging, DLQ consumer, ops/Makefile, retire host scripts (rolled-up 07-02/07-03/07-04). See `.planning/phases/07-ops-cutover/07-01-PLAN.md`.
 
 ### Phase 8: Entity resolution
 

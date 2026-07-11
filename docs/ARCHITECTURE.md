@@ -5,6 +5,26 @@ target; spike stays runnable while we build toward this.
 
 ---
 
+## ADR index
+
+| ADR | Title | Status |
+|---|---|---|
+| [ADR-001](#adr-001--postgres--pgvector-freshrss-centric) | Postgres + pgvector, FreshRSS-centric | Accepted |
+| [ADR-002](#adr-002--prior-art-evaluate-taranis-ai-before-building) | Prior art: evaluate Taranis AI before building | Accepted |
+| [ADR-003](#adr-003--reframe-this-is-an-osintall-source-intelligence-system-not-a-reader) | Reframe: this is an OSINT/all-source intelligence system, not a reader | Accepted |
+| [ADR-004](#adr-004--all-llm-work-runs-on-local-qwen36-hard-constraint) | All LLM work runs on local qwen3.6 (hard constraint) | Accepted |
+| [ADR-005](adr/ADR-005-cop-world-monitor.md) | COP / World Monitor: drop as engine, build native SP-COP | Accepted |
+| [ADR-006](adr/ADR-006-microservice-architecture-entity-resolution.md) | Microservice architecture + Postgres/pgvector entity resolution | Accepted |
+| [ADR-007](adr/ADR-007-rabbitmq-bus.md) | RabbitMQ event bus topology | Accepted |
+| [ADR-008](adr/ADR-008-self-hosted-mcp-oauth2-ingestion.md) | Self-hosted MCP / OAuth2 ingestion | Accepted |
+| [ADR-009](adr/ADR-009-pmesii-hybrid-definitions.md) | PMESII hybrid definitions | Accepted |
+| [ADR-010](adr/ADR-010-tessoc-taxonomy-correction.md) | TESSOC taxonomy correction | Accepted |
+| [ADR-011](adr/ADR-011-pmesii-ajp01-ajp5-citation.md) | PMESII AJP-01 / AJP-5 citation | Accepted |
+| [ADR-012](adr/ADR-012-dimefil-cop-cip-evaluation.md) | DIMEFIL / COP / CIP / CRP evaluation | Accepted |
+| [ADR-013](adr/ADR-013-recognized-picture-doctrine.md) | Recognized Picture doctrine | Accepted |
+
+---
+
 ## ADR-001 — Postgres + pgvector, FreshRSS-centric
 
 **Context.** The spike works (44 feeds, FreshRSS + local qwen36 CCIR triage, SAB
@@ -91,6 +111,67 @@ to cut LLM calls and sharpen tagging. *Done when:* clearly-off-topic items skip 
 **Phase 4 — RAG SAB / recall.** "What do we know about X since date" → vector retrieve +
 qwen36 synthesis. Situational awareness over time, not just today. *Done when:* a themed
 recall brief cites stored articles.
+
+## Brief app / SAB endpoints
+
+The `apps/brief` container serves the Situation Awareness Brief (SAB) and writes the
+digest files consumed by the vault and downstream readers.
+
+### HTTP endpoints
+
+| Endpoint | Description |
+|---|---|
+| `GET /health` | Liveness probe (no DB dependency) |
+| `GET /sab` | Cached SAB HTML; regenerates when `sab.html` is ≥24 h old |
+| `GET /sab?window=24h` | Ad-hoc HTML render for the last N hours; bypasses cache |
+| `GET /sab?mode=list` | Markdown list (`score >= 8`) for the window |
+| `GET /vault` | Obsidian vault SAB projection as markdown |
+| `GET /vault?view=cop` | Vault SAB filtered through the requested picture view |
+
+### View filters (`?view=`)
+
+The SAB can be rendered through three picture lenses (ADR-012, ADR-013). Views are
+applied **after** fetching rows from Postgres; they do not change the LLM scorer.
+
+| View | Query param | What it shows |
+|---|---|---|
+| **COP** | `?view=cop` | Common Operational Picture — friendly/operational items: `FFIR-1/2/3`, `PIR-3`, `SIR-2/3` × `Political/Military/Infrastructure` |
+| **CIP** | `?view=cip` | Common Intelligence Picture — adversary/threat items: `PIR-*` with a TESSOC tag × `Information/Military/Economic` |
+| **CRP** | `?view=crp&ccir=PIR-1,PIR-2&pmesii=Military&Economic&tessoc=Sabotage&min_score=8` | Common Relevant Picture — user-configurable AND-ed filters |
+
+CRP parameters:
+- `ccir` — comma-separated CCIR codes (case-insensitive)
+- `pmesii` — comma-separated PMESII domains
+- `tessoc` — comma-separated TESSOC categories
+- `min_score` — minimum enrichment score (inclusive)
+
+View-filtered requests bypass the shared `sab.html` cache and are never written to it.
+
+**Ad-hoc vs. persisted views.**
+- **COP and CIP** are first-class picture views. The background consumer renders them to disk on every `verdict.ready` event (see [Digest outputs](#digest-outputs)) and writes matching vault projections.
+- **CRP** is intentionally ad-hoc: it is available on demand through `GET /sab?view=crp&...` and `GET /vault?view=crp&...`, but the consumer does not persist CRP-specific files. This keeps the commander's custom filter ephemeral and avoids an open-ended multiplication of output files.
+
+The `/vault` endpoint returns the same Obsidian SAB projection that the consumer writes to `obsidian-sab.md`, but rendered on demand and filtered by the requested view. It supports the same `view` / `ccir` / `pmesii` / `tessoc` / `min_score` parameters as `/sab`.
+
+### Digest outputs
+
+The background consumer renders the following files under `INFOTRIAGE_DIGESTS_DIR`
+(default `data/digests`):
+
+```
+brief.md      cluster.md      list.md      bluf.md
+brief-cop.md  cluster-cop.md  list-cop.md  bluf-cop.md
+brief-cip.md  cluster-cip.md  list-cip.md  bluf-cip.md
+```
+
+Vault projections are written to `INFOTRIAGE_VAULT_PATH` (default `data/obsidian`):
+
+```
+obsidian-sab.md     obsidian-sab-cop.md     obsidian-sab-cip.md
+<item_id>.md
+```
+
+Individual item files are written once; view projections reuse the same item pool.
 
 ## Open questions
 - FreshRSS migration: re-provision fresh on Postgres (simplest) vs migrate SQLite data?

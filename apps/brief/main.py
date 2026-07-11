@@ -28,6 +28,8 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 
 from apps.brief.html_renderer import build_html
 from apps.brief.renderer import render_list
+from apps.brief.vault_writer import render_sab_obsidian
+from apps.brief.views import filter_rows
 
 # Default SAB cutoff now comes from BRIEF_WINDOW_HOURS (rolling window, default 24h).
 # OSLO timezone is used for the period label.
@@ -113,8 +115,17 @@ def _parse_window(window: str) -> datetime.datetime:
     return datetime.datetime.now(OSLO) - datetime.timedelta(hours=hours)
 
 
-async def _render_sab(since: datetime.datetime, with_bluf: bool) -> str:
+async def _render_sab(
+    since: datetime.datetime,
+    with_bluf: bool,
+    view: str | None = None,
+    crp_params: dict | None = None,
+) -> str:
     rows = await asyncio.to_thread(_fetch_rows, since)
+    try:
+        rows = filter_rows(rows, view, crp_params)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return await asyncio.to_thread(
         build_html, rows, _period_label(since), with_bluf,
         cluster_threshold=CLUSTER_THRESHOLD,
@@ -168,23 +179,58 @@ async def health():
 
 
 @app.get("/sab")
-async def sab(window: str | None = None, mode: str | None = None):
+async def sab(
+    window: str | None = None,
+    mode: str | None = None,
+    view: str | None = None,
+    ccir: str | None = None,
+    pmesii: str | None = None,
+    tessoc: str | None = None,
+    min_score: int | None = None,
+):
     with_bluf = os.environ.get("BRIEF_WITH_BLUF", "1") == "1"
+
+    # Build CRP params from query string
+    crp_params: dict | None = None
+    if view is not None and view.lower() == "crp":
+        crp_params = {}
+        if ccir:
+            crp_params["ccir"] = ccir
+        if pmesii:
+            crp_params["pmesii"] = pmesii
+        if tessoc:
+            crp_params["tessoc"] = tessoc
+        if min_score is not None:
+            crp_params["min_score"] = str(min_score)
+        if not crp_params:
+            raise HTTPException(
+                status_code=422,
+                detail="CRP view requires at least one of: ccir, pmesii, tessoc, min_score",
+            )
 
     # ?mode=list — list markdown for the window, never written to disk (SPEC)
     if mode == "list":
         since = _parse_window(window) if window else _default_cutoff()
         rows = await asyncio.to_thread(_fetch_rows, since)
+        try:
+            rows = filter_rows(rows, view, crp_params)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         return PlainTextResponse(render_list(rows), media_type="text/markdown")
     if mode is not None:
         raise HTTPException(status_code=422, detail="mode must be 'list'")
 
     # ?window=24h — ad-hoc render, serve without updating the cache (D-10)
     if window is not None:
-        html = await _render_sab(_parse_window(window), with_bluf)
+        html = await _render_sab(_parse_window(window), with_bluf, view, crp_params)
         return HTMLResponse(html)
 
-    # Default path — staleness gate on file mtime (D-01)
+    # Default path — staleness gate on file mtime (D-01).
+    # View filters are ad-hoc lenses: bypass the shared cache and never write it.
+    if view is not None:
+        html = await _render_sab(_default_cutoff(), with_bluf, view, crp_params)
+        return HTMLResponse(html)
+
     try:
         age = datetime.datetime.now().timestamp() - SAB_HTML.stat().st_mtime
         fresh = age < STALE_AFTER_S
@@ -195,6 +241,51 @@ async def sab(window: str | None = None, mode: str | None = None):
         await asyncio.to_thread(_write_atomic, SAB_HTML, html)
     return FileResponse(SAB_HTML, media_type="text/html",
                         headers={"Cache-Control": "max-age=86400"})
+
+
+@app.get("/vault")
+async def vault(
+    window: str | None = None,
+    view: str | None = None,
+    ccir: str | None = None,
+    pmesii: str | None = None,
+    tessoc: str | None = None,
+    min_score: int | None = None,
+):
+    """Return the Obsidian vault SAB projection as markdown.
+
+    Supports the same view filters as /sab:
+      - ?view=cop
+      - ?view=cip
+      - ?view=crp&ccir=...&pmesii=...&tessoc=...&min_score=...
+    """
+    # Build CRP params from query string
+    crp_params: dict | None = None
+    if view is not None and view.lower() == "crp":
+        crp_params = {}
+        if ccir:
+            crp_params["ccir"] = ccir
+        if pmesii:
+            crp_params["pmesii"] = pmesii
+        if tessoc:
+            crp_params["tessoc"] = tessoc
+        if min_score is not None:
+            crp_params["min_score"] = str(min_score)
+        if not crp_params:
+            raise HTTPException(
+                status_code=422,
+                detail="CRP view requires at least one of: ccir, pmesii, tessoc, min_score",
+            )
+
+    since = _parse_window(window) if window else _default_cutoff()
+    rows = await asyncio.to_thread(_fetch_rows, since)
+    try:
+        rows = filter_rows(rows, view, crp_params)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    md = await asyncio.to_thread(render_sab_obsidian, rows)
+    return PlainTextResponse(md, media_type="text/markdown")
 
 
 if __name__ == "__main__":

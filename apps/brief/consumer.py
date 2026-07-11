@@ -25,6 +25,7 @@ from apps.brief.renderer import (  # noqa: E402
     render_cluster,
 )
 from apps.brief.vault_writer import write_vault_digest  # noqa: E402
+from apps.brief.views import filter_rows  # noqa: E402
 
 log = logging.getLogger(__name__)
 
@@ -98,24 +99,35 @@ async def process_verdict(
 
     enrichment_rows = await asyncio.to_thread(_fetch_all)
 
-    # Render all four outputs
+    # Compute view-filtered row sets (ADR-012)
+    cop_rows = filter_rows(enrichment_rows, "cop")
+    cip_rows = filter_rows(enrichment_rows, "cip")
+
+    # Render all four outputs for default, COP, and CIP views
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    brief_md, cluster_md, list_md, bluf_md = await asyncio.gather(
-        asyncio.to_thread(render_brief, enrichment_rows, cluster_threshold=cluster_threshold),
-        asyncio.to_thread(render_cluster, enrichment_rows, cluster_threshold=cluster_threshold),
-        asyncio.to_thread(render_list, enrichment_rows),
-        asyncio.to_thread(_render_bluf_all_sections, enrichment_rows),
-    )
+    async def _render_view(rows: list[dict], suffix: str) -> dict[str, str]:
+        """Render the four digest files for a given row set."""
+        brief_md, cluster_md, list_md, bluf_md = await asyncio.gather(
+            asyncio.to_thread(render_brief, rows, cluster_threshold=cluster_threshold),
+            asyncio.to_thread(render_cluster, rows, cluster_threshold=cluster_threshold),
+            asyncio.to_thread(render_list, rows),
+            asyncio.to_thread(_render_bluf_all_sections, rows),
+        )
+        return {
+            f"brief{suffix}.md": brief_md,
+            f"cluster{suffix}.md": cluster_md,
+            f"list{suffix}.md": list_md,
+            f"bluf{suffix}.md": bluf_md,
+        }
+
+    # Default view
+    files = await _render_view(enrichment_rows, "")
+    # COP and CIP views
+    files.update(await _render_view(cop_rows, "-cop"))
+    files.update(await _render_view(cip_rows, "-cip"))
 
     # Write atomically (BACKSTOP: concurrent SAB writes via .tmp + os.replace)
-    files = {
-        "brief.md": brief_md,
-        "cluster.md": cluster_md,
-        "list.md": list_md,
-        "bluf.md": bluf_md,
-    }
-
     for name, content in files.items():
         fpath = DATA_DIR / name
         tmp = fpath.with_suffix(".tmp")
@@ -125,8 +137,19 @@ async def process_verdict(
 
     # Write Obsidian vault projection (SC2, SC3)
     vault_dir = Path(os.environ.get("INFOTRIAGE_VAULT_PATH", "data/obsidian"))
-    await asyncio.to_thread(write_vault_digest, enrichment_rows, vault_dir)
-    log.info("wrote Obsidian vault projection")
+    await asyncio.to_thread(
+        write_vault_digest, enrichment_rows, vault_dir,
+        write_items=True, sab_filename="obsidian-sab.md",
+    )
+    await asyncio.to_thread(
+        write_vault_digest, cop_rows, vault_dir,
+        write_items=False, sab_filename="obsidian-sab-cop.md",
+    )
+    await asyncio.to_thread(
+        write_vault_digest, cip_rows, vault_dir,
+        write_items=False, sab_filename="obsidian-sab-cip.md",
+    )
+    log.info("wrote Obsidian vault projections (default, cop, cip)")
 
     # Publish SabPublished event
     ccir_topics = sorted({
