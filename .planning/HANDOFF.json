@@ -1,85 +1,62 @@
 {
   "version": "1.0",
-  "timestamp": "2026-07-10T00:00:00Z",
-  "phase": "06-brief-app",
-  "phase_name": "Brief app",
-  "phase_dir": ".planning/phases/06-brief-app",
-  "plan": 6,
+  "timestamp": "2026-07-11T00:00:00Z",
+  "phase": "07-ops-cutover",
+  "phase_name": "Ops + cutover",
+  "phase_dir": ".planning/phases/07-ops-cutover",
+  "previous_phase": "06-brief-app",
+  "previous_phase_dir": ".planning/phases/06-brief-app",
+  "plan": 1,
   "task": 1,
-  "total_tasks": 9,
-  "status": "paused",
-  "completed_tasks": [
-    {"id": 1, "name": "06-01 Wave 1 renderer + Wave 2 serving", "status": "done", "commit": "316a20f"},
-    {"id": 2, "name": "06-02 pgvector semantic clustering", "status": "done", "commit": "3047116"},
-    {"id": 3, "name": "06-03 Clustering data-flow gap closure", "status": "done", "commit": "e6fab90"},
-    {"id": 4, "name": "06-04 Vault-writer gap closure", "status": "done", "commit": "e6fab90"},
-    {"id": 5, "name": "06-05 Test-DSN safety", "status": "done", "commit": "2d6c255"},
-    {"id": 6, "name": "06-06 Store txn hygiene", "status": "done", "commit": "53d2174"},
-    {"id": 7, "name": "SAB source status card + hide empty CCIR slides", "status": "done", "commit": "uncommitted"},
-    {"id": 8, "name": "FreshRSS OPML import + NewsAPI 3h TTL", "status": "done", "commit": "uncommitted"},
-    {"id": 9, "name": "TTL docs (RSS_BRIDGE_NOTES.md) + syntax test", "status": "done", "commit": "uncommitted"}
-  ],
-  "remaining_tasks": [
-    {"id": 1, "name": "UAT Test 1: Cold Start Smoke Test", "status": "not_started"},
-    {"id": 2, "name": "UAT Test 2: View SAB /sab endpoint", "status": "not_started"},
-    {"id": 3, "name": "UAT Test 3: Semantic clustering on real data", "status": "not_started"},
-    {"id": 4, "name": "UAT Test 4: Vault writer .md files", "status": "not_started"},
-    {"id": 5, "name": "UAT Test 5: Email items in vault", "status": "not_started"},
-    {"id": 6, "name": "UAT Test 6: CLUSTER_THRESHOLD validation", "status": "not_started"},
-    {"id": 7, "name": "UAT Test 7: Event-driven rendering", "status": "not_started"},
-    {"id": 8, "name": "UAT Test 8: Semantic clustering on real data", "status": "not_started"},
-    {"id": 9, "name": "UAT Test 9: CLUSTER_THRESHOLD configurable", "status": "not_started"}
-  ],
+  "total_tasks": 4,
+  "status": "queued",
+  "phase_6_closeout": {
+    "status": "closed",
+    "uat_passed": "9/9",
+    "summary": "All 6 plans (06-01..06-06) have SUMMARY.md. 06-UAT.md shows 9/9 (Test 7 has a documented q.notify caveat — the digest rewrite is direct evidence; the publish is just slow on cold oMLX).",
+    "completed_tasks": [
+      {"id": 1, "name": "06-01 Wave 1 renderer + Wave 2 serving", "status": "done", "commit": "316a20f"},
+      {"id": 2, "name": "06-02 pgvector semantic clustering", "status": "done", "commit": "3047116"},
+      {"id": 3, "name": "06-03 Clustering data-flow gap closure", "status": "done", "commit": "e6fab90"},
+      {"id": 4, "name": "06-04 Vault-writer gap closure", "status": "done", "commit": "e6fab90"},
+      {"id": 5, "name": "06-05 Test-DSN safety", "status": "done", "commit": "2d6c255"},
+      {"id": 6, "name": "06-06 Store txn hygiene", "status": "done", "commit": "53d2174"},
+      {"id": 7, "name": "render_brief regression fix (digest.line() `or` short-circuit dropped title/score)", "status": "done", "commit": "07df0d9"},
+      {"id": 8, "name": "View-filter pipeline + TESSOC taxonomy (ADR-010) + ADRs + UAT scripts", "status": "done", "commit": "ddf2a04"},
+      {"id": 9, "name": "Phase 6 UAT closure — 4 UAT scripts (uat_test4/5/7/9) + 06-UAT.md updated to 9/9", "status": "done", "commit": "8cf93e7"}
+    ]
+  },
   "blockers": [],
   "async_jobs": [],
-  "human_actions_pending": [
-    {"action": "Run UAT tests 1-9 against live stack", "context": "All gap-closure plans complete; need live verification", "blocking": true}
-  ],
+  "human_actions_pending": [],
   "decisions": [
     {"decision": "pgvector HNSW greedy centroid clustering per CCIR section", "rationale": "Replaces keyword-overlap fallback; semantic similarity via mE5-large embeddings", "phase": "06"},
     {"decision": "Vault-writer uses interim heuristic wikilinks", "rationale": "Full entity resolution deferred to Phase 8; interim heuristic sufficient for UAT", "phase": "06"},
     {"decision": "Test-DSN pattern: INFOTRIAGE_TEST_DSN only, no fallback", "rationale": "Prevents prod DB wipe; guard test enforces", "phase": "06"},
     {"decision": "Idle-in-transaction backstop: 5-min server-side timeout", "rationale": "Self-heals future leaks; 300s >> legitimate operations (~120s)", "phase": "06"},
-    {"decision": "threshold config: CLUSTER_THRESHOLD env var (0.0-1.0), default 0.75", "rationale": "Configurable threshold for clustering; validated in main.py", "phase": "06"}
+    {"decision": "threshold config: CLUSTER_THRESHOLD env var (0.0-1.0), default 0.75", "rationale": "Configurable threshold for clustering; validated in main.py", "phase": "06"},
+    {"decision": "View filters: COP/CIP/CRP (ADR-012); COP=operational/friendly, CIP=adversary/threat, CRP=user-configurable", "rationale": "Output lenses — don't change the LLM scorer, just render subsets", "phase": "06"},
+    {"decision": "TESSOC taxonomy: UK/NATO JDP 2-00 threat-actor frame (Terror/Espionage/Subversion/Sabotage/Organized Crime)", "rationale": "ADR-010; replaces operational-variable list (Time/Equipment/.../Communications)", "phase": "06"},
+    {"decision": "render_brief inline format (drop digest.line() which short-circuited title/score when why was truthy)", "rationale": "CAT_II/ROUTINE items were rendering `- <why>  [les](url)` with no title or score", "phase": "06"},
+    {"decision": "views.py:_normalize actually title-cases (was docstring-only); _matches_cip adds .upper() on ccir", "rationale": "Lowercase pmesii from seed_sample_data.py was failing case-sensitive _CIP_PMESII set membership; .title() corrupted 'PIR-1' → 'Pir-1' so ccir needed .upper() to undo it", "phase": "06"},
+    {"decision": "M1 ship-gate single 07-01 plan covers structured logging + DLQ consumer + ops Makefile + retire host scripts", "rationale": "Consolidates original 07-02/07-03/07-04 into one executable plan; the original 07-01 (FreshRSS ops) is already done", "phase": "07"}
   ],
-  "uncommitted_files": [
-    ".env.bak-channels",
-    ".planning/phases/00-concept-spike/00-VERIFICATION.md",
-    ".planning/research/",
-    "test_*.py"
+  "uncommitted_files": [],
+  "prerequisite_commits": [
+    {"commit": "07df0d9", "purpose": "render_brief regression fix — prevent digest.line() short-circuit from dropping title/score"},
+    {"commit": "ddf2a04", "purpose": "View-filter pipeline + TESSOC taxonomy (ADR-010) + 5 ADRs + UAT script seeds"},
+    {"commit": "8cf93e7", "purpose": "Phase 6 UAT closure — 4 live UAT scripts + 06-UAT.md updated to 9/9"}
   ],
-  "next_action": "Run UAT Test 1: Cold Start Smoke Test — docker compose down -v && docker compose up -d && sleep 10 && curl -s http://localhost:22040/health (or continue with Phase 7 ops planning if UAT is deferred)",
-  "context_notes": "Phase 6 gap-closure complete. All 6 plans have SUMMARY.md. UAT.md created with 9 tests. SAB UI polished (source status card, hide empty CCIR slides). FreshRSS OPML imported and NewsAPI feeds throttled to 3h TTL. TTL docs + syntax test added. Need to run UAT tests sequentially against live stack. Key technical debt: clustering threshold 0.75 may be too high (similarities 0.72-0.82); HTML renderer still uses keyword clustering via sab_html.py. Ready for UAT re-run or Phase 7 ops planning.",
+  "next_action": "Phase 7 07-01 entry conditions satisfied: all prerequisite_commits landed and Phase 6 is closed at 9/9 UAT. Begin Phase 7 07-01 (M1 ship-gate ops) per .planning/phases/07-ops-cutover/07-01-PLAN.md. NOTE: do NOT skip or reorder prerequisite_commits — they are the closed-out Phase 6 baseline. Suggested task order: Task 1 (retire host scripts — smallest/cheapest first) → Task 2 (structured logging — partly wired in commit edbf283, extend to remaining services) → Task 3 (ops/Makefile) → Task 4 (DLQ consumer — touches live RabbitMQ, do last). Original order in next_action draft was Task 4 → Task 1 → Task 3 → Task 2; revised to smallest-first.",
+  "context_notes": "Phase 6 fully closed. Renderer regression fix in apps/brief/renderer.py (commit 07df0d9) prevents digest.line() from short-circuiting title/score. View-filter pipeline + TESSOC taxonomy (ADR-010) + 5 ADRs in commit ddf2a04. 4 UAT scripts run live green (uat_test4 vault, uat_test5 email, uat_test7 event-driven, uat_test9 threshold env) with Test 7's q.notify check documented as 'slow but wiring correct' (the live consumer cycle is 90–360s due to 18 LLM calls for BLUF synthesis). Phase 7 is queued: 07-01 covers M1 ship-gate work. After 07-01 lands, the stack is at parity with the spike and ready for M1 ship.",
   "critical_anti_patterns": [
-    {
-      "pattern": "Writing SUMMARY before verifying artifacts on disk",
-      "description": "06-01 SUMMARY claimed deliverables not on disk",
-      "severity": "blocking",
-      "prevention": "git status + ls first; never trust agent output"
-    },
-    {
-      "pattern": "Running tests against prod DB",
-      "description": "DEV_DSN = prod :22000 in test fixtures",
-      "severity": "blocking",
-      "prevention": "test_dsn_safety.py guard; INFOTRIAGE_TEST_DSN only"
-    },
-    {
-      "pattern": "Monkey-patch without verification",
-      "description": "HTML renderer monkey-patch didn't apply",
-      "severity": "blocking",
-      "prevention": "Test monkey-patch in isolation before integrating"
-    },
-    {
-      "pattern": "Threshold too high",
-      "description": "0.75 excluded 0.72-0.82 similarity pairs",
-      "severity": "advisory",
-      "prevention": "Calibrate on held-out corpus; log merge decisions"
-    },
-    {
-      "pattern": "Monkey-patch not applied",
-      "description": "sab_html.cluster called directly, not via module",
-      "severity": "blocking",
-      "prevention": "Modify module function, not local reference"
-    }
+    {"pattern": "Writing SUMMARY before verifying artifacts on disk", "description": "06-01 SUMMARY claimed deliverables not on disk", "severity": "blocking", "prevention": "git status + ls first; never trust agent output"},
+    {"pattern": "Running tests against prod DB", "description": "DEV_DSN = prod :22000 in test fixtures", "severity": "blocking", "prevention": "test_dsn_safety.py guard; INFOTRIAGE_TEST_DSN only"},
+    {"pattern": "Monkey-patch without verification", "description": "HTML renderer monkey-patch didn't apply", "severity": "blocking", "prevention": "Test monkey-patch in isolation before integrating"},
+    {"pattern": "Threshold too high", "description": "0.75 excluded 0.72-0.82 similarity pairs", "severity": "advisory", "prevention": "Calibrate on held-out corpus; log merge decisions"},
+    {"pattern": "Monkey-patch not applied", "description": "sab_html.cluster called directly, not via module", "severity": "blocking", "prevention": "Modify module function, not local reference"},
+    {"pattern": "Reintroducing _digest_line", "description": "drops title/score when why is truthy", "severity": "blocking", "prevention": "TestRenderBriefIncludesAllItemFields regression test"},
+    {"pattern": "Lowercase pmesii/tessoc in DB rows", "description": "view filters fail (case-sensitive set membership)", "severity": "blocking", "prevention": "TestCaseInsensitiveNormalization regression test; views.py:_normalize title-cases"},
+    {"pattern": "Forgetting .upper() on ccir after .title()", "description": "str.title() corrupts 'PIR-1' → 'Pir-1' (capitalizes first letter, lowercases rest); _matches_cip needs .upper() on ccir like _matches_cop does", "severity": "blocking", "prevention": "Always use the pattern ccir = _normalize(row.get('ccir')).upper() when checking against uppercase sets or doing startswith on uppercase prefixes"}
   ]
 }
