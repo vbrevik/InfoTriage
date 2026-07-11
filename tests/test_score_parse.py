@@ -144,3 +144,56 @@ def test_ccir_none_both_pmesii_and_tessoc_emitted_both_coerced():
     assert v["pmesii"] == "none"
     assert v["tessoc"] == "none"
     assert v["bucket"] == "skip"
+
+
+# -- TESSOC vocabulary coverage (formerly untested labels) ---------------
+
+
+def test_tessoc_terror_low_score_maybe():
+    """PIR-1 + TESSOC='Terror' passes through score_item unchanged → bucket=maybe.
+
+    Regression guard for the TESSOC taxonomy (commit 9b62b95 reorganised
+    TESSOC to the UK/NATO JDP 2-00 threat-actor frame: Terror / Espionage /
+    Subversion / Sabotage / Organized Crime). If a future prompt rewrite
+    drops 'Terror' from the enumeration list, the LLM might silently start
+    emitting 'none' or another label instead, and this test fails loudly.
+    """
+    payload = json.dumps({"ccir": "PIR-1", "cnr": "II", "pmesii": "Military",
+                          "tessoc": "Terror", "score": 4, "why": "test"})
+    v = _score_with(payload)
+    assert v["bucket"] == "maybe"
+    assert v["pmesii"] == "Military"
+    assert v["tessoc"] == "Terror"
+
+
+def test_tessoc_subversion_low_score_maybe():
+    """PIR-1 + TESSOC='Subversion' passes through score_item unchanged → bucket=maybe.
+
+    Regression guard. Per ccir.md (post-9b62b95), PIR-1's canonical TESSOC
+    annotation lists 'Espionage, Sabotage, Subversion' — so this label is
+    BOTH canonically valid AND now directly tested (previously only
+    Espionage and Sabotage were exercised in the test suite).
+    """
+    payload = json.dumps({"ccir": "PIR-1", "cnr": "II", "pmesii": "Political",
+                          "tessoc": "Subversion", "score": 4, "why": "test"})
+    v = _score_with(payload)
+    assert v["bucket"] == "maybe"
+    assert v["pmesii"] == "Political"
+    assert v["tessoc"] == "Subversion"
+
+
+def test_tessoc_organized_crime_low_score_maybe():
+    """PIR-1 + TESSOC='Organized Crime' passes through score_item unchanged → bucket=maybe.
+
+    Regression guard. Note the SPACE in the value — matches the LLM-emitted
+    title-case form per the prompt's enumeration list ('Organized Crime',
+    not 'organized_crime' or 'Organized_Crime'). This value flows through
+    sab_html.py, which lowercases it before lookup (TESSOC_ICONS['organized crime']),
+    so both the scorer and the renderer need to preserve the space.
+    """
+    payload = json.dumps({"ccir": "PIR-1", "cnr": "II", "pmesii": "Economic",
+                          "tessoc": "Organized Crime", "score": 4, "why": "test"})
+    v = _score_with(payload)
+    assert v["bucket"] == "maybe"
+    assert v["pmesii"] == "Economic"
+    assert v["tessoc"] == "Organized Crime"
