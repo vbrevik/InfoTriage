@@ -1,23 +1,14 @@
 ---
-status: testing
+status: complete
 phase: 06-brief-app
 source: 06-01-SUMMARY.md, 06-02-SUMMARY.md, 06-03-SUMMARY.md, 06-04-SUMMARY.md, 06-05-SUMMARY.md, 06-06-SUMMARY.md
 started: 2026-07-09T14:00:00Z
-updated: 2026-07-09T14:00:00Z
+updated: 2026-07-11T20:30:00Z
 ---
 
 ## Current Test
 
-number: 2
-name: View SAB via FastAPI /sab endpoint
-expected: |
-  Server responds to GET /sab with HTML page, displays CNR alerts at top, CCIR sections with
-  clusters, and includes "Since" timestamp. Container is healthy at /health.
-result: pass
-evidence: |
-  2026-07-10: GET http://localhost:22040/sab returned a valid HTML document with title
-  "InfoTriage · SAB — siden 2026-07-10 12:05". Fixed a NameError ('cutoff' undefined) in
-  apps/triage/sab_html.py by threading cutoff_epoch through build_html().
+[testing complete]
 
 ## Tests
 
