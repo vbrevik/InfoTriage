@@ -1,9 +1,9 @@
 ---
-status: complete
+status: diagnosed
 phase: 06-brief-app
 source: 06-01-SUMMARY.md, 06-02-SUMMARY.md, 06-03-SUMMARY.md, 06-04-SUMMARY.md, 06-05-SUMMARY.md, 06-06-SUMMARY.md
-started: 2026-07-09T14:00:00Z
-updated: 2026-07-11T20:30:00Z
+started: 2026-07-11T21:00:00Z
+updated: 2026-07-11T21:45:00Z
 ---
 
 ## Current Test
@@ -13,187 +13,98 @@ updated: 2026-07-11T20:30:00Z
 ## Tests
 
 ### 1. Cold Start Smoke Test
-expected: Kill any running services. Clear ephemeral state. Start the application stack from scratch (docker compose up -d). Server boots without errors, seed/migration completes, and a primary query (GET /health on brief:22040) returns live data.
+expected: Kill any running services (docker compose down -v). Start the stack from scratch (docker compose up -d). All services boot without errors, schema/migration completes, GET http://localhost:22040/health returns ok.
 result: pass
 evidence: |
-  - Executed `docker compose down -v` at 2026-07-10.
-  - Executed `docker compose up -d`; stack started successfully.
-  - GET http://localhost:22040/health returned `{"status":"ok","service":"brief"}`.
-  - Fixed a pre-existing `apps/opml_health/Dockerfile` path/import bug that caused
-    `infotriage-opml-health` to crash on startup with `ModuleNotFoundError: No module named 'apps'`.
-    The Dockerfile now preserves the `apps/` layout (matching `apps/brief/Dockerfile`).
+  Deviation: ran `docker compose down` + `up -d` WITHOUT -v (volumes preserved) — full
+  volume-wipe + reseed already validated in round 1 (2026-07-10); wiping now would destroy
+  live enrichment data needed by tests 3-8. All 14 services restarted; brief healthy in 20s;
+  /health returned {"status":"ok","service":"brief"}; 0 errors in brief logs.
 
-### 2. View SAB via FastAPI /sab endpoint
-expected: Server responds to GET /sab with HTML page, displays CNR alerts at top, CCIR sections with clusters, and includes "Since" timestamp. Container is healthy at /health.
+### 2. View SAB via /sab endpoint with query params
+expected: GET /sab returns staleness-gated HTML page (CNR alerts top, CCIR sections, "siden" timestamp). ?window=Nh narrows the time window; ?mode=list renders list view sorted by score.
 result: pass
 evidence: |
-  - GET http://localhost:22040/sab returned HTTP 200 with a complete HTML document.
-  - Title includes "Since" timestamp: `InfoTriage · SAB — siden 2026-07-10 12:05`.
-  - HTML contains slide sections: title, CNR, PIR-1, PIR-2, PIR-3, PIR-4, FFIR-3, filtered, BLUF, stats.
-  - CNR alert (`🚩 CNR — varsle straks`) is rendered at the top when CNR-I items exist.
-  - CCIR sections are rendered only when matching items exist in the window.
-  - Seeded 11 sample articles/enrichments/embeddings via `scripts/seed_sample_data.py` to
-    populate CNR alerts and CCIR sections.
-  - Fixed `NameError: name 'cutoff' is not defined` in `apps/triage/sab_html.py` by adding
-    `cutoff_epoch` parameter to `build_html()` and threading it through
-    `apps/brief/html_renderer.py` → `apps/brief/main.py`.
-  - Full pytest suite: 275 passed, 2 skipped after the fix.
+  /sab → HTTP 200, 74KB HTML, title "InfoTriage · SAB — siden 2026-07-10 18:13", 4 CNR +
+  FFIR/CCIR sections. ?window=48h → 200, 81KB (window respected). ?mode=list → 200, compact
+  list "7 viktigste" sorted 9,9,8,8,8,8,8 with 🚩 flags.
 
-### 3. Clustering shows multi-item semantic groups
-expected: At least one CCIR section contains 2+ items grouped together via pgvector clustering (not just singletons). Keyword-overlap fallback is NOT used.
+### 3. Semantic clustering groups related items per CCIR
+expected: Items with similar content within the same CCIR section merge into multi-source clusters ("N kilder"); items from different CCIR sections never merge into one cluster.
 result: pass
 evidence: |
-  - Seeded 11 sample articles/enrichments/embeddings via `scripts/seed_sample_data.py`.
-  - After clearing `data/digests/sab.html`, GET http://localhost:22040/sab rendered CCIR
-    sections with multi-item clusters:
-    - PIR-1: 4 saker · 1 klynger
-    - PIR-2: 2 saker · 1 klynger
-    - PIR-4: 2 saker · 1 klynger
-    - FFIR-3: 2 saker · 1 klynger
-  - Multi-source cluster tags appear in the HTML: `(3 kilder)`, `(2 kilder)`.
-  - Root cause found and fixed: `psycopg` returned embeddings as JSON strings, which
-    `apps/brief/html_renderer.py` discarded as non-list embeddings. Updated
-    `_apply_semantic_clustering()` to parse string embeddings and pass the real
-    `cluster_threshold` through to `cluster_items_in_memory()`.
-  - Full pytest suite: 275 passed, 2 skipped after the fix.
+  Live /sab shows 6 multi-source clusters ("2 kilder", "3 kilder"). 169 embeddings in
+  infotriage.embeddings. CCIR-boundary: zebra decoy items (near-identical content, seeded
+  in PIR-1 vs PIR-2) rendered as separate items — never merged across sections.
 
-### 4. Vault writer creates .md files in brief-outbox
-expected: Obsidian markdown files appear in ${OBSIDIAN_VAULT_PATH}/brief-outbox for high-value items and the SAB summary. Files have valid front-matter parseable by existing codec.
+### 4. CLUSTER_THRESHOLD env var validated and wired
+expected: Setting CLUSTER_THRESHOLD outside 0.0-1.0 fails startup with a clear error. A valid value changes clustering behavior — the value reaches the actual clustering call.
 result: pass
 evidence: |
-  - `scripts/uat_test4_vault.py` ran clean on the live stack.
-  - Vault directory `/Users/vidarbrevik/Vault/brief-outbox` exists.
-  - 24 `.md` files present, including `obsidian-sab.md`.
-  - 5 per-item `.md` files correctly parsed via `contracts.from_frontmatter()`.
+  CLUSTER_THRESHOLD=1.5 → ValueError("CLUSTER_THRESHOLD must be 0.0–1.0, got 1.5") at import.
+  Live 42-row corpus clustered in-container: threshold=0.95 → 35 clusters (5 multi);
+  0.75 → 8 clusters (6 multi). Value demonstrably reaches cluster_items_in_memory().
+  Note: ad-hoc DB reads need pgvector register_vector(); production PostgresStore registers
+  it in __enter__ (embedding arrives as str otherwise — harness artifact, not a product bug).
 
-### 5. Vault writer includes email-sourced items by default
-expected: Items with source_type='imap' (email) appear in vault output unless VAULT_INCLUDE_EMAIL=0. Front-matter codec round-trips correctly with punctuation and multiline fields.
+### 5. Vault writer emits Obsidian .md files
+expected: After a render cycle, /vault/brief-outbox contains obsidian-sab.md plus per-item .md files for high-value items, with YAML front-matter and [[entity]] wikilinks.
 result: pass
 evidence: |
-  - `scripts/uat_test5_email.py` ran. 0 live `imap://` rows exist in DB
-    (gmail-ingest is down/out of scope for Phase 6), so the live inclusion
-    path was vacuously satisfied.
-  - Fixture test passed in both directions: a synthesized `imap://` row was
-    included in the vault by default, and correctly filtered out when
-    `VAULT_INCLUDE_EMAIL=0`.
-  - Front-matter codec round-trip is already covered by Test 4 (5 per-item
-    files parsed cleanly).
+  /vault/brief-outbox (host: ~/Vault/brief-outbox) holds obsidian-sab.md (22 saker,
+  22 wikilinks, SIR/PIR sections) + per-item .md files keyed by item_id with YAML
+  front-matter (bucket, ccir, cnr, score, source, title, url).
 
-### 6. CLUSTER_THRESHOLD validation works
-expected: Out-of-range values (negative, >1) cause ValueError; default 0.75 is used when env var missing. Threshold is validated in main.py and passed through consumer render path.
+### 6. VAULT_INCLUDE_EMAIL toggle
+expected: Default (1): email-sourced items appear in vault output. Set to 0 and re-render: email-sourced items excluded from vault files.
+result: issue
+reported: "VAULT_INCLUDE_EMAIL=0 does not exclude production email items. Synthetic proof in-container: row with source='gmail' (exactly what production enrichment rows carry) is still written to vault + obsidian-sab.md under VAULT_INCLUDE_EMAIL=0; control row with source='imap://…' is correctly excluded. Default-include half works (gmail item present in live vault)."
+severity: major
+
+### 7. Markdown digest rendering correctness
+expected: brief.md shows CNR alerts first; list mode sorted score-descending (score >= 8 flagged); BLUF section has [N] citations and a visible placeholder (not silence) on LLM failure.
 result: pass
 evidence: |
-  - Created `scripts/uat_test6_cluster_threshold.py` and ran it against the live DB.
-  - Default: with `CLUSTER_THRESHOLD` unset, `apps.brief.main.CLUSTER_THRESHOLD == 0.75`.
-  - Validation: `CLUSTER_THRESHOLD=-0.2` and `CLUSTER_THRESHOLD=1.5` both raise `ValueError`
-    at import time.
-  - Pass-through: `apps/brief/main.py` passes `cluster_threshold=CLUSTER_THRESHOLD` to both
-    `build_html()` and the `run_consumer()` call.
-  - End-to-end: rendering the same rows with `cluster_threshold=0.99` produced 7 total
-    clusters, while `cluster_threshold=0.0` produced 5 total clusters, proving the threshold
-    changes clustering behavior.
+  FINDING (resolved during UAT): running container image (built 12:27) predated renderer
+  fix 07df0d9 (committed 18:18) — live brief.md showed the pre-fix "- Why:" regression.
+  md5 of /app/apps/brief/renderer.py != host. Rebuilt + restarted brief during UAT.
+  Post-rebuild fresh render: CNR section first; CCIR lines = flag + **[score] title** · why
+  + (N kilder) + [les](url); bluf.md has [N] citations per CCIR section; list.md sorted
+  9,9,9,8,8,8,8,8. Ops takeaway (Phase 7 scope): no guard that running images match HEAD.
 
-### 7. Event-driven rendering works end-to-end
-expected: Republishing verdict.ready event regenerates all 4 digest files (brief.md, cluster.md, list.md, bluf.md) atomically via .tmp + os.replace. sab.published event lands on bus.
-result: pass (digest rewrite verified; q.notify publish slow but wiring correct)
-evidence: |
-  - `scripts/uat_test7_event.py` ran. `q.brief` has 1 consumer (live brief app).
-  - Republished `verdict.ready` via `docker exec infotriage-rabbitmq rabbitmqadmin -u infotriage -p infotriage_rmq publish exchange=infotriage.events routing_key=verdict.ready` returned success.
-  - 4/4 default digests (brief.md, cluster.md, list.md, bluf.md) were atomically
-    rewritten (mtime 2026-07-11 18:32:50 UTC) — the consumer's `.tmp + os.replace`
-    pipeline fired.
-  - The `sab.published` publish on `q.notify` did not land within the 60s test
-    timeout. The live consumer cycle takes ~90–360s end-to-end (6 CCIR sections
-    × 3 views × ~1 LLM call each, with each LLM call 5–20s on cold oMLX). The
-    default view's digests are written early in that cycle; the publish happens
-    last. The TOCTOU race in earlier test runs was fixed (baseline queue depth
-    is now captured pre-publish and threaded into the post-publish check).
-  - **Known follow-up:** the test currently uses q.notify depth as the publish
-    evidence, which races the slow cycle. A more reliable signal would be to
-    poll the brief container's docker logs for the `published SabPublished
-    for day=...` line (emitted immediately after a successful publish), or
-    to bump `POLL_NOTIFY_TIMEOUT_S` to 300s. Tracked as Phase 7 ops work.
-
-### 8. Semantic clustering engages on real data
-expected: pgvector HNSW clustering engages on real enrichment data (not keyword-overlap fallback). Items with similar embeddings merge into same cluster within same CCIR section. Items in different CCIR sections never merge.
+### 8. Event-driven rendering end-to-end
+expected: Publishing a verdict.ready event triggers the consumer: all four digest files (incl. bluf.md) atomically rewritten, and a sab.published event is emitted on the bus.
 result: pass
 evidence: |
-  - Created `scripts/uat_test8_semantic.py` to seed discriminating real data:
-    - Two PIR-1 items with nearly identical embeddings but dissimilar titles (no keyword
-      overlap that keyword fallback could use).
-    - One PIR-2 item with title keywords overlapping a PIR-1 item but a divergent embedding.
-  - Ran the script against the live Postgres + brief app.
-  - Cluster assignments from the brief-app path showed the two PIR-1 items merged into
-    one cluster, while the PIR-2 item remained a singleton.
-  - Rendered `/sab` showed multi-item clusters (PIR-1: 6 saker · 2 klynger).
-  - This confirms semantic clustering is active and not falling back to keyword overlap.
-
-### 9. CLUSTER_THRESHOLD env var configurable and passed to renderer
-expected: Setting CLUSTER_THRESHOLD env var changes clustering behavior. Value validated 0.0-1.0 in main.py. Threshold flows from main.py into renderer._cluster_rows().
-result: pass
-evidence: |
-  - `scripts/uat_test9_threshold_env.py` ran clean. Default imports as 0.75.
-  - Out-of-bounds values (-0.2, 1.5, "abc") raise ValueError at import in
-    short-lived subprocesses.
-  - In-process `build_html()` on the live 24h rows with `threshold=0.0` vs
-    `0.99` produced 5 vs 7 total clusters, proving the env-var-derived
-    threshold reaches `cluster_items_in_memory()`.
-  - Defense: subprocesses strip `INFOTRIAGE_PG_DSN` so the import test never
-    opens a DB/AMQP connection (the `lifespan` block doesn't run on bare
-    import, but defensively).
+  scripts/uat_test7_event.py against live stack: q.brief has 1 consumer; republished
+  verdict.ready → 4/4 digests atomically rewritten (brief.md, cluster.md, list.md, bluf.md);
+  sab.published landed on q.notify (depth 0 → 1). All checks passed.
 
 ## Summary
 
-total: 9
-passed: 9
-issues: 0
+total: 8
+passed: 7
+issues: 1
 pending: 0
 skipped: 0
 
 ## Gaps
 
-[none yet]
+- truth: "VAULT_INCLUDE_EMAIL=0 excludes email-sourced items from vault output"
+  status: failed
+  reason: "User-run live test: production email rows carry source='gmail' with the imap URI in the url field, but the exclusion filter matches source.startswith('imap://') — it can never fire on real data. Exclusion currently works only for the synthetic source='imap://…' shape."
+  severity: major
+  test: 6
+  artifacts:
+    - path: "apps/brief/vault_writer.py"
+      issue: "write_vault_digest() line ~254: `kept = [r for r in kept if not (r.get('source') or '').startswith('imap://')]` — wrong field; enrichment rows have source='gmail', the imap:// scheme lives in r['url']"
+  missing:
+    - "Exclusion predicate that matches production email rows, e.g. source == 'gmail' OR url.startswith('imap://')"
+    - "Regression test with a production-shaped row (source='gmail', url='imap://…') asserting exclusion under VAULT_INCLUDE_EMAIL=0"
+  root_cause: "Filter tests the wrong column: written against the url scheme but applied to the source field, which holds the adapter name ('gmail'), never an imap:// URI. Verified by synthetic-row experiment in the live container (gmail row leaked; imap:// row excluded)."
 
 ## Notes
 
-- Cold-start revealed and fixed `apps/opml_health/Dockerfile` import layout bug.
-- Several non-critical services (`freshrss`, `rssbridge`, `feeds`, `gmail-mcp-server`,
-  `scheduler`) reported as `unhealthy` in `docker compose ps` shortly after startup.
-  Their logs show they started; the unhealthy status is likely due to missing
-  runtime configuration (FreshRSS setup, Gmail OAuth) or timing of the first health
-  probe. These are outside the scope of Test 1 (brief /health) and will be revisited
-  in later UAT tests or Phase 7 ops work.
-
-### Renderer regression caught during UAT re-run (2026-07-11)
-
-`apps/brief/renderer.py::render_brief()` called `digest.line()` from
-`apps/triage/digest.py` in its CCIR-iteration path. That helper is
-`f"- {v.get('why') or v['title']}{withsrc}  [les]({v.get('url','')})"` —
-when `why` is truthy, `or` short-circuits and both `title` and `score` are
-dropped from the rendered line. Visible in the brief app as `- <why>  [les](<url>)`
-under any CAT_II or ROUTINE CCIR section.
-
-Root-caused by re-running `tests/test_brief_consumer.py` after the COP/CIP
-view-filter work landed; `test_process_verdict_renders_default_cop_cip_files`
-failed with `AssertionError: assert 'COP Item' in '# InfoTriage · SAB\n_1 saker · ~10 min_\n\n## FFIR-1 · Norsk forsvar & sikkerhetspolitikk\n- Test why  [les](http://example.com)\n'`
-— note the missing `**[9] COP Item**` prefix.
-
-Fix: replaced the single `_digest_line(lead, extra)` call inside the
-CCIR-iteration loop with inline formatting (matches the CAT_I section's
-style, includes `flag`, `why_str`, `score`, `title`, and `[les](url)`).
-Also deleted pre-existing dead code `_group_by_ccir()` (was defined but
-never called; return shape was broken).
-
-Regression test: `tests/test_brief_renderer.py::TestRenderBriefIncludesAllItemFields`
-asserts that for a CAT_II item with truthy `why`, all three of `title`,
-`[score]`, and `why` appear in `render_brief()` output. A second test
-asserts title+score for `Routine` (no-CCIR) items.
-
-Live proof: rendered a CAT_II item with `why="Krigsøkonomi under press"`,
-`title="Russland varsler nye sanksjoner"`, `score=7` through the live
-`render_brief()` path. Output: `## PIR-1 · Russland / Ukraina\n- **[7] Russland
-varsler nye sanksjoner** · Krigsøkonomi under press  [les](http://example.com)`.
-Title, score, and why all present.
-
-Full pytest suite after fix: 280 passed, 34 skipped. UAT 6 (CLUSTER_THRESHOLD)
-and UAT 8 (semantic clustering) re-run live: both still pass.
+- Round 2 (2026-07-11), executed by Claude on user request. Round 1 (9/9 pass) preserved at commit 235b3d2.
+- Test 1 deviation: volumes preserved deliberately (full -v wipe validated in round 1).
+- Test 7 surfaced a deployment-freshness gap (stale image vs HEAD) — resolved by rebuild during UAT; systemic guard belongs to Phase 7 (ops Makefile).
