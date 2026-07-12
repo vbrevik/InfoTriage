@@ -80,9 +80,9 @@ def store(request, tmp_path):
         import psycopg
         with psycopg.connect(dsn, autocommit=True) as conn:
             conn.execute(
-                "TRUNCATE infotriage.entity_links, infotriage.entities, "
+                "TRUNCATE infotriage.ccir, infotriage.entity_links, infotriage.entities, "
                 "infotriage.embeddings, infotriage.enrichment, infotriage.audit, "
-                "infotriage.articles RESTART IDENTITY"
+                "infotriage.articles RESTART IDENTITY CASCADE"
             )
         with PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs") as s:
             yield s
@@ -156,7 +156,7 @@ def test_put_entity_preserves_embedding(store):
         embedding=None,
     )
     got = store.get_entity(entity_id)
-    assert got["embedding"] == vec
+    assert list(got["embedding"]) == vec
 
 
 def test_link_entity_idempotent_for_item(store):
@@ -235,9 +235,9 @@ def test_entity_links_cross_language(tmp_path):
     import psycopg
     with psycopg.connect(dsn, autocommit=True) as conn:
         conn.execute(
-            "TRUNCATE infotriage.entity_links, infotriage.entities, "
+            "TRUNCATE infotriage.ccir, infotriage.entity_links, infotriage.entities, "
             "infotriage.embeddings, infotriage.enrichment, infotriage.audit, "
-            "infotriage.articles RESTART IDENTITY"
+            "infotriage.articles RESTART IDENTITY CASCADE"
         )
     with PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs") as s:
         item1 = _make_item("item-en")
