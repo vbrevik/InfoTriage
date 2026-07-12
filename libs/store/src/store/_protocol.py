@@ -155,3 +155,41 @@ class Store(Protocol):
             Returns None when no embeddings are stored (first article is never a false positive).
         """
         ...
+
+    # -------------------------------------------------------------------------
+    # Entity resolution — Phase 8 (ADR-006)
+    # -------------------------------------------------------------------------
+
+    def put_entity(
+        self,
+        name: str,
+        name_norm: str,
+        lang: str,
+        type: str | None,
+        embedding: list[float] | None,
+    ) -> str:
+        """Upsert a canonical entity and return its id.
+
+        Idempotent: ON CONFLICT (name_norm, lang) updates name, type, and embedding.
+        A None embedding is stored as NULL and does not overwrite an existing vector
+        (COALESCE preserves the prior vector).
+        """
+        ...
+
+    def get_entity(self, entity_id: str) -> Optional[dict]:
+        """Return entity dict for entity_id, or None if absent."""
+        ...
+
+    def link_entity(self, entity_id: str, item_id: str, mention: str, lang: str) -> None:
+        """Link an entity to an item with the surface mention and mention language.
+
+        Idempotent: duplicate (entity_id, item_id, mention) links are ignored.
+        """
+        ...
+
+    def get_entity_links(self, item_id: str) -> list[dict]:
+        """Return entity-link rows for item_id joined to canonical entity names.
+
+        Each row contains: entity_id, name, mention, lang.
+        """
+        ...

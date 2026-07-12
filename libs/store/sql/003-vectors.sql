@@ -29,6 +29,13 @@ CREATE TABLE IF NOT EXISTS infotriage.embeddings (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Unique constraints for idempotent entity upserts (Phase 8)
+ALTER TABLE infotriage.entities
+    ADD CONSTRAINT uk_entities_name_lang UNIQUE (name_norm, lang);
+
+ALTER TABLE infotriage.entity_links
+    ADD CONSTRAINT uk_entity_links_entity_item_mention UNIQUE (entity_id, item_id, mention);
+
 -- HNSW cosine indexes (m=16, ef_construction=64 per D-05b)
 CREATE INDEX IF NOT EXISTS idx_entities_embedding_hnsw
     ON infotriage.entities USING hnsw (embedding vector_cosine_ops)

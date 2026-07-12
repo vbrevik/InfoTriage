@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 8 (Entity Resolution) planning complete; ready to execute
-stopped_at: 08-SPEC.md and 08-PLAN.md created under .planning/phases/08-entity-resolution
+status: Phase 8 (Entity Resolution) executed; awaiting final review/commit
+stopped_at: Store entity methods, triage entity extraction, worker integration, vault projection, and mE5 threshold validation script/report complete
 last_updated: "2026-07-12T00:00:00.000Z"
 progress:
   total_phases: 13

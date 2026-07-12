@@ -62,6 +62,9 @@ class InMemoryStore:
         # Phase 5 state: enrichment and embedding dicts (D-05, D-07)
         self._enrichments: dict[str, dict] = {}
         self._embeddings: dict[str, list[float]] = {}
+        # Phase 8 state: entity resolution (ADR-006)
+        self._entities: dict[tuple[str, str], dict] = {}
+        self._entity_links: dict[tuple[str, str, str], dict] = {}
 
     # Context manager — no-ops; implemented for Store Protocol compliance
 
@@ -177,3 +180,77 @@ class InMemoryStore:
         if best_sim >= threshold:
             return best_id
         return None
+
+    # -------------------------------------------------------------------------
+    # Entity resolution — Phase 8 (ADR-006)
+    # -------------------------------------------------------------------------
+
+    def put_entity(
+        self,
+        name: str,
+        name_norm: str,
+        lang: str,
+        type: str | None,
+        embedding: list[float] | None,
+    ) -> str:
+        """Upsert a canonical entity and return its id.
+
+        Idempotent: keyed by (name_norm, lang). A None embedding does not overwrite
+        an existing vector.
+        """
+        key = (name_norm, lang)
+        existing = self._entities.get(key)
+        if existing is not None:
+            # Preserve existing embedding if new embedding is None.
+            if embedding is None:
+                embedding = existing.get("embedding")
+            existing.update({
+                "name": name,
+                "type": type,
+                "embedding": embedding,
+            })
+            return existing["id"]
+        entity_id = str(len(self._entities) + 1)
+        self._entities[key] = {
+            "id": entity_id,
+            "name": name,
+            "name_norm": name_norm,
+            "lang": lang,
+            "type": type,
+            "embedding": embedding,
+        }
+        return entity_id
+
+    def get_entity(self, entity_id: str) -> Optional[dict]:
+        """Return entity dict for entity_id, or None if absent."""
+        for entity in self._entities.values():
+            if entity["id"] == entity_id:
+                return dict(entity)
+        return None
+
+    def link_entity(self, entity_id: str, item_id: str, mention: str, lang: str) -> None:
+        """Link an entity to an item with the surface mention and mention language."""
+        key = (entity_id, item_id, mention)
+        if key not in self._entity_links:
+            self._entity_links[key] = {
+                "entity_id": entity_id,
+                "item_id": item_id,
+                "mention": mention,
+                "lang": lang,
+            }
+
+    def get_entity_links(self, item_id: str) -> list[dict]:
+        """Return entity-link rows for item_id joined to canonical entity names."""
+        results = []
+        for link in self._entity_links.values():
+            if link["item_id"] == item_id:
+                entity = self.get_entity(link["entity_id"])
+                if entity is not None:
+                    results.append({
+                        "entity_id": link["entity_id"],
+                        "name": entity["name"],
+                        "mention": link["mention"],
+                        "lang": link["lang"],
+                    })
+        results.sort(key=lambda r: (r["name"], r["mention"]))
+        return results

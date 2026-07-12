@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 from contracts import from_frontmatter
 from apps.brief.vault_writer import (
-    extract_entities,
     render_wikilinked,
     write_item_obsidian,
     write_sab_obsidian,
@@ -21,31 +20,6 @@ def temp_vault():
     """Create a temporary directory for vault contents."""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield Path(tmpdir)
-
-
-def test_extract_entities():
-    """Test entity extraction from text."""
-    text = "NATO plans a meeting in Oslo. Rodney was miserable when he talked to the commissioner. Climate change is urgent."
-
-    entities = extract_entities(text, known_topics=["NATO", "climate"])
-
-    # Should extract "Climate" (from built-in), "NATO" (from topics), "Oslo"
-    assert "NATO" in entities
-    assert "Climate" in entities or "Climate change" in entities
-    assert "Oslo" in entities
-    # Ensure we don't extract too many spurious entities
-    assert len(entities) <= 5
-
-
-def test_extract_entities_with_known_topics():
-    """Test entity extraction with explicitly provided topic list."""
-    text = "Norwegian defense minister meets with NATO in Bergen."
-    known_topics = ["Norge", "NATO", "Ukraina"]
-
-    entities = extract_entities(text, known_topics=known_topics)
-
-    assert "NATO" in entities
-    assert "Norge" not in entities  # "norge" absent from text
 
 
 def test_render_wikilinked():
@@ -73,6 +47,8 @@ def test_write_item_obsidian(temp_vault):
         "score": 9,
         "bucket": "read",
         "why": "Important for Norway",
+        "entities": [{"name": "NATO", "mention": "NATO", "lang": "en"},
+                     {"name": "Oslo", "mention": "Oslo", "lang": "en"}],
     }
 
     path = write_item_obsidian(item, temp_vault)
@@ -111,6 +87,8 @@ def test_write_item_obsidian_uses_codec_safe_yaml(temp_vault):
         "score": 9,
         "bucket": "read",
         "why": "Important for Norway: yes",
+        "entities": [{"name": "NATO", "mention": "NATO", "lang": "en"},
+                     {"name": "Oslo", "mention": "Oslo", "lang": "en"}],
     }
 
     path = write_item_obsidian(item, temp_vault)
@@ -133,6 +111,7 @@ def test_write_sab_obsidian(temp_vault):
             "ccir": "PIR-1",
             "score": 8,
             "cnr": "I",
+            "entities": [{"name": "Climate", "mention": "climate", "lang": "en"}],
         },
         {
             "item_id": "2",
@@ -143,6 +122,7 @@ def test_write_sab_obsidian(temp_vault):
             "ccir": "PIR-2",
             "score": 9,
             "cnr": "I",
+            "entities": [{"name": "NATO", "mention": "NATO", "lang": "en"}],
         },
     ]
 

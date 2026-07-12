@@ -439,3 +439,111 @@ class PostgresStore:
         if row is not None and row["dist"] < (1.0 - threshold):
             return row["item_id"]
         return None
+
+    # -------------------------------------------------------------------------
+    # Entity resolution — Phase 8 (ADR-006)
+    # -------------------------------------------------------------------------
+
+    def put_entity(
+        self,
+        name: str,
+        name_norm: str,
+        lang: str,
+        type: str | None,
+        embedding: list[float] | None,
+    ) -> str:
+        """Upsert a canonical entity and return its id as text.
+
+        Idempotent: ON CONFLICT (name_norm, lang) updates name, type, and embedding.
+        A None embedding is stored as NULL and does not overwrite an existing vector
+        (COALESCE preserves the prior vector).
+        """
+        assert self._conn is not None, (
+            "PostgresStore must be used as a context manager"
+        )
+        # Convert empty list to None so psycopg inserts NULL, not an empty vector.
+        if embedding is not None and len(embedding) == 0:
+            embedding = None
+        row = self._conn.execute(
+            """
+            INSERT INTO infotriage.entities (name, name_norm, lang, type, embedding)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (name_norm, lang) DO UPDATE SET
+                name      = EXCLUDED.name,
+                type      = EXCLUDED.type,
+                embedding = COALESCE(EXCLUDED.embedding, infotriage.entities.embedding)
+            RETURNING id
+            """,
+            (name, name_norm, lang, type, embedding),
+        ).fetchone()
+        self._conn.commit()
+        return str(row["id"])
+
+    def get_entity(self, entity_id: str) -> "dict | None":
+        """Return entity dict for entity_id, or None if absent."""
+        assert self._conn is not None, (
+            "PostgresStore must be used as a context manager"
+        )
+        row = self._conn.execute(
+            """
+            SELECT id, name, name_norm, lang, type, embedding
+            FROM infotriage.entities
+            WHERE id = %s
+            """,
+            (entity_id,),
+        ).fetchone()
+        self._conn.rollback()
+        if row is None:
+            return None
+        return {
+            "id": str(row["id"]),
+            "name": row["name"],
+            "name_norm": row["name_norm"],
+            "lang": row["lang"],
+            "type": row["type"],
+            "embedding": row["embedding"],
+        }
+
+    def link_entity(self, entity_id: str, item_id: str, mention: str, lang: str) -> None:
+        """Link an entity to an item with the surface mention and mention language.
+
+        Idempotent: duplicate (entity_id, item_id, mention) links are ignored.
+        """
+        assert self._conn is not None, (
+            "PostgresStore must be used as a context manager"
+        )
+        self._conn.execute(
+            """
+            INSERT INTO infotriage.entity_links (entity_id, item_id, mention, lang)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (entity_id, item_id, mention) DO NOTHING
+            """,
+            (entity_id, item_id, mention, lang),
+        )
+        self._conn.commit()
+
+    def get_entity_links(self, item_id: str) -> list[dict]:
+        """Return entity-link rows for item_id joined to canonical entity names."""
+        assert self._conn is not None, (
+            "PostgresStore must be used as a context manager"
+        )
+        rows = self._conn.execute(
+            """
+            SELECT el.entity_id, e.name, el.mention, el.lang
+            FROM infotriage.entity_links el
+            JOIN infotriage.entities e ON e.id = el.entity_id
+            WHERE el.item_id = %s
+            ORDER BY e.name, el.mention
+            """,
+            (item_id,),
+        ).fetchall()
+        self._conn.rollback()
+        return [
+            {
+                "entity_id": str(r["entity_id"]),
+                "name": r["name"],
+                "mention": r["mention"],
+                "lang": r["lang"],
+            }
+            for r in rows
+        ]

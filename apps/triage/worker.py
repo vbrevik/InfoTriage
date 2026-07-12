@@ -23,6 +23,7 @@ from pathlib import Path
 from contracts import RabbitMQBus, VerdictReady, setup_logging
 from store import PostgresStore
 from triage_score import score_item
+from entities import resolve_entities_async
 
 setup_logging("triage")
 log = logging.getLogger(__name__)
@@ -132,6 +133,15 @@ async def process_item(item_id, store, bus, *, embed=get_embedding, score=score_
     # a crash or exception here propagates without ever reaching bus.publish below.
     await asyncio.to_thread(store.put_enrichment, item_id, fields)
     await asyncio.to_thread(store.put_embedding, item_id, vec)
+
+    # Phase 8: extract, embed, and link entities to this item.
+    # This is best-effort: entity-linking failures are logged but must not
+    # prevent the verdict.ready event from being published.
+    try:
+        entity_text = item.title + " " + (item.summary or "")
+        await resolve_entities_async(item_id, entity_text, item.lang or "en", store, embed)
+    except Exception as exc:
+        log.warning("entity resolution failed for item_id=%s: %s", item_id, exc)
 
     payload = VerdictReady(
         event="verdict.ready",

@@ -99,6 +99,15 @@ async def process_verdict(
 
     enrichment_rows = await asyncio.to_thread(_fetch_all)
 
+    # Phase 8: project entity graph links into each enrichment row for the vault.
+    def _attach_entities(rows: list[dict]) -> list[dict]:
+        for row in rows:
+            item_id = row["item_id"]
+            row["entities"] = store.get_entity_links(item_id)
+        return rows
+
+    enrichment_rows = await asyncio.to_thread(_attach_entities, enrichment_rows)
+
     # Compute view-filtered row sets (ADR-012)
     cop_rows = filter_rows(enrichment_rows, "cop")
     cip_rows = filter_rows(enrichment_rows, "cip")

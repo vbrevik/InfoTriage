@@ -19,54 +19,34 @@ from contracts import to_frontmatter
 # source field holds the adapter/mailbox name (e.g. "gmail" or "Telegraph Ukraine").
 _EMAIL_URL_SCHEMES = ("imap://", "gmail://")
 
-# Simple heuristic for entity extraction - no external dependencies
-# In Phase 8, this will be replaced by proper entity resolution
-_SYSTEM_TOPICS = {
-    "norge", "norsk", "norway", "oslo", "bergen", "tromsø", "stavanger", "trondheim",
-    "nato", "natos hq", "norwegian defense", "norwegian armed forces", "forsvaret",
-    "ukraine", "russia", "putin", "zelensky", "warsaw", "poland", "belarus",
-    "china", "beijing", "taiwan", "hong kong", "diplomatic",
-    "america", "usa", "united states", "washington",
-    "climate", "environment", "green", "sustainable", "renewable",
-    "technology", "ai", "artificial intelligence", "cybersecurity", "security",
-    "ukrainian", "russian", "chinese", "american", "european",
-}
-
-
 def extract_entities(text: str, known_topics: Optional[list[str]] = None) -> list[str]:
-    """Extract entities from text using simple heuristics.
+    """DEPRECATED: use the entity graph (item['entities']) instead.
 
-    This is a placeholder until Phase 8 provides proper entity resolution.
-    It uses known topic matching and simple capitalization heuristics.
-
-    Args:
-        text: Text to extract entities from
-        known_topics: Optional list of known topics to match
-
-    Returns:
-        List of unique extracted entities
+    Kept for backward compatibility with callers that imported this helper.
+    It now returns the intersection of ``known_topics`` with the text, or an
+    empty list when no topics are supplied.
     """
-    entities = set()
+    import warnings
+    warnings.warn(
+        "extract_entities() is deprecated; use the entity graph via item['entities']",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    if not known_topics:
+        return []
+    text_lower = (text or "").lower()
+    return [t for t in known_topics if t.lower() in text_lower]
 
-    text_lower = text.lower()
 
-    if known_topics:
-        for topic in known_topics:
-            if topic.lower() in text_lower:
-                entities.add(topic)
-    else:
-        for topic in _SYSTEM_TOPICS:
-            if topic in text_lower:
-                entities.add(topic.strip().title())
+def _entity_names(item: dict) -> list[str]:
+    """Return canonical entity names from the item's entity graph links.
 
-    words = text.split()
-    for word in words:
-        clean_word = re.sub(r'^[^A-Za-z]+|[^A-Za-z]+$', '', word)
-        if clean_word and clean_word[0].isupper() and len(clean_word) >= 2:
-            if clean_word not in {"This", "That", "It", "There", "Where", "When", "Why", "How"}:
-                entities.add(clean_word)
-
-    return list(sorted(entities))
+    Phase 8 populates each enrichment row with an list of entity-link dicts under
+    the ``entities`` key (e.g. ``[{"name": "NATO", "mention": "NATO", ...}]``).
+    The vault writer no longer extracts entities heuristically; it projects the
+    canonical graph stored by the triage worker.
+    """
+    return [e["name"] for e in item.get("entities", []) if e.get("name")]
 
 
 def render_wikilinked(text: str, entities: list[str]) -> str:
@@ -108,11 +88,10 @@ def write_item_obsidian(item: dict, vault_path: Path) -> Path:
     filename = f"{safe_id}.md"
     filepath = vault_path / filename
 
-    # Extract entities from summary and why
+    # Project canonical entities from the entity graph (Phase 8).
     summary = (item.get("summary") or "")
     why = (item.get("why") or "")
-    all_text = f"{summary}. {why}"
-    entities = extract_entities(all_text)
+    entities = _entity_names(item)
 
     # Render entities in summary and why with wikilinks
     summary_wikilinked = render_wikilinked(summary, entities)
@@ -180,10 +159,8 @@ def render_sab_obsidian(enrichment_rows: list[dict]) -> str:
         for item in sorted_items[:10]:
             summary = item.get("summary", "")
 
-            # Extract entities and render wikilinks
-            why = item.get("why", "")
-            all_text = f"{summary}. {why}"
-            entities = extract_entities(all_text)
+            # Project canonical entities from the entity graph (Phase 8).
+            entities = _entity_names(item)
             summary_wikilinked = render_wikilinked(summary, entities)
 
             lines.append(f"- **[{item.get('score') or 0}] {item.get('title', '')}**")

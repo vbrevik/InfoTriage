@@ -246,6 +246,22 @@ def test_dedup_distinct(store, bus):
     assert enrichment_b["bucket"] == "maybe"
 
 
+def test_entity_resolution_links_entities(store, bus):
+    """Phase 8: process_item extracts entities and links them to the item."""
+    item = _item("NATO Summit in Oslo")
+    store.put_item(item)
+    score = _fake_score(
+        {"ccir": "PIR-3", "cnr": "II", "score": 7, "bucket": "maybe",
+         "why": "NATO toppmote", "pmesii": "Political", "tessoc": "Subversion"}
+    )
+    asyncio.run(process_item(item.id, store, bus, embed=lambda text: VEC_A, score=score))
+
+    links = store.get_entity_links(item.id)
+    names = {l["name"] for l in links}
+    assert "NATO" in names
+    assert "Oslo" in names
+
+
 def test_verdict_ready_fields(store, bus):
     """A normal scored item produces a verdict.ready payload with all required fields."""
     item = _item("Normal Scored Item")

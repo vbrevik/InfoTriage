@@ -1,0 +1,18 @@
+{
+  "same_pairs": [
+    ["NATO", "НАТО"],
+    ["Norway", "Norge"],
+    ["Norway", "Норвегия"],
+    ["United States", "США"],
+    ["United States", "USA"],
+    ["Ukraine", "Украина"],
+    ["Zelensky", "Зеленский"]
+  ],
+  "distinct_pairs": [
+    ["NATO", "Russia"],
+    ["Norway", "Sweden"],
+    ["Putin", "Zelensky"],
+    ["USA", "China"],
+    ["Oslo", "Beijing"]
+  ]
+}
