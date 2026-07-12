@@ -17,3 +17,25 @@ markers = [
     "db_live: requires INFOTRIAGE_TEST_DSN pointing at a reachable isolated test Postgres",
     "rabbitmq: requires RabbitMQ :22001 to be running",
 ]
+
+[tool.mypy]
+# Use directory structure to infer package boundaries; required for the
+# src-layout libs above.
+explicit_package_bases = true
+namespace_packages = true
+# Default targets: the shared libs (by their package directories) and tests.
+# Pointing mypy at the package roots (e.g. libs/contracts/src/contracts)
+# instead of the whole repo tree avoids duplicate-module errors.
+files = [
+    "libs/contracts/src/contracts",
+    "libs/store/src/store",
+    "libs/ingest_common/src/ingest_common",
+    "tests",
+]
+# apps/* are excluded from the default run because several services contain a
+# top-level main.py; mypy sees them as duplicate modules when scanned together.
+# Check each app separately with:
+#   for app in apps/*; do mypy "$app"; done
+exclude = ["^apps/", "^scripts/", "^test_.*\\.py$"]
+# Tests import from standalone app modules that are not installed packages.
+ignore_missing_imports = true
