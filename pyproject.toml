@@ -17,6 +17,7 @@ markers = [
     "db_live: requires INFOTRIAGE_TEST_DSN pointing at a reachable isolated test Postgres",
     "rabbitmq: requires RabbitMQ :22001 to be running",
 ]
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.mypy]
 # Default targets: the shared libs (by their package directories) and tests.
