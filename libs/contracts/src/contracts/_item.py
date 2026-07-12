@@ -37,7 +37,7 @@ class Item(BaseModel):
     payload: dict = {}  # open dict — Phase 5 writes ccir, cnr, score, bucket, why
     attachments: list = []
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def id(self) -> str:
         """SHA-256 of normalized source_type + NUL + url + NUL + title.

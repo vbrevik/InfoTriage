@@ -23,9 +23,5 @@ jobs:
           pip install -r requirements-dev.txt
           pip install mypy==1.14.1
 
-      # TEMPORARY: continue-on-error is set to true so existing mypy errors do
-      # not block PR merges while the codebase is being typed. Remove this flag
-      # once mypy passes cleanly.
       - name: Run mypy
-        continue-on-error: true
         run: mypy

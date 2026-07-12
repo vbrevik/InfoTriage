@@ -51,7 +51,7 @@ def _test_db_reachable() -> bool:
         info = psycopg.conninfo.conninfo_to_dict(dsn)
     except psycopg.Error:
         return False
-    host = info.get("host") or "localhost"
+    host = str(info.get("host") or "localhost")
     port = int(info.get("port") or 5432)
     try:
         with socket.create_connection((host, port), timeout=1.0):

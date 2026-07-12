@@ -74,7 +74,7 @@ async def admin_health() -> dict:
 
     for i, res in enumerate(gathered):
         name = SERVICES[i][0]
-        if isinstance(res, Exception):
+        if isinstance(res, BaseException):
             results[name] = {"status": "down", "error": str(res)[:120]}
         else:
             results[name] = res

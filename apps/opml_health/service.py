@@ -29,7 +29,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from contracts import setup_logging, FeedUnhealthy
 from fastapi import FastAPI, Response
@@ -57,7 +57,7 @@ def run_health_check(
     ua: str = DEFAULT_UA,
     timeout: int = DEFAULT_TIMEOUT,
     since_hours: float = 24,
-) -> list[dict]:
+) -> tuple[list[dict[str, Any]], list[FeedUnhealthy]]:
     """Run a full health-check on OPML feeds.
 
     Returns ``(results, unhealthy_events)`` where results is a list of
@@ -127,7 +127,7 @@ async def emit_unhealthy_events(unhealthy: list[FeedUnhealthy]) -> None:
     )
     bus = RabbitMQBus(amqp_url=amqp_url)
     try:
-        await bus.connect()
+        await bus.connect()  # type: ignore[attr-defined]
         for evt in unhealthy:
             d = evt.model_dump(mode="json")
             item_id = d.get("item_id", f"uh-{abs(hash(d['feed_url'])) % (10**12)}")

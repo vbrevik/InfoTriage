@@ -22,6 +22,7 @@ import json
 import logging
 import socket
 import time
+
 from unittest.mock import patch
 
 import aio_pika
@@ -207,7 +208,7 @@ def test_publish_consume_roundtrip() -> None:
     async def _run() -> None:
         bus = await _fresh_bus()
         try:
-            payloads = {
+            payloads: dict[str, dict] = {
                 "item.ingested": {
                     "event": "item.ingested",
                     "item_id": "rt_01",
@@ -243,9 +244,10 @@ def test_publish_consume_roundtrip() -> None:
                 assert (
                     len(messages) == 1
                 ), f"Expected 1 message for {rk}, got {len(messages)}"
+                first_message = messages[0]
                 assert (
-                    messages[0] == expected
-                ), f"Payload mismatch for {rk}: {messages[0]} != {expected}"
+                    first_message == expected
+                ), f"Payload mismatch for {rk}: {first_message} != {expected}"
         finally:
             await bus.close()
 
@@ -279,7 +281,8 @@ def test_dedup() -> None:
             assert (
                 len(messages) == 1
             ), f"Expected 1 message (dedup), got {len(messages)}: {messages}"
-            assert messages[0]["n"] == 1
+            first_message = messages[0]
+            assert first_message == {"event": rk, "item_id": item_id, "n": 1}
         finally:
             await bus.close()
 

@@ -82,7 +82,7 @@ def _apply_semantic_clustering(
                 emb = json.loads(emb)
             except ValueError:
                 emb = None
-        elif hasattr(emb, "to_list"):
+        elif emb is not None and hasattr(emb, "to_list"):
             emb = emb.to_list()
         if not isinstance(emb, list) or not emb:
             emb = None
@@ -105,7 +105,7 @@ def _apply_semantic_clustering(
         items_by_ccir.setdefault(cid, []).append(item)
 
     # Cluster within each CCIR section
-    clustered_items = []
+    clustered_items: list[EnrichedItem] = []
     for cid, items in items_by_ccir.items():
         if not items:
             continue

@@ -228,6 +228,8 @@ def cluster_items(
                 dim = len(item.embedding)
                 new_centroid: list[float] = [0.0] * dim
                 for ci in cluster_items:
+                    if ci.embedding is None:
+                        continue
                     for d in range(dim):
                         new_centroid[d] += ci.embedding[d]
                 clusters[best_cluster_idx] = (
@@ -304,7 +306,6 @@ def cluster_items_in_memory(
 
             best_idx: int | None = None
             best_dist = max_dist
-
             for idx, centroid in enumerate(centroids):
                 dist = _cosine_distance(item.embedding, centroid)
                 if dist < best_dist:
@@ -320,6 +321,8 @@ def cluster_items_in_memory(
                 dim = len(item_emb)
                 new_centroid = [0.0] * dim
                 for ci in cluster:
+                    if ci.embedding is None:
+                        continue
                     ci_emb = _as_list(ci.embedding)
                     for d in range(dim):
                         new_centroid[d] += ci_emb[d]

@@ -146,7 +146,7 @@ def render_sab_obsidian(enrichment_rows: list[dict]) -> str:
         Markdown string
     """
     # Group items by CCIR
-    by_ccir = {}
+    by_ccir: dict[str, list[dict]] = {}
     for r in enrichment_rows:
         ccir = (r.get("ccir") or "none").upper()
         by_ccir.setdefault(ccir, []).append(r)
