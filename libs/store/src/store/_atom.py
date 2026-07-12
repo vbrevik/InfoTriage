@@ -20,6 +20,7 @@ Limit (default 50): caps the number of entries to mitigate unbounded
 result materialization from a large store (T-02-05 DoS mitigation).
 """
 import datetime
+from typing import cast
 
 from feedgen.feed import FeedGenerator
 
@@ -72,4 +73,4 @@ def render_atom(store: Store, limit: int = 50) -> bytes:
 
     # Returns bytes (UTF-8 encoded XML) — callers must decode if they need str.
     # Do NOT use atom_str(pretty=True) with a text mode open(); open in binary.
-    return fg.atom_str(pretty=True)
+    return cast(bytes, fg.atom_str(pretty=True))

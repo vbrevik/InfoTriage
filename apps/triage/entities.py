@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+from typing import cast
 
 
 log = logging.getLogger(__name__)
@@ -341,7 +342,7 @@ def embed_entity_name(
     try:
         # mE5-large asymmetric retrieval convention.
         prefixed = f"query: {name}"
-        return embed_fn(prefixed)
+        return cast(list[float] | None, embed_fn(prefixed))
     except Exception as exc:  # pragma: no cover - network/model failure path
         log.warning("entity embedding failed for %r: %s", name, exc)
         return None
@@ -368,21 +369,24 @@ def _find_or_create_entity(
 
     existing = store.get_entity_by_name_norm(name_norm, lang)
     if existing is not None:
-        return existing["id"]
+        return cast(str, existing["id"])
 
     embedding = embed_entity_name(name_norm, lang, embed_fn)
 
     if embedding is not None:
         similar = store.find_similar_entity(embedding, LINK_THRESHOLD)
         if similar is not None:
-            return similar["entity_id"]
+            return cast(str, similar["entity_id"])
 
-    return store.put_entity(
-        name=mention,
-        name_norm=name_norm,
-        lang=lang,
-        type=None,
-        embedding=embedding,
+    return cast(
+        str,
+        store.put_entity(
+            name=mention,
+            name_norm=name_norm,
+            lang=lang,
+            type=None,
+            embedding=embedding,
+        ),
     )
 
 

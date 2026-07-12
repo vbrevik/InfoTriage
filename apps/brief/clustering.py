@@ -28,7 +28,7 @@ Acceptance criterion (from 06-SPEC.md R4):
 import os
 import math
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from store._postgres import PostgresStore  # noqa: F401
@@ -64,10 +64,10 @@ class EnrichedItem:
 def _as_list(vec) -> list[float]:
     """Convert pgvector Vector or any iterable to list[float]."""
     if isinstance(vec, list):
-        return vec
+        return cast(list[float], vec)
     if hasattr(vec, "to_list"):
-        return vec.to_list()
-    return list(vec)
+        return cast(list[float], vec.to_list())
+    return cast(list[float], list(vec))
 
 
 def _cosine_distance(a: list[float], b: list[float]) -> float:

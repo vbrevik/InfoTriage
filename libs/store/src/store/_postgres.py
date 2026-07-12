@@ -28,7 +28,7 @@ Design decisions (from CONTEXT.md / RESEARCH.md):
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import psycopg
 from psycopg.rows import dict_row
@@ -430,7 +430,7 @@ class PostgresStore:
         ).fetchone()
         self._conn.rollback()  # end read txn — avoid idle-in-transaction
         if row is not None and row["dist"] < (1.0 - threshold):
-            return row["item_id"]
+            return cast(str, row["item_id"])
         return None
 
     # -------------------------------------------------------------------------
@@ -469,7 +469,7 @@ class PostgresStore:
         ).fetchone()
         self._conn.commit()
         assert row is not None, "put_entity RETURNING id produced no row"
-        return str(row["id"])
+        return cast(str, row["id"])
 
     def get_entity(self, entity_id: str) -> "dict | None":
         """Return entity dict for entity_id, or None if absent."""

@@ -34,3 +34,9 @@ files = [
 exclude = ["^apps/", "^scripts/", "^test_.*\\.py$"]
 # Tests import from standalone app modules that are not installed packages.
 ignore_missing_imports = true
+# Stricter checks (incremental). warn_return_any catches silent Any leaks from
+# untyped imports; warn_unused_ignores / warn_redundant_casts keep the
+# codebase tidy.
+warn_return_any = true
+warn_unused_ignores = true
+warn_redundant_casts = true

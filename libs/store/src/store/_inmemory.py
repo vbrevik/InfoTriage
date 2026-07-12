@@ -18,7 +18,7 @@ Phase 5 additions (D-05, D-06, D-07):
 """
 import math
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 
 from contracts import Item
 
@@ -211,7 +211,7 @@ class InMemoryStore:
                     "embedding": embedding,
                 }
             )
-            return existing["id"]
+            return cast(str, existing["id"])
         entity_id = str(len(self._entities) + 1)
         self._entities[key] = {
             "id": entity_id,

@@ -9,6 +9,7 @@ matching the always-on pattern of tests/test_dsn_safety.py.
 
 import json
 from importlib import resources
+from typing import cast
 
 import pytest
 
@@ -20,7 +21,7 @@ def _load_json_ssot() -> dict:
     with resources.files("contracts").joinpath("uvicorn-log-config.json").open(
         encoding="utf-8"
     ) as f:
-        return json.load(f)
+        return cast(dict, json.load(f))
 
 
 def test_logging_config_is_a_dict():

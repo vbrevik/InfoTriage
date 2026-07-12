@@ -22,6 +22,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from typing import cast
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
@@ -94,7 +95,7 @@ def _fetch_rows(since: datetime.datetime) -> list[dict]:
             cur.execute(_ENRICHMENT_SQL, (since,))
             rows = cur.fetchall()
             cur.connection.commit()  # end read txn — avoid idle-in-transaction
-            return rows
+            return cast(list[dict], rows)
         except Exception:
             cur.connection.rollback()  # un-poison the shared connection
             raise

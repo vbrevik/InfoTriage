@@ -22,7 +22,7 @@ The JSON file is registered in ``libs/contracts/pyproject.toml`` via
 
 import json
 from importlib import resources
-from typing import Any
+from typing import Any, cast
 
 __all__ = ["LOGGING_CONFIG"]
 
@@ -31,7 +31,7 @@ def _load_logging_config() -> dict[str, Any]:
     with resources.files("contracts").joinpath("uvicorn-log-config.json").open(
         encoding="utf-8"
     ) as f:
-        return json.load(f)
+        return cast(dict[str, Any], json.load(f))
 
 
 LOGGING_CONFIG: dict[str, Any] = _load_logging_config()

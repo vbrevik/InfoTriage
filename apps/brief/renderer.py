@@ -21,7 +21,7 @@ Bucket vocabulary (RAW): "read" | "maybe" | "skip"
 import os
 import re
 import sys
-from typing import Optional
+from typing import Optional, cast
 
 # Import CCIR_ORDER from digest.py — never redefine here
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "triage"))
@@ -32,7 +32,7 @@ from apps.brief.clustering import cluster_items_in_memory, EnrichedItem  # noqa:
 try:
     from triage_score import llm  # noqa: E402
 except ImportError:
-    llm = None  # type: ignore[misc,assignment]
+    llm = None
 
 # CNR display mapping
 _CNR_DISPLAY = {
@@ -375,7 +375,7 @@ def render_bluf(
             flush=True,
         )
         bluf_text = llm([{"role": "user", "content": prompt}], max_tokens=400).strip()
-        return bluf_text
+        return cast(str, bluf_text)
     except Exception as e:
         print(
             f"  …BLUF failure for {ccir_id or 'topic'}: {type(e).__name__}: {e}",

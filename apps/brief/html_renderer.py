@@ -17,6 +17,7 @@ Pure library: no HTTP, no Docker, no file IO — main.py owns serving and writes
 import json
 import os
 import sys
+from typing import cast
 
 # Import build_html from sab_html — template imported, never copied (D-12).
 # Same path convention as renderer.py's digest import.
@@ -151,10 +152,13 @@ def build_html(
     verdicts = [_row_to_verdict(r) for r in enrichment_rows]
     verdicts = _apply_semantic_clustering(verdicts, threshold=cluster_threshold)
 
-    return _sab_build_html(
-        verdicts,
-        period,
-        with_bluf=with_bluf,
-        generated_at=generated_at,
-        cutoff_epoch=cutoff_epoch,
+    return cast(
+        str,
+        _sab_build_html(
+            verdicts,
+            period,
+            with_bluf=with_bluf,
+            generated_at=generated_at,
+            cutoff_epoch=cutoff_epoch,
+        ),
     )
