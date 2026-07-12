@@ -1,0 +1,31 @@
+name: Mypy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  mypy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          pip install mypy==1.14.1
+
+      # TEMPORARY: continue-on-error is set to true so existing mypy errors do
+      # not block PR merges while the codebase is being typed. Remove this flag
+      # once mypy passes cleanly.
+      - name: Run mypy
+        continue-on-error: true
+        run: mypy
