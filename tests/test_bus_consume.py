@@ -32,17 +32,15 @@ AMQP_URL = os.environ.get(
 
 
 def _rabbitmq_reachable() -> bool:
-    """Return True if RabbitMQ is reachable and speaks AMQP."""
-
-    async def _check() -> bool:
-        try:
-            conn = await aio_pika.connect(AMQP_URL, timeout=2.0)
-            await conn.close()
-            return True
-        except Exception:
-            return False
-
-    return asyncio.run(_check())
+    """Return True if RabbitMQ AMQP port is reachable on 127.0.0.1:22001."""
+    try:
+        s = socket.socket()
+        s.settimeout(2)
+        s.connect(("127.0.0.1", 22001))
+        s.close()
+        return True
+    except OSError:
+        return False
 
 
 def _skip_if_unavailable() -> None:
@@ -72,6 +70,7 @@ def test_consume_delivers_message() -> None:
 
     async def _run() -> None:
         bus = await _fresh_bus()
+        consumer_tag: str | None = None
         try:
             rk = "item.ingested"
             item_id = "consume_test_001"
@@ -85,12 +84,14 @@ def test_consume_delivers_message() -> None:
                     received_payload.update(json.loads(msg.body.decode()))
                     received.set()
 
-            await bus.consume(rk, _handler, prefetch_count=1)
+            consumer_tag = await bus.consume(rk, _handler, prefetch_count=1)
             await bus.publish(rk, item_id, payload)
 
             await asyncio.wait_for(received.wait(), timeout=5.0)
             assert received_payload.get("item_id") == item_id
         finally:
+            if consumer_tag is not None:
+                await bus._queues[rk].cancel(consumer_tag)
             await bus.close()
 
     asyncio.run(_run())

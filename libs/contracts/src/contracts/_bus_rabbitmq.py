@@ -72,6 +72,7 @@ class RabbitMQBus:
         self._dlx: aio_pika.RobustExchange | None = None
         self._dlq: aio_pika.RobustQueue | None = None
         self._queues: dict[str, aio_pika.RobustQueue] = {}   # routing_key → queue
+        self._consumers: list[Any] = []   # active consumer tags for clean shutdown
         self._dedup_lock = asyncio.Lock()
         self._seen: set[tuple[str, str]] = set()
 
@@ -224,13 +225,16 @@ class RabbitMQBus:
 
         return messages
 
-    async def consume(self, routing_key: str, handler, prefetch_count: int = 1) -> None:
+    async def consume(self, routing_key: str, handler, prefetch_count: int = 1) -> str:
         """Register a persistent consumer on routing_key's queue. Does not block.
 
         Reuses the topology declared by _ensure_connection/_declare_topology — does
         not redeclare exchanges/queues. self._queues is keyed by routing_key (NOT
         queue name); looking it up by queue name is a bug (see subscribe()'s
         ROUTING_KEY_TO_QUEUE lookup, which is a different, unrelated mapping).
+
+        Returns the aio-pika consumer tag so callers can cancel the consumer if
+        needed. Active consumers are automatically cancelled when close() is called.
 
         Raises ValueError if routing_key has no declared queue.
         """
@@ -242,9 +246,21 @@ class RabbitMQBus:
             raise ValueError(f"Unknown routing key: {routing_key}")
 
         await self._channel.set_qos(prefetch_count=prefetch_count)
-        await queue.consume(handler)
+        tag = await queue.consume(handler)
+        self._consumers.append((queue, tag))
+        return tag
 
     async def close(self) -> None:
-        """Close AMQP connection gracefully."""
+        """Close AMQP connection gracefully.
+
+        Cancels any active consumers first so that asyncio event loops don't hang
+        waiting for background consumer tasks to finish.
+        """
+        for queue, tag in self._consumers:
+            try:
+                await queue.cancel(tag)
+            except Exception as exc:  # pragma: no cover
+                log.debug("Could not cancel consumer %s: %s", tag, exc)
+        self._consumers.clear()
         if self._connection and not self._connection.is_closed:
             await self._connection.close()
