@@ -103,6 +103,14 @@ test-full: ## Run the full pytest suite against a throwaway test Postgres contai
 	INFOTRIAGE_TEST_DSN=postgresql://test:test@localhost:22062/infotriage_test \
 		python -m pytest tests/ -q
 
+test-integration: ## Run pytest with both test Postgres and RabbitMQ so no tests skip
+	$(COMPOSE) -f $(OPS_DIR)/../docker-compose.test.yml up -d --wait
+	$(COMPOSE) up -d --wait rabbitmq
+	@trap '$(COMPOSE) -f $(OPS_DIR)/../docker-compose.test.yml down; $(COMPOSE) down rabbitmq' EXIT; \
+	cd $(OPS_DIR)/.. && \
+	INFOTRIAGE_TEST_DSN=postgresql://test:test@localhost:22062/infotriage_test \
+		python -m pytest tests/ -q
+
 # Convenience targets for the three new gap-closure tests (operator-facing).
 test-uvicorn-log: ## Run only the uvicorn log-config regression test
 	cd $(OPS_DIR)/.. && python -m pytest tests/test_uvicorn_log_config.py -q
