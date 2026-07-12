@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: M1 ship-gate met (Phase 7 07-01..07-04 closed); M1 ship or Phase 8 next
-stopped_at: Phase 7 07-02..07-04 closed and verified live; planning sweep complete (this commit)
+status: M1 shipped; Phase 8 (Entity Resolution) ready to plan
+stopped_at: Phase 7 07-01..07-04 closed, verified, and pushed to origin/main
 last_updated: "2026-07-12T00:00:00.000Z"
 progress:
   total_phases: 13
