@@ -1,4 +1,5 @@
 .env
+.env*
 data/
 __pycache__/
 *.pyc
@@ -7,3 +8,5 @@ __pycache__/
 .yt_channels.json
 .spike/
 *.egg-info/
+.omo/
+/test_*.py

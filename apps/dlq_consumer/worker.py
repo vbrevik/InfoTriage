@@ -93,7 +93,7 @@ class DLQConsumer:
         await self._dlq.consume(self._on_message)
         log.info("DLQ consumer started on %s (depth probe enabled)", DLQ_NAME)
         await asyncio.gather(
-            asyncio.Future(),          # sentinel — the consumer stays attached
+            asyncio.Future(),  # sentinel — the consumer stays attached
             self._depth_probe_loop(),
         )
 
@@ -172,7 +172,8 @@ class DLQConsumer:
             log.error(
                 "Discarding feed.unhealthy event for event_type=%s due to schema "
                 "validation failure (reason > 120 chars? malformed ts?): %s",
-                event_type, e,
+                event_type,
+                e,
             )
             return
         message = aio_pika.Message(
@@ -237,7 +238,7 @@ class DLQConsumer:
         )
         mgmt_vhost = mgmt_vhost or os.environ.get("RABBITMQ_MGMT_VHOST", "/")
 
-                # The default vhost "/" MUST be URL-encoded as %2F per the RabbitMQ
+        # The default vhost "/" MUST be URL-encoded as %2F per the RabbitMQ
         # mgmt-API contract; an unencoded literal "/" yields the malformed
         # path `/api/queues///<queue>` and a 404. Use safe='' so every char
         # is encoded (no slashes leak through). (Phase 7 07-03 fix.)
@@ -263,13 +264,17 @@ class DLQConsumer:
 
         log.info(
             "DLQ depth: %d messages (threshold %d, queue %s)",
-            depth, threshold, DLQ_NAME,
+            depth,
+            threshold,
+            DLQ_NAME,
         )
 
         if depth >= threshold:
             log.critical(
                 "DLQ depth threshold breached: %d >= %d on %s",
-                depth, threshold, DLQ_NAME,
+                depth,
+                threshold,
+                DLQ_NAME,
             )
             # Surface the depth value in the event_type so the FeedUnhealthy
             # `reason` field (which embeds event_type) carries the breach count

@@ -25,25 +25,30 @@ OPML = os.path.join(os.path.dirname(__file__), "..", "apps", "opml", "feeds.opml
 # classify()
 # ---------------------------------------------------------------------------
 
+
 def test_200_rss_xml_is_live():
     """200 OK with <?xml + <rss = ✅."""
-    assert _check.classify((200, "application/rss+xml",
-                            b'<?xml version="1.0"?><rss version="2.0">')) == \
-        ("✅", "HTTP 200, RSS/Atom XML")
+    assert _check.classify(
+        (200, "application/rss+xml", b'<?xml version="1.0"?><rss version="2.0">')
+    ) == ("✅", "HTTP 200, RSS/Atom XML")
 
 
 def test_200_atom_xml_is_live():
     """200 OK with <?xml + <feed = ✅ (Atom format)."""
-    assert _check.classify((200, "application/atom+xml",
-                            b'<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">')) == \
-        ("✅", "HTTP 200, RSS/Atom XML")
+    assert _check.classify(
+        (
+            200,
+            "application/atom+xml",
+            b'<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">',
+        )
+    ) == ("✅", "HTTP 200, RSS/Atom XML")
 
 
 def test_200_html_body_keeps_warning():
     """200 OK but body is HTML (Pravda / The National Interest) = ⚠️."""
-    assert _check.classify((200, "text/html",
-                            b"<!DOCTYPE html><html><head><title>Pravda</title>")) == \
-        ("⚠️", "HTTP 200, HTML body")
+    assert _check.classify(
+        (200, "text/html", b"<!DOCTYPE html><html><head><title>Pravda</title>")
+    ) == ("⚠️", "HTTP 200, HTML body")
 
 
 def test_403_cloudflare_is_warning():
@@ -58,16 +63,18 @@ def test_404_retired_url_is_warning():
 
 def test_429_too_many_requests_is_transient():
     """429 = 🟡 (back off and retry; do NOT drop — gdeltproject.org class)."""
-    assert _check.classify((429, "text/html", b"Rate limit exceeded")) == \
-        ("🟡", "HTTP 429 Too Many Requests")
+    assert _check.classify((429, "text/html", b"Rate limit exceeded")) == (
+        "🟡",
+        "HTTP 429 Too Many Requests",
+    )
 
 
 def test_429_with_html_body_still_transient():
     """429 takes precedence even when the body is HTML — operator should
     slow FreshRSS, regardless of body shape."""
-    assert _check.classify((429, "text/html",
-                            b"<!DOCTYPE html><html><body>rate limited</body></html>")) == \
-        ("🟡", "HTTP 429 Too Many Requests")
+    assert _check.classify(
+        (429, "text/html", b"<!DOCTYPE html><html><body>rate limited</body></html>")
+    ) == ("🟡", "HTTP 429 Too Many Requests")
 
 
 def test_429_takes_precedence_over_4xx_branch():
@@ -96,19 +103,28 @@ def test_200_unrecognised_body_is_warning():
 
 def test_302_redirect_is_warning():
     """302 (no follow) = ⚠️ so operator knows the URL is stale."""
-    assert _check.classify((302, "text/html", b"")) == ("⚠️", "HTTP 302 redirect (no follow)")
+    assert _check.classify((302, "text/html", b"")) == (
+        "⚠️",
+        "HTTP 302 redirect (no follow)",
+    )
 
 
 def test_200_rss_with_utf8_bom_is_live():
     """200 OK with UTF-8 BOM + raw <rss> = ✅ (servers that omit <?xml)."""
-    body = b"\xef\xbb\xbf<rss version=\"2.0\"><channel>"
-    assert _check.classify((200, "application/rss+xml", body)) == ("✅", "HTTP 200, RSS/Atom XML")
+    body = b'\xef\xbb\xbf<rss version="2.0"><channel>'
+    assert _check.classify((200, "application/rss+xml", body)) == (
+        "✅",
+        "HTTP 200, RSS/Atom XML",
+    )
 
 
 def test_200_atom_bare_no_prolog_is_live():
     """200 OK with bare <feed> (no <?xml declaration) = ✅ (lenient path)."""
     body = b'<feed xmlns="http://www.w3.org/2005/Atom">'
-    assert _check.classify((200, "application/atom+xml", body)) == ("✅", "HTTP 200, RSS/Atom XML")
+    assert _check.classify((200, "application/atom+xml", body)) == (
+        "✅",
+        "HTTP 200, RSS/Atom XML",
+    )
 
 
 def test_200_html_with_literal_rss_in_body_is_warning():
@@ -119,7 +135,9 @@ def test_200_html_with_literal_rss_in_body_is_warning():
         b"<rss>example</rss></body></html>"
     )
     emoji, reason = _check.classify((200, "text/html", body))
-    assert emoji == "⚠️", f"HTML page with literal <rss> must stay ⚠️, got {emoji!r}: {reason}"
+    assert (
+        emoji == "⚠️"
+    ), f"HTML page with literal <rss> must stay ⚠️, got {emoji!r}: {reason}"
     assert "HTML body" in reason
 
 
@@ -127,11 +145,13 @@ def test_200_html_with_literal_rss_in_body_is_warning():
 # load_opml()
 # ---------------------------------------------------------------------------
 
+
 def test_categories_count_12():
     """feeds.opml has 12 top-level outlines (Norske aviser → NewsAPI.org → Sport SIR-2)."""
     groups = _check.load_opml(OPML)
-    assert len(groups) == 12, \
-        f"Expected 12 category groups, got {len(groups)}: {[cat for cat, _ in groups]}"
+    assert (
+        len(groups) == 12
+    ), f"Expected 12 category groups, got {len(groups)}: {[cat for cat, _ in groups]}"
 
 
 def test_total_rss_count_70():
@@ -154,6 +174,7 @@ def test_filter_outlines_substring():
 # filter_outlines() direct
 # ---------------------------------------------------------------------------
 
+
 def test_no_filter_returns_all():
     groups = _check.load_opml(OPML)
     all_rss = [o for _, rss in groups for o in rss]
@@ -170,28 +191,62 @@ def test_no_match_returns_empty():
 # emit_working_opml() — using tmp_path fixture
 # ---------------------------------------------------------------------------
 
+
 def _make_outline(title, url):
-    return ET.Element("outline", {
-        "type": "rss",
-        "text": title,
-        "title": title,
-        "xmlUrl": url,
-        "htmlUrl": url.rsplit("/", 1)[0],
-    })
+    return ET.Element(
+        "outline",
+        {
+            "type": "rss",
+            "text": title,
+            "title": title,
+            "xmlUrl": url,
+            "htmlUrl": url.rsplit("/", 1)[0],
+        },
+    )
 
 
 def _synthetic_results():
     return [
-        ("CatA", _make_outline("A1-live", "https://a1.example/rss"),
-         "A1-live", "https://a1.example/rss", "✅", "HTTP 200, RSS/Atom XML"),
-        ("CatA", _make_outline("A2-transient", "https://a2.example/rss"),
-         "A2-transient", "https://a2.example/rss", "🟡", "HTTP 429 Too Many Requests"),
-        ("CatA", _make_outline("A3-broken", "https://a3.example/rss"),
-         "A3-broken", "https://a3.example/rss", "⚠️", "HTTP 404"),
-        ("CatB", _make_outline("B1-unreachable", "https://b1.example/rss"),
-         "B1-unreachable", "https://b1.example/rss", "❌", "HTTP 503"),
-        ("CatB", _make_outline("B2-live", "https://b2.example/rss"),
-         "B2-live", "https://b2.example/rss", "✅", "HTTP 200, RSS/Atom XML"),
+        (
+            "CatA",
+            _make_outline("A1-live", "https://a1.example/rss"),
+            "A1-live",
+            "https://a1.example/rss",
+            "✅",
+            "HTTP 200, RSS/Atom XML",
+        ),
+        (
+            "CatA",
+            _make_outline("A2-transient", "https://a2.example/rss"),
+            "A2-transient",
+            "https://a2.example/rss",
+            "🟡",
+            "HTTP 429 Too Many Requests",
+        ),
+        (
+            "CatA",
+            _make_outline("A3-broken", "https://a3.example/rss"),
+            "A3-broken",
+            "https://a3.example/rss",
+            "⚠️",
+            "HTTP 404",
+        ),
+        (
+            "CatB",
+            _make_outline("B1-unreachable", "https://b1.example/rss"),
+            "B1-unreachable",
+            "https://b1.example/rss",
+            "❌",
+            "HTTP 503",
+        ),
+        (
+            "CatB",
+            _make_outline("B2-live", "https://b2.example/rss"),
+            "B2-live",
+            "https://b2.example/rss",
+            "✅",
+            "HTTP 200, RSS/Atom XML",
+        ),
     ]
 
 
@@ -236,7 +291,9 @@ def test_emit_working_opml_has_date_stamp_in_title(tmp_path):
     _check.emit_working_opml(_synthetic_results(), out_path, "2026-06-24")
     tree = ET.parse(out_path)
     title = tree.getroot().find("head").find("title").text
-    assert "probe-passed" in title, f"title should mark file as probe-passed snapshot, got {title!r}"
+    assert (
+        "probe-passed" in title
+    ), f"title should mark file as probe-passed snapshot, got {title!r}"
     assert "2026-06-24" in title, f"title should embed today's date, got {title!r}"
 
 

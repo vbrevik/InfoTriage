@@ -109,8 +109,9 @@ async def test_process_verdict_renders_default_cop_cip_files(
     """Consumer should write default, COP, and CIP digest files."""
     vault_path = tmp_path / "vault"
 
-    with patch("apps.brief.consumer.DATA_DIR", new=tmp_path), \
-         patch.dict(os.environ, {"INFOTRIAGE_VAULT_PATH": str(vault_path)}):
+    with patch("apps.brief.consumer.DATA_DIR", new=tmp_path), patch.dict(
+        os.environ, {"INFOTRIAGE_VAULT_PATH": str(vault_path)}
+    ):
         event = await process_verdict(
             "pir-1", mock_store, mock_bus, snap_day="2026-07-11"
         )
@@ -163,8 +164,9 @@ async def test_process_verdict_writes_view_filtered_vault_projections(
     """Consumer should write default, COP, and CIP vault projections."""
     vault_path = tmp_path / "vault"
 
-    with patch("apps.brief.consumer.DATA_DIR", new=tmp_path), \
-         patch.dict(os.environ, {"INFOTRIAGE_VAULT_PATH": str(vault_path)}):
+    with patch("apps.brief.consumer.DATA_DIR", new=tmp_path), patch.dict(
+        os.environ, {"INFOTRIAGE_VAULT_PATH": str(vault_path)}
+    ):
         await process_verdict("pir-1", mock_store, mock_bus, snap_day="2026-07-11")
 
     # Vault projections should be written
@@ -191,8 +193,9 @@ async def test_process_verdict_publishes_sab_published_event(
     """Consumer should publish a SabPublished event via RabbitMQBus."""
     vault_path = tmp_path / "vault"
 
-    with patch("apps.brief.consumer.DATA_DIR", new=tmp_path), \
-         patch.dict(os.environ, {"INFOTRIAGE_VAULT_PATH": str(vault_path)}):
+    with patch("apps.brief.consumer.DATA_DIR", new=tmp_path), patch.dict(
+        os.environ, {"INFOTRIAGE_VAULT_PATH": str(vault_path)}
+    ):
         event = await process_verdict(
             "pir-1", mock_store, mock_bus, snap_day="2026-07-11"
         )

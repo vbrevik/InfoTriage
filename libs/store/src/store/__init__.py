@@ -9,6 +9,7 @@ Exports the public API of the store package:
 Usage:
     from store import Store, PostgresStore, InMemoryStore, render_atom
 """
+
 from ._atom import render_atom
 from ._inmemory import InMemoryStore
 from ._postgres import PostgresStore

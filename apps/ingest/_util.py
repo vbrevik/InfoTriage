@@ -32,6 +32,5 @@ def escape(s):
     if s is None:
         return ""
     if not isinstance(s, str):
-        raise TypeError(
-            f"escape expected str or None, got {type(s).__name__}")
+        raise TypeError(f"escape expected str or None, got {type(s).__name__}")
     return _html_escape(s, quote=True)

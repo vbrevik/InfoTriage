@@ -43,10 +43,10 @@ def _test_channels(url: str = "https://youtube.com/@test") -> list[dict]:
 @pytest.mark.asyncio
 async def test_ingest_r2_dual_output(tmp_path: pathlib.Path, monkeypatch) -> None:
     """For a channel listing 2 videos:
-      - 2 rows in store, each with source_type='yt' and body_ref set
-      - get_blob(body_ref) returns the stub bytes for each item
-      - 2 events published to bus
-      - Non-empty youtube-TestChannel.xml Atom file written (dual output)
+    - 2 rows in store, each with source_type='yt' and body_ref set
+    - get_blob(body_ref) returns the stub bytes for each item
+    - 2 events published to bus
+    - Non-empty youtube-TestChannel.xml Atom file written (dual output)
     """
     import youtube_ingest
 
@@ -73,11 +73,17 @@ async def test_ingest_r2_dual_output(tmp_path: pathlib.Path, monkeypatch) -> Non
 
     # All source_type == "yt" with body_ref resolving to stub bytes
     for item in items:
-        assert item.source_type == "yt", f"source_type must be 'yt', got {item.source_type!r}"
-        assert item.url.startswith("https://youtu.be/"), f"url must be youtu.be link, got {item.url!r}"
+        assert (
+            item.source_type == "yt"
+        ), f"source_type must be 'yt', got {item.source_type!r}"
+        assert item.url.startswith(
+            "https://youtu.be/"
+        ), f"url must be youtu.be link, got {item.url!r}"
         assert item.body_ref is not None, "body_ref must be set after put_blob"
         blob_bytes = store.get_blob(item.body_ref)
-        assert b"transcription disabled" in blob_bytes or b"stub mode" in blob_bytes, "blob must contain stub text"
+        assert (
+            b"transcription disabled" in blob_bytes or b"stub mode" in blob_bytes
+        ), "blob must contain stub text"
 
     # 2 events published
     events = await bus.subscribe("item.ingested")
@@ -88,7 +94,9 @@ async def test_ingest_r2_dual_output(tmp_path: pathlib.Path, monkeypatch) -> Non
     assert len(atom_files) == 1, f"expected 1 Atom file, got {atom_files}"
     content = atom_files[0].read_text()
     assert "<entry>" in content, "Atom file must contain entries"
-    assert "Video One" in content or "Video Two" in content, "Atom must include video titles"
+    assert (
+        "Video One" in content or "Video Two" in content
+    ), "Atom must include video titles"
 
 
 # ---------------------------------------------------------------------------
@@ -99,8 +107,8 @@ async def test_ingest_r2_dual_output(tmp_path: pathlib.Path, monkeypatch) -> Non
 @pytest.mark.asyncio
 async def test_ingest_r2_idempotent_rerun(tmp_path: pathlib.Path, monkeypatch) -> None:
     """Re-running ingest against identical channel listing:
-      - Same row count after second run
-      - No second 'item.ingested' event for already-seen items
+    - Same row count after second run
+    - No second 'item.ingested' event for already-seen items
     """
     import youtube_ingest
 
@@ -238,7 +246,9 @@ def test_blob_dedup_same_content_one_file(tmp_path: pathlib.Path) -> None:
 
     assert hash1 == hash2, "identical content must produce identical hash"
     blob_files = [f for f in (tmp_path / "blobs").rglob("*") if f.is_file()]
-    assert len(blob_files) == 1, f"expected 1 blob file, got {len(blob_files)}: {blob_files}"
+    assert (
+        len(blob_files) == 1
+    ), f"expected 1 blob file, got {len(blob_files)}: {blob_files}"
 
 
 def test_blob_dedup_distinct_content_distinct_files(tmp_path: pathlib.Path) -> None:

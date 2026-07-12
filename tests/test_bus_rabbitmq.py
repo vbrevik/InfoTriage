@@ -30,7 +30,8 @@ import pytest
 log = logging.getLogger(__name__)
 
 import sys
-sys.path.insert(0, '/Users/vidarbrevik/projects/InfoTriage/libs/contracts/src')
+
+sys.path.insert(0, "/Users/vidarbrevik/projects/InfoTriage/libs/contracts/src")
 from contracts import RabbitMQBus
 
 
@@ -113,7 +114,9 @@ def _rabbitmq_reachable() -> bool:
 def _skip_if_unavailable() -> None:
     """Skip the current test if RabbitMQ :22001 is not reachable."""
     if not _rabbitmq_reachable():
-        pytest.skip("RabbitMQ :22001 not available — run: docker compose up -d rabbitmq")
+        pytest.skip(
+            "RabbitMQ :22001 not available — run: docker compose up -d rabbitmq"
+        )
 
 
 async def _fresh_bus() -> RabbitMQBus:
@@ -135,6 +138,7 @@ async def _fresh_bus() -> RabbitMQBus:
 # Test 0: Publisher confirms enabled after connection (R2.AC3)
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.rabbitmq
 def test_publisher_confirms_enabled() -> None:
     """After _ensure_connection(), channel must have publisher confirms active (R2.AC3).
@@ -147,11 +151,13 @@ def test_publisher_confirms_enabled() -> None:
     async def _check() -> None:
         bus = await _fresh_bus()
         try:
-            assert bus._channel is not None, "_channel is None after _ensure_connection()"
+            assert (
+                bus._channel is not None
+            ), "_channel is None after _ensure_connection()"
             # aio-pika RobustChannel sets _publisher_confirms = True after confirm_delivery()
-            assert bus._channel.publisher_confirms is True, (
-                f"Publisher confirms not enabled — publisher_confirms={bus._channel.publisher_confirms!r}"
-            )
+            assert (
+                bus._channel.publisher_confirms is True
+            ), f"Publisher confirms not enabled — publisher_confirms={bus._channel.publisher_confirms!r}"
         finally:
             await bus.close()
 
@@ -162,6 +168,7 @@ def test_publisher_confirms_enabled() -> None:
 # ---------------------------------------------------------------------------
 # Test 1: Connectivity + topology check (R1)
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.rabbitmq
 def test_rabbitmq_available() -> None:
@@ -177,9 +184,9 @@ def test_rabbitmq_available() -> None:
             assert bus._exchange is not None, "events exchange not declared"
             assert bus._dlx is not None, "DLX not declared"
             assert bus._dlq is not None, "DLQ not declared"
-            assert set(bus._queues.keys()) == set(ROUTING_KEYS), (
-                f"Queue keys mismatch: {set(bus._queues.keys())}"
-            )
+            assert set(bus._queues.keys()) == set(
+                ROUTING_KEYS
+            ), f"Queue keys mismatch: {set(bus._queues.keys())}"
         finally:
             await bus.close()
 
@@ -191,6 +198,7 @@ def test_rabbitmq_available() -> None:
 # Test 2: Publish/consume round-trip for all 4 event types (R3)
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.rabbitmq
 def test_publish_consume_roundtrip() -> None:
     """Publish all 4 event types and consume each from its queue (R3 end-to-end)."""
@@ -200,8 +208,16 @@ def test_publish_consume_roundtrip() -> None:
         bus = await _fresh_bus()
         try:
             payloads = {
-                "item.ingested": {"event": "item.ingested", "item_id": "rt_01", "source": "NRK"},
-                "verdict.ready": {"event": "verdict.ready", "item_id": "rt_02", "score": 8},
+                "item.ingested": {
+                    "event": "item.ingested",
+                    "item_id": "rt_01",
+                    "source": "NRK",
+                },
+                "verdict.ready": {
+                    "event": "verdict.ready",
+                    "item_id": "rt_02",
+                    "score": 8,
+                },
                 "sab.published": {
                     "event": "sab.published",
                     "item_id": "rt_03",
@@ -224,12 +240,12 @@ def test_publish_consume_roundtrip() -> None:
             # Consume and verify each
             for rk, expected in payloads.items():
                 messages = await bus.subscribe(rk)
-                assert len(messages) == 1, (
-                    f"Expected 1 message for {rk}, got {len(messages)}"
-                )
-                assert messages[0] == expected, (
-                    f"Payload mismatch for {rk}: {messages[0]} != {expected}"
-                )
+                assert (
+                    len(messages) == 1
+                ), f"Expected 1 message for {rk}, got {len(messages)}"
+                assert (
+                    messages[0] == expected
+                ), f"Payload mismatch for {rk}: {messages[0]} != {expected}"
         finally:
             await bus.close()
 
@@ -240,6 +256,7 @@ def test_publish_consume_roundtrip() -> None:
 # ---------------------------------------------------------------------------
 # Test 3: Dedup — same (routing_key, item_id) is no-op
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.rabbitmq
 def test_dedup() -> None:
@@ -259,9 +276,9 @@ def test_dedup() -> None:
 
             await asyncio.sleep(0.2)
             messages = await bus.subscribe(rk)
-            assert len(messages) == 1, (
-                f"Expected 1 message (dedup), got {len(messages)}: {messages}"
-            )
+            assert (
+                len(messages) == 1
+            ), f"Expected 1 message (dedup), got {len(messages)}: {messages}"
             assert messages[0]["n"] == 1
         finally:
             await bus.close()
@@ -273,6 +290,7 @@ def test_dedup() -> None:
 # ---------------------------------------------------------------------------
 # Test 4: Dead-letter queue — NACK requeue=False routes poison to infotriage.dlq
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.rabbitmq
 def test_dlq_poison() -> None:
@@ -299,7 +317,7 @@ def test_dlq_poison() -> None:
             async def _consumer(msg: aio_pika.IncomingMessage) -> None:
                 body = json.loads(msg.body.decode())
                 if body.get("__poison__"):
-                    await msg.nack(requeue=False)   # triggers dead-lettering
+                    await msg.nack(requeue=False)  # triggers dead-lettering
                     nacked.set()
 
             consumer_tag = await q_triage.consume(_consumer)
@@ -324,9 +342,9 @@ def test_dlq_poison() -> None:
                 await asyncio.sleep(0.2)
 
             assert dlq_payload is not None, "DLQ empty after 5s — dead-lettering failed"
-            assert dlq_payload.get("__poison__") is True, (
-                f"DLQ payload unexpected: {dlq_payload}"
-            )
+            assert (
+                dlq_payload.get("__poison__") is True
+            ), f"DLQ payload unexpected: {dlq_payload}"
         finally:
             await bus.close()
 

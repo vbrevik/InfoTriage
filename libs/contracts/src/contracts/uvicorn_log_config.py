@@ -19,6 +19,7 @@ contracts package was installed as wheel, source-tree, or via ``-e`` (editable).
 The JSON file is registered in ``libs/contracts/pyproject.toml`` via
 ``package-data``.
 """
+
 import json
 from importlib import resources
 from typing import Any

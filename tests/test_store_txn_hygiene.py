@@ -158,15 +158,16 @@ def test_read_method_leaves_connection_idle(pg_store, method_name, call, expect_
     # end read txn — avoid idle-in-transaction
     """
     result = call(pg_store)
-    assert expect_miss(result), (
-        f"{method_name} against an empty DB must return the miss value; got {result!r}"
-    )
+    assert expect_miss(
+        result
+    ), f"{method_name} against an empty DB must return the miss value; got {result!r}"
     status = pg_store._conn.info.transaction_status
     assert status == psycopg.pq.TransactionStatus.IDLE, (
         f"{method_name} left the connection in transaction_status "
         f"{status.name} — expected IDLE. The read method did not end its "
         f"read transaction (idle-in-transaction leak)."
     )
+
 
 @db_live
 def test_idle_in_transaction_backstop_is_set(tmp_path):
@@ -184,7 +185,5 @@ def test_idle_in_transaction_backstop_is_set(tmp_path):
         params = dict(store._conn.info.get_parameters())
         options = params.get("options", "")
         assert "idle_in_transaction_session_timeout=300000" in options, (
-            f"idle_in_transaction_session_timeout not set; "
-            f"options={options!r}"
+            f"idle_in_transaction_session_timeout not set; " f"options={options!r}"
         )
-

@@ -51,6 +51,7 @@ CLUSTER_THRESHOLD = float(os.getenv("CLUSTER_THRESHOLD", "0.75"))
 if not (0.0 <= CLUSTER_THRESHOLD <= 1.0):
     raise ValueError(f"CLUSTER_THRESHOLD must be 0.0–1.0, got {CLUSTER_THRESHOLD}")
 
+
 # Default SAB window in hours (default 24). Override with BRIEF_WINDOW_HOURS to
 # extend the 'since' time window, e.g. 72 or 168.
 def _default_window_hours() -> int:
@@ -63,9 +64,10 @@ def _default_window_hours() -> int:
 
 def _default_cutoff() -> datetime.datetime:
     """Return the default SAB cutoff: now (Oslo) minus BRIEF_WINDOW_HOURS."""
-    return (datetime.datetime.now(OSLO) - datetime.timedelta(
+    return datetime.datetime.now(OSLO) - datetime.timedelta(
         hours=_default_window_hours()
-    ))
+    )
+
 
 _ENRICHMENT_SQL = (
     "SELECT e.item_id, e.ccir, e.cnr, e.score, e.bucket, e.why, e.pmesii, e.tessoc, "
@@ -113,7 +115,9 @@ def _write_atomic(path: Path, content: str) -> None:
 def _parse_window(window: str) -> datetime.datetime:
     m = WINDOW_RE.match(window.strip())
     if not m:
-        raise HTTPException(status_code=422, detail="window must look like '24h' (1-999 hours)")
+        raise HTTPException(
+            status_code=422, detail="window must look like '24h' (1-999 hours)"
+        )
     hours = int(m.group(1))
     return datetime.datetime.now(OSLO) - datetime.timedelta(hours=hours)
 
@@ -130,7 +134,10 @@ async def _render_sab(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return await asyncio.to_thread(
-        build_html, rows, _period_label(since), with_bluf,
+        build_html,
+        rows,
+        _period_label(since),
+        with_bluf,
         cluster_threshold=CLUSTER_THRESHOLD,
         cutoff_epoch=int(since.timestamp()),
     )
@@ -242,8 +249,9 @@ async def sab(
     if not fresh:
         html = await _render_sab(_default_cutoff(), with_bluf)
         await asyncio.to_thread(_write_atomic, SAB_HTML, html)
-    return FileResponse(SAB_HTML, media_type="text/html",
-                        headers={"Cache-Control": "max-age=86400"})
+    return FileResponse(
+        SAB_HTML, media_type="text/html", headers={"Cache-Control": "max-age=86400"}
+    )
 
 
 @app.get("/vault")

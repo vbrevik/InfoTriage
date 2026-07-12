@@ -20,11 +20,13 @@ CCIR_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "ccir.md")
 
 log = logging.getLogger(__name__)
 
+
 def load_ccir():
     try:
         return open(CCIR_PATH, encoding="utf-8").read()
     except FileNotFoundError:
         return "(no ccir.md found — keep only clearly defense/geopolitics/Norway/tech items)"
+
 
 def load_dotenv(path):
     if not os.path.exists(path):
@@ -35,20 +37,27 @@ def load_dotenv(path):
             k, v = line.split("=", 1)
             os.environ.setdefault(k.strip(), v.strip())
 
+
 def llm(messages, max_tokens=400):
     base = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:8000/v1")
     key = os.environ.get("LLM_API_KEY", "omlx")
     model = os.environ.get("LLM_MODEL", "qwen36-ud-4bit")
-    body = json.dumps({
-        "model": model, "messages": messages,
-        "temperature": 0, "max_tokens": max_tokens,
-    }).encode()
+    body = json.dumps(
+        {
+            "model": model,
+            "messages": messages,
+            "temperature": 0,
+            "max_tokens": max_tokens,
+        }
+    ).encode()
     req = urllib.request.Request(
-        base.rstrip("/") + "/chat/completions", data=body,
-        headers={"Content-Type": "application/json",
-                 "Authorization": f"Bearer {key}"})
+        base.rstrip("/") + "/chat/completions",
+        data=body,
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"},
+    )
     with urllib.request.urlopen(req, timeout=120) as r:
         return json.load(r)["choices"][0]["message"]["content"]
+
 
 def score_item(it):
     ccir = load_ccir()
@@ -131,9 +140,16 @@ SUMMARY: {it.get('summary','')}"""
         raw = raw.split("```")[1].lstrip("json").strip()
     s, e = raw.find("{"), raw.rfind("}")
     try:
-        v = json.loads(raw[s:e+1])
+        v = json.loads(raw[s : e + 1])
     except Exception:
-        v = {"ccir": "none", "cnr": "none", "pmesii": "none", "tessoc": "none", "score": 0, "why": "uleselig modell-svar"}
+        v = {
+            "ccir": "none",
+            "cnr": "none",
+            "pmesii": "none",
+            "tessoc": "none",
+            "score": 0,
+            "why": "uleselig modell-svar",
+        }
     # Prompt-contract enforcement: ccir='none' forces pmesii='none' AND
     # tessoc='none' (PMESII: '"none" if ccir is "none"' / TESSOC: '"none" if ccir is "none"'
     # in the scoring prompt's disambiguation rules). Coerce LLM drift before
@@ -150,9 +166,10 @@ SUMMARY: {it.get('summary','')}"""
         # warning can carry the actual drift signal.
         _pre_pmesii = v.get("pmesii")
         _pre_tessoc = v.get("tessoc")
-        coerced = (
-            _pre_pmesii not in (None, "", "none")
-            or _pre_tessoc not in (None, "", "none")
+        coerced = _pre_pmesii not in (None, "", "none") or _pre_tessoc not in (
+            None,
+            "",
+            "none",
         )
         v["pmesii"] = "none"
         v["tessoc"] = "none"
@@ -161,8 +178,9 @@ SUMMARY: {it.get('summary','')}"""
                 "triage_score enriched ccir=none with non-'none' pmesii/tessoc; "
                 "coercing to 'none' (pre-coercion: pmesii=%r tessoc=%r). "
                 "Likely cause: qwen36 drift away from ccir.md's rule "
-                "'\"none\" if ccir is \"none\"'.",
-                _pre_pmesii, _pre_tessoc,
+                '\'"none" if ccir is "none"\'.',
+                _pre_pmesii,
+                _pre_tessoc,
             )
     else:
         # ensure enrichment fields always present (LLM may omit them)
@@ -170,36 +188,65 @@ SUMMARY: {it.get('summary','')}"""
         v.setdefault("tessoc", "none")
     # derive bucket for the Fever loop: CCIR match = keep, else skip
     ccir = ccir_lower
-    v["bucket"] = "skip" if ccir == "none" else ("read" if v.get("cnr") == "I"
-                                                 or v.get("score", 0) >= 7 else "maybe")
+    v["bucket"] = (
+        "skip"
+        if ccir == "none"
+        else ("read" if v.get("cnr") == "I" or v.get("score", 0) >= 7 else "maybe")
+    )
     return {**it, **v}
+
 
 SAMPLE = [
     # PIR-6: OSINT & etterforskning
-    {"title": "Bellingcat identifies GRU officer behind Skripal attack via passport leak",
-     "source": "Bellingcat", "summary": "Open-source investigators traced a GRU colonel to the Novichok attack using leaked Russian passport records and travel data."},
+    {
+        "title": "Bellingcat identifies GRU officer behind Skripal attack via passport leak",
+        "source": "Bellingcat",
+        "summary": "Open-source investigators traced a GRU colonel to the Novichok attack using leaked Russian passport records and travel data.",
+    },
     # SIR-1: Midtøsten & US-Iran
-    {"title": "IRGC seizes oil tanker in Strait of Hormuz amid rising tensions",
-     "source": "Crisis Group", "summary": "Iran's Revolutionary Guard boarded and detained a commercial vessel in the Strait of Hormuz, escalating US-Iran maritime standoff."},
+    {
+        "title": "IRGC seizes oil tanker in Strait of Hormuz amid rising tensions",
+        "source": "Crisis Group",
+        "summary": "Iran's Revolutionary Guard boarded and detained a commercial vessel in the Strait of Hormuz, escalating US-Iran maritime standoff.",
+    },
     # SIR-2: Sport — VM 2026
-    {"title": "Mass protests expected at 2026 World Cup over US immigration policy",
-     "source": "BBC Sport Football", "summary": "Activist groups announce coordinated demonstrations at FIFA World Cup 2026 venues to protest US border and immigration enforcement."},
+    {
+        "title": "Mass protests expected at 2026 World Cup over US immigration policy",
+        "source": "BBC Sport Football",
+        "summary": "Activist groups announce coordinated demonstrations at FIFA World Cup 2026 venues to protest US border and immigration enforcement.",
+    },
     # FFIR-3: Egen teknologikapabilitet
-    {"title": "Run Claude Code Locally on a Mac: 65 tok/s with 4-bit Qwen3.6-27B + DFlash",
-     "source": "Medium", "summary": "Speculative decoding to run Claude Code on local Qwen on a Mac."},
+    {
+        "title": "Run Claude Code Locally on a Mac: 65 tok/s with 4-bit Qwen3.6-27B + DFlash",
+        "source": "Medium",
+        "summary": "Speculative decoding to run Claude Code on local Qwen on a Mac.",
+    },
     # none: irrelevant
-    {"title": "L'Oréal Builds AI Beauty Engine with OpenAI",
-     "source": "MyClaw", "summary": "L'Oréal cuts production cost 40%, 50k marketing assets."},
+    {
+        "title": "L'Oréal Builds AI Beauty Engine with OpenAI",
+        "source": "MyClaw",
+        "summary": "L'Oréal cuts production cost 40%, 50k marketing assets.",
+    },
     # none: irrelevant
-    {"title": "MAMMOTION robotic lawn mowers on sale for Prime Day",
-     "source": "HowToGeek", "summary": "Sponsored. Up to $1059 off robotic mowers."},
+    {
+        "title": "MAMMOTION robotic lawn mowers on sale for Prime Day",
+        "source": "HowToGeek",
+        "summary": "Sponsored. Up to $1059 off robotic mowers.",
+    },
     # PIR-4: Hybrid- & cybertrusler
-    {"title": "Suspected sabotage cuts undersea cable between Norway and Finland",
-     "source": "NRK", "summary": "An undersea fiber optic cable in the Barents Sea was severed overnight; Norwegian authorities suspect deliberate sabotage."},
+    {
+        "title": "Suspected sabotage cuts undersea cable between Norway and Finland",
+        "source": "NRK",
+        "summary": "An undersea fiber optic cable in the Barents Sea was severed overnight; Norwegian authorities suspect deliberate sabotage.",
+    },
     # FFIR-1: Norsk forsvar & sikkerhetspolitikk
-    {"title": "Norway orders 52 Leopard 2A7 tanks in largest defence purchase in decades",
-     "source": "Forsvarets forum", "summary": "The Norwegian government approved a NOK 19 billion procurement of German Leopard 2A7 main battle tanks for the Army."},
+    {
+        "title": "Norway orders 52 Leopard 2A7 tanks in largest defence purchase in decades",
+        "source": "Forsvarets forum",
+        "summary": "The Norwegian government approved a NOK 19 billion procurement of German Leopard 2A7 main battle tanks for the Army.",
+    },
 ]
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -216,17 +263,20 @@ def main():
     else:
         items = json.load(sys.stdin)
 
-    scored = sorted((score_item(it) for it in items),
-                    key=lambda x: x.get("score", 0), reverse=True)
+    scored = sorted(
+        (score_item(it) for it in items), key=lambda x: x.get("score", 0), reverse=True
+    )
 
     if args.json:
-        print(json.dumps(scored, indent=2)); return
+        print(json.dumps(scored, indent=2))
+        return
 
     icon = {"read": "🔥", "maybe": "🤔", "skip": "🗑️"}
     print("# InfoTriage digest\n")
     for it in scored:
         print(f"{icon.get(it.get('bucket'),'•')} **[{it.get('score')}] {it['title']}**")
         print(f"    {it.get('source','')} — {it.get('why','')}\n")
+
 
 if __name__ == "__main__":
     main()

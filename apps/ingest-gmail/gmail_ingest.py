@@ -35,6 +35,7 @@ MAX_MESSAGES: int = int(os.environ.get("GMAIL_MAX_MESSAGES", "50"))
 # Testability seam: allow tests to inject store/bus without real env vars
 # ---------------------------------------------------------------------------
 
+
 def _build_store():
     """Default store factory; replaced by tests via monkeypatch."""
     return build_store()
@@ -48,6 +49,7 @@ def _build_bus():
 # ---------------------------------------------------------------------------
 # Normalization: Gmail message dict → Item
 # ---------------------------------------------------------------------------
+
 
 def _parse_subject(headers: list[dict]) -> str:
     """Extract the Subject header value (empty string if missing)."""
@@ -116,6 +118,7 @@ def fetch_items(messages: list[dict]) -> list:
 # Main ingest coroutine
 # ---------------------------------------------------------------------------
 
+
 async def ingest() -> None:
     """Fetch Gmail messages via MCP and persist each as an Item.
 
@@ -168,7 +171,9 @@ async def ingest() -> None:
                     is_new = await persist_and_publish(store, bus, item)
                     if is_new:
                         new_count += 1
-            log.info("Ingested %d new, %d duplicates", new_count, len(items) - new_count)
+            log.info(
+                "Ingested %d new, %d duplicates", new_count, len(items) - new_count
+            )
 
         except Exception:
             log.exception("ingest-gmail run failed")

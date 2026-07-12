@@ -56,7 +56,7 @@ FAKE_MCP_GET_RESULT = {
                     f'{{"name": "Subject", "value": "{FAKE_SUBJECT}"}}, '
                     f'{{"name": "Date", "value": "{FAKE_DATE}"}}, '
                     f'{{"name": "From", "value": "Acme <news@acme.com>"}}'
-                    f']}}}}'
+                    f"]}}}}"
                 ),
             }
         ]

@@ -44,6 +44,6 @@ def from_frontmatter(text: str) -> dict:
     if not lines or lines[0].strip() != "---":
         raise ValueError(f"No YAML frontmatter found in text: {text[:80]!r}")
     for i in range(1, len(lines)):
-        if lines[i].strip() == "---":            # closing delimiter on its own line
+        if lines[i].strip() == "---":  # closing delimiter on its own line
             return yaml.safe_load("\n".join(lines[1:i])) or {}
     raise ValueError(f"Unterminated YAML frontmatter in text: {text[:80]!r}")

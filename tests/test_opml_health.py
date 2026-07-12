@@ -1,4 +1,5 @@
 """Tests for opml-health admin dashboard (Phase 7)."""
+
 import sys
 import os
 from pathlib import Path
@@ -13,12 +14,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 def test_admin_module_imports():
     """Verify admin.py imports without requiring live services."""
     from apps.opml_health.admin import app, SERVICES  # noqa: F401
+
     assert len(SERVICES) > 0, "SERVICES registry must not be empty"
 
 
 def test_services_registry():
     """Verify all expected services are in the registry."""
     from apps.opml_health.admin import SERVICES
+
     names = [s[0] for s in SERVICES]
     expected = {"ingest-imap", "triage", "brief", "freshrss", "rssbridge", "feeds"}
     for exp in expected:

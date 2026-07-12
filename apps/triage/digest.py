@@ -20,17 +20,24 @@ from zoneinfo import ZoneInfo
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 OUT = os.path.join(ROOT, "data", "digests")
 OSLO = ZoneInfo("Europe/Oslo")
-STOP = set("the a an of to in on for and or at by with from is are as it its this that "
-           "i og å en et er på til av for som med det den de har om mot ved".split())
+STOP = set(
+    "the a an of to in on for and or at by with from is are as it its this that "
+    "i og å en et er på til av for som med det den de har om mot ved".split()
+)
 
 # CCIR display order + titles (must match the ids the model emits from ccir.md)
 CCIR_ORDER = [
-    ("PIR-1", "Russland / Ukraina"), ("PIR-2", "Nordområdene & Arktis"),
-    ("PIR-3", "NATO & europeisk sikkerhet"), ("PIR-4", "Hybrid- & cybertrusler"),
-    ("PIR-5", "Stormaktsrivalisering"),     ("PIR-6", "OSINT & etterforskning"),
-    ("SIR-1", "Midtøsten & US-Iran"),       ("SIR-2", "Sport — VM 2026 (FIFA)"),
+    ("PIR-1", "Russland / Ukraina"),
+    ("PIR-2", "Nordområdene & Arktis"),
+    ("PIR-3", "NATO & europeisk sikkerhet"),
+    ("PIR-4", "Hybrid- & cybertrusler"),
+    ("PIR-5", "Stormaktsrivalisering"),
+    ("PIR-6", "OSINT & etterforskning"),
+    ("SIR-1", "Midtøsten & US-Iran"),
+    ("SIR-2", "Sport — VM 2026 (FIFA)"),
     ("SIR-3", "NATO-toppmøtet i Ankara"),
-    ("FFIR-1", "Norsk forsvar & sikkerhetspolitikk"), ("FFIR-2", "Norsk politikk & samfunn"),
+    ("FFIR-1", "Norsk forsvar & sikkerhetspolitikk"),
+    ("FFIR-2", "Norsk politikk & samfunn"),
     ("FFIR-3", "Egen teknologikapabilitet"),
 ]
 
@@ -38,7 +45,13 @@ CCIR_ORDER = [
 # Renderer order must equal the count of `- **CODE**` top-level CCIR bullets in ccir.md;
 # otherwise the digest silently drops new (or stale) IDs. Explicit raise (not bare
 # `assert`) so the guard survives `python3 -O`.
-_ccir_md_ids = set(re.findall(r'^\s*-\s+\*\*([A-Z]{3,4}-\d+)\b', open(os.path.join(ROOT, "ccir.md"), encoding="utf-8").read(), re.MULTILINE))
+_ccir_md_ids = set(
+    re.findall(
+        r"^\s*-\s+\*\*([A-Z]{3,4}-\d+)\b",
+        open(os.path.join(ROOT, "ccir.md"), encoding="utf-8").read(),
+        re.MULTILINE,
+    )
+)
 _order_ids = {cid for cid, _ in CCIR_ORDER}
 _missing_in_ccir = _order_ids - _ccir_md_ids
 _missing_in_order = _ccir_md_ids - _order_ids
@@ -48,21 +61,34 @@ if _missing_in_ccir or _missing_in_order:
         parts.append(f"in CCIR_ORDER but not in ccir.md: {sorted(_missing_in_ccir)}")
     if _missing_in_order:
         parts.append(f"in ccir.md but not in CCIR_ORDER: {sorted(_missing_in_order)}")
-    raise AssertionError(f"CCIR drift detected — {'; '.join(parts)}. Fix both to match.")
+    raise AssertionError(
+        f"CCIR drift detected — {'; '.join(parts)}. Fix both to match."
+    )
+
 
 def oslo_now():
     return datetime.datetime.fromtimestamp(time.time(), OSLO)
 
+
 def default_cutoff():
     n = oslo_now()
-    c = (n - datetime.timedelta(days=1)).replace(hour=16, minute=0, second=0, microsecond=0)
+    c = (n - datetime.timedelta(days=1)).replace(
+        hour=16, minute=0, second=0, microsecond=0
+    )
     return c
+
 
 def stamp(dt):
     return dt.strftime("%Y-%m-%d %H:%M")
 
+
 def keywords(title):
-    return {w for w in re.findall(r"[a-zA-ZæøåÆØÅ0-9]{4,}", (title or "").lower()) if w not in STOP}
+    return {
+        w
+        for w in re.findall(r"[a-zA-ZæøåÆØÅ0-9]{4,}", (title or "").lower())
+        if w not in STOP
+    }
+
 
 def cluster(items):
     """greedy keyword-overlap clustering; returns list of clusters (lead + members)."""
@@ -71,41 +97,64 @@ def cluster(items):
         kw = keywords(v["title"])
         hit = next((c for c in clusters if len(kw & c["kw"]) >= 2), None)
         if hit:
-            hit["items"].append(v); hit["kw"] |= kw
+            hit["items"].append(v)
+            hit["kw"] |= kw
         else:
             clusters.append({"kw": kw, "items": [v]})
     return clusters
 
+
 def line(v, withsrc=""):
     return f"- {v.get('why') or v['title']}{withsrc}  [les]({v.get('url','')})"
+
 
 def _est_tokens(s):
     """Rough prompt-token estimate. Stdlib-first; chars/4 (Qwen3 average ~4 chars/tok)."""
     return max(1, len(s) // 4)
 
+
 # ---- views ---------------------------------------------------------------
+
 
 def kept(verdicts):
     return [v for v in verdicts if (v.get("ccir") or "none").lower() != "none"]
 
+
 def write_cluster(verdicts, period):
     ks = kept(verdicts)
-    cs = sorted(cluster(ks), key=lambda c: (-max(i.get("score", 0) for i in c["items"]), -len(c["items"])))
-    L = [f"# InfoTriage · cluster — {period}", f"\n{len(cs)} saker fra {len(ks)} elementer\n"]
+    cs = sorted(
+        cluster(ks),
+        key=lambda c: (-max(i.get("score", 0) for i in c["items"]), -len(c["items"])),
+    )
+    L = [
+        f"# InfoTriage · cluster — {period}",
+        f"\n{len(cs)} saker fra {len(ks)} elementer\n",
+    ]
     for c in cs:
         lead = max(c["items"], key=lambda i: i.get("score", 0))
         srcs = sorted({i.get("source", "") for i in c["items"]})
-        tag = f"  _({len(c['items'])} kilder: {', '.join(srcs)})_" if len(c["items"]) > 1 else ""
+        tag = (
+            f"  _({len(c['items'])} kilder: {', '.join(srcs)})_"
+            if len(c["items"]) > 1
+            else ""
+        )
         flag = "🚩 " if any(i.get("cnr") == "I" for i in c["items"]) else ""
-        L.append(f"- {flag}**[{lead.get('score')}] {lead['title']}**{tag}  [les]({lead.get('url','')})")
+        L.append(
+            f"- {flag}**[{lead.get('score')}] {lead['title']}**{tag}  [les]({lead.get('url','')})"
+        )
     return "cluster.md", "\n".join(L)
+
 
 def write_brief(verdicts, period):
     ks = kept(verdicts)
-    L = [f"# InfoTriage · SAB — {period}",
-         f"_{len(ks)} saker som svarer på CCIR · ~10 min_\n"]
+    L = [
+        f"# InfoTriage · SAB — {period}",
+        f"_{len(ks)} saker som svarer på CCIR · ~10 min_\n",
+    ]
     # CNR CAT I first
-    cat1 = sorted([v for v in ks if v.get("cnr") == "I"], key=lambda x: -x.get("score", 0))
+    cat1 = sorted(
+        [v for v in ks if v.get("cnr") == "I"], key=lambda x: -x.get("score", 0)
+    )
     if cat1:
         L.append("## 🚩 CNR — varsle straks")
         for c in cluster(cat1):
@@ -121,7 +170,9 @@ def write_brief(verdicts, period):
         if not grp:
             continue
         L.append(f"## {cid} · {title}")
-        cs = sorted(cluster(grp), key=lambda c: -max(i.get("score", 0) for i in c["items"]))
+        cs = sorted(
+            cluster(grp), key=lambda c: -max(i.get("score", 0) for i in c["items"])
+        )
         for c in cs[:6]:
             lead = max(c["items"], key=lambda i: i.get("score", 0))
             srcs = sorted({i.get("source", "") for i in c["items"]})
@@ -129,6 +180,7 @@ def write_brief(verdicts, period):
             L.append(line(lead, extra))
         L.append("")
     return "brief.md", "\n".join(L)
+
 
 def write_bluf(verdicts, period, top_n=12, cap_total=6000):
     """Per-topic BLUF (Bottom Line Up Front) digest.
@@ -148,13 +200,16 @@ def write_bluf(verdicts, period, top_n=12, cap_total=6000):
       --bluf-cap-total N from CLI.
     """
     from triage_score import llm  # dynamic: write_bluf is the only caller
+
     ks = kept(verdicts)
     by = {}
     for v in ks:
         by.setdefault((v.get("ccir") or "none").upper(), []).append(v)
-    L = [f"# InfoTriage · BLUF — {period}",
-         f"_{len(ks)} saker syntetisert på tvers av kilder · én blokk per CCIR · "
-         f"per-prompt cap {cap_total} (estimerte tokens)_\n"]
+    L = [
+        f"# InfoTriage · BLUF — {period}",
+        f"_{len(ks)} saker syntetisert på tvers av kilder · én blokk per CCIR · "
+        f"per-prompt cap {cap_total} (estimerte tokens)_\n",
+    ]
     trimmed_total = 0
     for cid, title in CCIR_ORDER:
         L.append(f"## {cid} · {title}")
@@ -186,84 +241,118 @@ def write_bluf(verdicts, period, top_n=12, cap_total=6000):
             "[2][4]. A claim with no citation is wrong.\n"
             "3. CONTRADICTIONS: if sources disagree on facts, attribution, or "
             "intent, you MUST report both positions explicitly. Example: "
-            "\"Kildene spriker: [1] hevder X, mens [3] oppgir Y.\" Do NOT "
+            '"Kildene spriker: [1] hevder X, mens [3] oppgir Y." Do NOT '
             "silently pick one and discard the other.\n"
             "4. Output ONLY the BLUF text. No headers, no source list. "
             "If the items don't share one overarching story, write one "
             "sentence per cluster, each still cited with bracketed refs."
         )
         # Per-prompt truncation: drop tail items until prompt ≤ cap_total.
-        while len(ctx_blocks) > 1 and _est_tokens(
-            frame_template.format(N=len(ctx_blocks), CTX="".join(ctx_blocks))
-        ) > cap_total:
+        while (
+            len(ctx_blocks) > 1
+            and _est_tokens(
+                frame_template.format(N=len(ctx_blocks), CTX="".join(ctx_blocks))
+            )
+            > cap_total
+        ):
             ctx_blocks.pop()
             ctx_items.pop()
         # If 1 item + frame still cannot fit, the cap is below useful → skip.
-        skipped_for_cap = bool(ctx_blocks) and _est_tokens(
-            frame_template.format(N=len(ctx_blocks), CTX="".join(ctx_blocks))
-        ) > cap_total
+        skipped_for_cap = (
+            bool(ctx_blocks)
+            and _est_tokens(
+                frame_template.format(N=len(ctx_blocks), CTX="".join(ctx_blocks))
+            )
+            > cap_total
+        )
         if skipped_for_cap:
             ctx_blocks, ctx_items = [], []
         dropped = len(top) - len(ctx_items)
         prompt = (
             frame_template.format(N=len(ctx_items), CTX="".join(ctx_blocks))
-            if ctx_items else None
+            if ctx_items
+            else None
         )
         if skipped_for_cap:
             trimmed_total += len(top)
-            print(f"  …{cid} skipped — cap {cap_total} below frame + 1 item "
-                  f"({len(top)} items not sent)",
-                  file=sys.stderr, flush=True)
+            print(
+                f"  …{cid} skipped — cap {cap_total} below frame + 1 item "
+                f"({len(top)} items not sent)",
+                file=sys.stderr,
+                flush=True,
+            )
         elif dropped:
             trimmed_total += dropped
-            print(f"  …{cid} trimmed {dropped} item(s) (lowest-score tail) to fit "
-                  f"{cap_total}-tok cap ({len(ctx_items)}/{len(top)} kept)",
-                  file=sys.stderr, flush=True)
+            print(
+                f"  …{cid} trimmed {dropped} item(s) (lowest-score tail) to fit "
+                f"{cap_total}-tok cap ({len(ctx_items)}/{len(top)} kept)",
+                file=sys.stderr,
+                flush=True,
+            )
         if not prompt:
-            L.append(f"_(seksjon hoppet over — cap {cap_total} for lav til å "
-                     f"kjøre BLUF for {cid}, {len(top)} saker droppet)_\n")
+            L.append(
+                f"_(seksjon hoppet over — cap {cap_total} for lav til å "
+                f"kjøre BLUF for {cid}, {len(top)} saker droppet)_\n"
+            )
             continue
         try:
-            print(f"  …generating BLUF for {cid} ({len(ctx_items)} items, "
-                  f"~{_est_tokens(prompt)} tok)",
-                  file=sys.stderr, flush=True)
-            bluf_text = llm([{"role": "user", "content": prompt}],
-                            max_tokens=400).strip()
+            print(
+                f"  …generating BLUF for {cid} ({len(ctx_items)} items, "
+                f"~{_est_tokens(prompt)} tok)",
+                file=sys.stderr,
+                flush=True,
+            )
+            bluf_text = llm(
+                [{"role": "user", "content": prompt}], max_tokens=400
+            ).strip()
         except Exception as e:
             # Never echo the exception into bluf.md: urllib errors can carry
             # auth headers / paths that contain env vars. Stderr keeps the
             # full detail for the operator; the digest itself is stingy.
-            print(f"  …BLUF failure for {cid}: {type(e).__name__}: {e}",
-                  file=sys.stderr, flush=True)
+            print(
+                f"  …BLUF failure for {cid}: {type(e).__name__}: {e}",
+                file=sys.stderr,
+                flush=True,
+            )
             bluf_text = "_(Kunne ikke generere BLUF — sjekk logg for detaljer)_"
         L.append(bluf_text)
         L.append("")
         for i, it in enumerate(ctx_items, 1):
             src = it.get("source", "") or "(ukjent kilde)"
-            L.append(f"[{i}] **{src}** · [{it.get('title','')}]"
-                     f"({it.get('url','') or '#'})")
+            L.append(
+                f"[{i}] **{src}** · [{it.get('title','')}]"
+                f"({it.get('url','') or '#'})"
+            )
         L.append("")
     if trimmed_total:
-        L.append("---\n"
-                 f"_Trimmet {trimmed_total} elementer for å holde hver LLM-prompt "
-                 f"innenfor cap {cap_total} estimerte tokens. "
-                 f"Juster `--bluf-cap-total` for å heve/grense._")
+        L.append(
+            "---\n"
+            f"_Trimmet {trimmed_total} elementer for å holde hver LLM-prompt "
+            f"innenfor cap {cap_total} estimerte tokens. "
+            f"Juster `--bluf-cap-total` for å heve/grense._"
+        )
     return "bluf.md", "\n".join(L)
 
 
 def write_list(verdicts, period):
-    strict = sorted([v for v in kept(verdicts) if v.get("score", 0) >= 8], key=lambda x: -x["score"])
+    strict = sorted(
+        [v for v in kept(verdicts) if v.get("score", 0) >= 8], key=lambda x: -x["score"]
+    )
     L = [f"# InfoTriage · list (strict 🔥) — {period}", f"\n{len(strict)} viktigste\n"]
     for v in strict:
         f = "🚩 " if v.get("cnr") == "I" else ""
-        L.append(f"- {f}**[{v['score']}] {v['title']}**  · {v.get('source','')} · {v.get('ccir','')}")
+        L.append(
+            f"- {f}**[{v['score']}] {v['title']}**  · {v.get('source','')} · {v.get('ccir','')}"
+        )
         L.append(f"  - {v.get('why','')} — [les]({v.get('url','')})")
     return "list.md", "\n".join(L)
+
 
 def main():
     raise SystemExit(
         "digest.py CLI is deprecated; use the brief app event-driven renderer instead."
     )
+
 
 if __name__ == "__main__":
     main()

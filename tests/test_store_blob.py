@@ -27,6 +27,7 @@ def _sha256(data: bytes) -> str:
 # Basic round-trip
 # ---------------------------------------------------------------------------
 
+
 def test_put_returns_sha256(tmp_path):
     data = b"hello world"
     h = put_blob(tmp_path, data)
@@ -49,6 +50,7 @@ def test_roundtrip_empty_bytes(tmp_path):
 # Sharded path layout
 # ---------------------------------------------------------------------------
 
+
 def test_shard_path(tmp_path):
     data = b"sharded content"
     h = put_blob(tmp_path, data)
@@ -66,6 +68,7 @@ def test_shard_path_correct_content(tmp_path):
 # ---------------------------------------------------------------------------
 # Idempotency — duplicate put of identical bytes
 # ---------------------------------------------------------------------------
+
 
 def test_dedup_single_file(tmp_path):
     data = b"identical bytes"
@@ -88,6 +91,7 @@ def test_dedup_no_error(tmp_path):
 # Distinct bytes produce distinct hashes and paths
 # ---------------------------------------------------------------------------
 
+
 def test_distinct_payloads_distinct_hashes(tmp_path):
     h1 = put_blob(tmp_path, b"payload A")
     h2 = put_blob(tmp_path, b"payload B")
@@ -107,6 +111,7 @@ def test_distinct_payloads_distinct_paths(tmp_path):
 # ---------------------------------------------------------------------------
 # Traversal guard (T-02-02)
 # ---------------------------------------------------------------------------
+
 
 def test_traversal_guard_relative_path(tmp_path):
     with pytest.raises(ValueError):
@@ -134,6 +139,7 @@ def test_traversal_guard_non_hex(tmp_path):
 # Miss — valid-format hash that doesn't exist
 # ---------------------------------------------------------------------------
 
+
 def test_get_absent_hash_raises_file_not_found(tmp_path):
     # A valid sha256-format hash that was never written
     absent = "a" * 64
@@ -144,6 +150,7 @@ def test_get_absent_hash_raises_file_not_found(tmp_path):
 # ---------------------------------------------------------------------------
 # Atomicity — induced write failure leaves no final-path file
 # ---------------------------------------------------------------------------
+
 
 def test_atomic_write_failure_no_final_file(tmp_path):
     """An induced write failure must leave no file at the final sharded path.

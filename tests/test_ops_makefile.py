@@ -1,4 +1,5 @@
 """Tests for ops/Makefile targets."""
+
 import subprocess
 from pathlib import Path
 

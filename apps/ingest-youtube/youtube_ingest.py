@@ -109,14 +109,11 @@ def yt_dlp_list(channel: str, max_n: int) -> list[tuple[str, str]]:
     if out.returncode != 0:
         tail = out.stderr.strip().splitlines()[-3:]
         print(
-            f"yt-dlp failed on {channel} (exit {out.returncode}): "
-            + " / ".join(tail),
+            f"yt-dlp failed on {channel} (exit {out.returncode}): " + " / ".join(tail),
             file=sys.stderr,
         )
     return [
-        tuple(line.split("|||", 1))
-        for line in out.stdout.splitlines()
-        if "|||" in line
+        tuple(line.split("|||", 1)) for line in out.stdout.splitlines() if "|||" in line
     ]
 
 

@@ -19,6 +19,7 @@ TEST_DSN_ENV = "INFOTRIAGE_TEST_DSN"
 def _test_db_reachable() -> bool:
     """Return True if the INFOTRIAGE_TEST_DSN test DB accepts a TCP connection within 1s."""
     import psycopg
+
     dsn = os.environ.get(TEST_DSN_ENV)
     if not dsn:
         return False
@@ -48,6 +49,7 @@ _pg_live_skipif = (
 
 def _ts() -> str:
     from datetime import datetime, timezone
+
     return datetime.now(timezone.utc).isoformat()
 
 
@@ -74,10 +76,12 @@ def store(request, tmp_path):
         yield InMemoryStore(blob_root=tmp_path / "blobs")
     else:
         from store import PostgresStore
+
         dsn = os.environ.get(TEST_DSN_ENV)
         PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs").init_schema()
         # Truncate entity-related tables for isolation
         import psycopg
+
         with psycopg.connect(dsn, autocommit=True) as conn:
             conn.execute(
                 "TRUNCATE infotriage.ccir, infotriage.entity_links, infotriage.entities, "
@@ -208,8 +212,12 @@ def test_find_similar_entity_returns_match_above_threshold(store):
     vec_a = [1.0] + [0.0] * 1023
     vec_b = [0.99] + [0.01] * 1023  # very similar to vec_a
     vec_c = [0.0, 1.0] + [0.0] * 1022  # orthogonal to vec_a
-    store.put_entity(name="NATO", name_norm="nato", lang="en", type="ORG", embedding=vec_a)
-    store.put_entity(name="Oslo", name_norm="oslo", lang="en", type="GPE", embedding=vec_c)
+    store.put_entity(
+        name="NATO", name_norm="nato", lang="en", type="ORG", embedding=vec_a
+    )
+    store.put_entity(
+        name="Oslo", name_norm="oslo", lang="en", type="GPE", embedding=vec_c
+    )
 
     match = store.find_similar_entity(vec_b, threshold=0.85)
     assert match is not None
@@ -220,19 +228,26 @@ def test_find_similar_entity_returns_match_above_threshold(store):
 def test_find_similar_entity_ignores_null_embeddings(store):
     """find_similar_entity must not return entities without embeddings."""
     _seed_item(store)
-    store.put_entity(name="NATO", name_norm="nato", lang="en", type="ORG", embedding=None)
+    store.put_entity(
+        name="NATO", name_norm="nato", lang="en", type="ORG", embedding=None
+    )
     match = store.find_similar_entity([1.0] + [0.0] * 1023, threshold=0.85)
     assert match is None
 
 
-@pytest.mark.skipif(not _PG_UP, reason="INFOTRIAGE_TEST_DSN unset or test DB unreachable — db_live test skipped")
+@pytest.mark.skipif(
+    not _PG_UP,
+    reason="INFOTRIAGE_TEST_DSN unset or test DB unreachable — db_live test skipped",
+)
 @pytest.mark.db_live
 def test_entity_links_cross_language(tmp_path):
     """Postgres-only: cross-language mentions link to the same entity_id."""
     from store import PostgresStore
+
     dsn = os.environ.get(TEST_DSN_ENV)
     PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs").init_schema()
     import psycopg
+
     with psycopg.connect(dsn, autocommit=True) as conn:
         conn.execute(
             "TRUNCATE infotriage.ccir, infotriage.entity_links, infotriage.entities, "

@@ -20,8 +20,16 @@ def test_ccir_hot_read(tmp_path, monkeypatch):
 
     def _capture_llm(messages, max_tokens=400):
         captured_prompts.append(messages[0]["content"])
-        return json.dumps({"ccir": "none", "cnr": "none", "pmesii": "none",
-                            "tessoc": "none", "score": 0, "why": "test"})
+        return json.dumps(
+            {
+                "ccir": "none",
+                "cnr": "none",
+                "pmesii": "none",
+                "tessoc": "none",
+                "score": 0,
+                "why": "test",
+            }
+        )
 
     monkeypatch.setattr(triage_score, "llm", _capture_llm)
 

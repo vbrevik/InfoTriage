@@ -77,7 +77,10 @@ def item_from_obsidian_clip(path: str) -> Item:
         fm = from_frontmatter(text)
     except ValueError:
         fm = {}
-        log.warning("Obsidian clip %r has no YAML frontmatter delimiters; using empty dict", path)
+        log.warning(
+            "Obsidian clip %r has no YAML frontmatter delimiters; using empty dict",
+            path,
+        )
 
     # --- required field extraction with fallback + warning ---
     title: str = fm.get("title") or ""
@@ -86,20 +89,29 @@ def item_from_obsidian_clip(path: str) -> Item:
     summary = fm.get("description")
 
     if not title:
-        log.warning("Obsidian clip %r missing 'title' frontmatter field; defaulting to ''", path)
+        log.warning(
+            "Obsidian clip %r missing 'title' frontmatter field; defaulting to ''", path
+        )
     if not url:
-        log.warning("Obsidian clip %r missing 'url' frontmatter field; defaulting to ''", path)
+        log.warning(
+            "Obsidian clip %r missing 'url' frontmatter field; defaulting to ''", path
+        )
 
     # --- date → tz-aware ts ---
     date_raw = fm.get("date")
     if date_raw is None:
         ts = datetime.now(tz=timezone.utc)
         log.warning(
-            "Obsidian clip %r missing 'date' frontmatter field; defaulting to utcnow()", path
+            "Obsidian clip %r missing 'date' frontmatter field; defaulting to utcnow()",
+            path,
         )
     elif isinstance(date_raw, datetime):
         # from_frontmatter may return naive datetime if no TZ offset in YAML
-        ts = date_raw if date_raw.tzinfo is not None else date_raw.replace(tzinfo=timezone.utc)
+        ts = (
+            date_raw
+            if date_raw.tzinfo is not None
+            else date_raw.replace(tzinfo=timezone.utc)
+        )
     else:
         # Unexpected type (e.g. plain date object) — fall back to utcnow
         ts = datetime.now(tz=timezone.utc)

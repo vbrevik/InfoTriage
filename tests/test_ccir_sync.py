@@ -18,8 +18,8 @@ import digest  # resolved via apps/triage on pythonpath
 
 CCIR_MD = os.path.join(os.path.dirname(__file__), "..", "ccir.md")
 # Same regex as the runtime guard in apps/triage/digest.py.
-CCIR_BULLET_RE = re.compile(r'^\s*-\s+\*\*([A-Z]{3,4}-\d+)\b', re.MULTILINE)
-CCIR_ID_RE = re.compile(r'^[A-Z]{3,4}-\d+$')
+CCIR_BULLET_RE = re.compile(r"^\s*-\s+\*\*([A-Z]{3,4}-\d+)\b", re.MULTILINE)
+CCIR_ID_RE = re.compile(r"^[A-Z]{3,4}-\d+$")
 
 
 def ccir_md_ids():
@@ -43,7 +43,9 @@ def test_ids_match():
         problems.append(f"in CCIR_ORDER but not in ccir.md: {missing_in_md}")
     if missing_in_order:
         problems.append(f"in ccir.md but not in CCIR_ORDER: {missing_in_order}")
-    assert not problems, "CCIR drift detected — " + "; ".join(problems) + ". Update both files to match."
+    assert not problems, (
+        "CCIR drift detected — " + "; ".join(problems) + ". Update both files to match."
+    )
 
 
 def test_ccir_order_has_no_duplicates():
@@ -70,6 +72,9 @@ def test_ccir_ids_are_canonical():
 
 def test_ccir_order_titles_are_nonempty():
     """Every CCIR_ORDER tuple carries a non-empty title for markdown rendering."""
-    bad = [(cid, title) for cid, title in digest.CCIR_ORDER
-           if not title or not title.strip()]
+    bad = [
+        (cid, title)
+        for cid, title in digest.CCIR_ORDER
+        if not title or not title.strip()
+    ]
     assert not bad, f"CCIR_ORDER entries with empty/whitespace titles: {bad}"

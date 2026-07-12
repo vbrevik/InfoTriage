@@ -7,6 +7,7 @@ loop (best-effort log-and-continue posture).
 
 MUST be a unit test (NOT db_live) so it runs on every pytest invocation.
 """
+
 import asyncio
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -44,9 +45,7 @@ def test_probe_below_threshold_is_silent():
     consumer._events_exchange = MagicMock()
     with patch("apps.dlq_consumer.worker.httpx.AsyncClient") as Client:
         Client.return_value.__aenter__ = AsyncMock(
-            return_value=MagicMock(
-                get=AsyncMock(return_value=_make_mock_response(10))
-            )
+            return_value=MagicMock(get=AsyncMock(return_value=_make_mock_response(10)))
         )
         Client.return_value.__aexit__ = AsyncMock(return_value=None)
         with patch("apps.dlq_consumer.worker.log") as log_mock:
@@ -66,27 +65,25 @@ def test_probe_at_threshold_emits_critical_and_feed_unhealthy():
 
     with patch("apps.dlq_consumer.worker.httpx.AsyncClient") as Client:
         Client.return_value.__aenter__ = AsyncMock(
-            return_value=MagicMock(
-                get=AsyncMock(return_value=_make_mock_response(75))
-            )
+            return_value=MagicMock(get=AsyncMock(return_value=_make_mock_response(75)))
         )
         Client.return_value.__aexit__ = AsyncMock(return_value=None)
         with patch("apps.dlq_consumer.worker.log") as log_mock:
             _run(consumer._probe_queue_depth(threshold=50))
 
     log_mock.critical.assert_called()
-    assert exchange_mock.publish.await_count == 1, (
-        "feed.unhealthy event must be emitted on threshold breach."
-    )
+    assert (
+        exchange_mock.publish.await_count == 1
+    ), "feed.unhealthy event must be emitted on threshold breach."
     # The published message body's reason must surface the depth value so the
     # downstream operator/consumer can grep for it.
     call = exchange_mock.publish.await_args
     msg = call.kwargs.get("message") or call.args[0]
     body = json.loads(msg.body.decode())
     assert body["event"] == "feed.unhealthy"
-    assert "75" in body["reason"] or "depth=75" in body["reason"], (
-        f"reason must include the depth value; got: {body['reason']!r}"
-    )
+    assert (
+        "75" in body["reason"] or "depth=75" in body["reason"]
+    ), f"reason must include the depth value; got: {body['reason']!r}"
 
 
 def test_probe_connectivity_failure_is_warning_only():

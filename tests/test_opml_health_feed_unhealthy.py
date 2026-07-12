@@ -20,6 +20,7 @@ It catches:
      This is the load-bearing assertion: if a future refactor reintroduces an
      inline class, identity check fails IMMEDIATELY.
 """
+
 import datetime
 import logging
 import re
@@ -53,18 +54,18 @@ def test_feed_unhealthy_schema_accepts_opml_health_emit_shape():
     assert isinstance(d["reason"], str)
     assert len(d["reason"]) <= 120
     # Pydantic serializes AwareDatetime to ISO-8601 string in mode="json".
-    assert isinstance(d["ts"], str), (
-        f"ts must serialize to ISO-8601 string under mode='json'; got {type(d['ts']).__name__}"
-    )
+    assert isinstance(
+        d["ts"], str
+    ), f"ts must serialize to ISO-8601 string under mode='json'; got {type(d['ts']).__name__}"
     # Strict ISO-8601 fingerprint: YYYY-MM-DDTHH:MM:SS prefix + UTC tz marker
     # (+00:00 or Z). The +00:00 form is what `datetime.isoformat()` emits for
     # tz-aware UTC datetimes; Z is the RFC3339 equivalent. Both are acceptable.
-    assert re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", d["ts"]), (
-        f"ts must start with ISO-8601 YYYY-MM-DDTHH:MM:SS prefix; got {d['ts']!r}"
-    )
-    assert d["ts"].endswith("+00:00") or d["ts"].endswith("Z"), (
-        f"ts must end with UTC tz marker (+00:00 or Z); got {d['ts']!r}"
-    )
+    assert re.match(
+        r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", d["ts"]
+    ), f"ts must start with ISO-8601 YYYY-MM-DDTHH:MM:SS prefix; got {d['ts']!r}"
+    assert d["ts"].endswith("+00:00") or d["ts"].endswith(
+        "Z"
+    ), f"ts must end with UTC tz marker (+00:00 or Z); got {d['ts']!r}"
 
 
 def test_feed_unhealthy_max_length_120_enforced():
@@ -116,6 +117,7 @@ def test_opml_health_module_uses_canonical_feed_unhealthy():
     )
     # And the canonical must be a Pydantic BaseModel — not the duck-typed inline class.
     import pydantic
+
     assert isinstance(CanonicalFeedUnhealthy, type) and issubclass(
         CanonicalFeedUnhealthy, pydantic.BaseModel
     ), "Canonical FeedUnhealthy must be a Pydantic BaseModel subclass."
@@ -145,15 +147,31 @@ def test_run_health_check_survives_validation_error_mid_batch(caplog):
     """
     from apps.opml_health import service
 
-    long_reason = "LongReason_" + ("x" * 200)  # > 200 chars, exceeds Field(max_length=120)
+    long_reason = "LongReason_" + (
+        "x" * 200
+    )  # > 200 chars, exceeds Field(max_length=120)
 
     fake_outlines = [
-        ("category-a", [
-            {"type": "rss", "text": "Good Feed", "xmlUrl": "https://good.example.invalid/feed.xml"},
-        ]),
-        ("category-b", [
-            {"type": "rss", "text": "Bad Reason Feed", "xmlUrl": "https://bad.example.invalid/feed.xml"},
-        ]),
+        (
+            "category-a",
+            [
+                {
+                    "type": "rss",
+                    "text": "Good Feed",
+                    "xmlUrl": "https://good.example.invalid/feed.xml",
+                },
+            ],
+        ),
+        (
+            "category-b",
+            [
+                {
+                    "type": "rss",
+                    "text": "Bad Reason Feed",
+                    "xmlUrl": "https://bad.example.invalid/feed.xml",
+                },
+            ],
+        ),
     ]
 
     def fake_probe_and_classify(outline, ua, timeout):
@@ -168,14 +186,16 @@ def test_run_health_check_survives_validation_error_mid_batch(caplog):
         # it has its own module-namespace binding that is NOT updated when
         # the source module is patched. Patch the binding actually invoked.
         with patch.object(service, "load_opml", return_value=fake_outlines):
-            with patch.object(service, "probe_and_classify", side_effect=fake_probe_and_classify):
+            with patch.object(
+                service, "probe_and_classify", side_effect=fake_probe_and_classify
+            ):
                 # Must NOT raise -- the inner guard catches ValidationError.
                 results, unhealthy = service.run_health_check()
 
     # Both feeds must be in results (loop survived the bad-`reason` feed).
-    assert len(results) == 2, (
-        f"run_health_check loop must process every feed; got {len(results)} / 2"
-    )
+    assert (
+        len(results) == 2
+    ), f"run_health_check loop must process every feed; got {len(results)} / 2"
     # Only the short-reason feed should land in unhealthy (long-reason one was
     # ValidationError-skipped at emission-time, before it could be appended).
     assert len(unhealthy) == 1, (
@@ -186,7 +206,8 @@ def test_run_health_check_survives_validation_error_mid_batch(caplog):
     assert unhealthy[0].feed_url == "https://good.example.invalid/feed.xml"
     # And a Discarding log line was emitted.
     discard_logs = [
-        rec for rec in caplog.records
+        rec
+        for rec in caplog.records
         if rec.levelno >= logging.ERROR
         and "Discarding feed.unhealthy event" in rec.message
     ]

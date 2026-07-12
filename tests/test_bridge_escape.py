@@ -73,7 +73,7 @@ def test_realistic_norwegian_title_with_metachars():
     # All metachars escaped — no raw special chars in output
     assert "<" not in out
     assert ">" not in out
-    assert "& " not in out   # raw & followed by space (not &amp; / &lt; / ...)
+    assert "& " not in out  # raw & followed by space (not &amp; / &lt; / ...)
     assert "&amp;" in out
     assert "&lt;" in out
     assert "&gt;" in out

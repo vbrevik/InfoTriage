@@ -196,7 +196,9 @@ class Store(Protocol):
         """
         ...
 
-    def link_entity(self, entity_id: str, item_id: str, mention: str, lang: str) -> None:
+    def link_entity(
+        self, entity_id: str, item_id: str, mention: str, lang: str
+    ) -> None:
         """Link an entity to an item with the surface mention and mention language.
 
         Idempotent: duplicate (entity_id, item_id, mention) links are ignored.

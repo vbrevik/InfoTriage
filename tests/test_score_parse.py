@@ -25,10 +25,19 @@ def _score_with(llm_raw, item=None):
 
 # -- A: well-formed JSON -----------------------------------------------
 
+
 def test_wellformed_json():
     """Clean JSON → parsed fields, bucket=read (score >= 7)."""
-    payload = json.dumps({"ccir": "FFIR-3", "cnr": "II", "pmesii": "Information",
-                          "tessoc": "Espionage", "score": 7, "why": "test"})
+    payload = json.dumps(
+        {
+            "ccir": "FFIR-3",
+            "cnr": "II",
+            "pmesii": "Information",
+            "tessoc": "Espionage",
+            "score": 7,
+            "why": "test",
+        }
+    )
     v = _score_with(payload)
     assert v["ccir"] == "FFIR-3"
     assert v["cnr"] == "II"
@@ -40,10 +49,19 @@ def test_wellformed_json():
 
 # -- B: code-fenced JSON -----------------------------------------------
 
+
 def test_codefence_json():
     """JSON wrapped in ```json ... ``` → same as well-formed."""
-    inner = json.dumps({"ccir": "FFIR-3", "cnr": "II", "pmesii": "Information",
-                        "tessoc": "Espionage", "score": 7, "why": "test"})
+    inner = json.dumps(
+        {
+            "ccir": "FFIR-3",
+            "cnr": "II",
+            "pmesii": "Information",
+            "tessoc": "Espionage",
+            "score": 7,
+            "why": "test",
+        }
+    )
     payload = f"```json\n{inner}\n```"
     v = _score_with(payload)
     assert v["ccir"] == "FFIR-3"
@@ -54,6 +72,7 @@ def test_codefence_json():
 
 
 # -- C: garbage (no JSON at all) ----------------------------------------
+
 
 def test_garbage_returns_fallback():
     """Unparseable → fallback dict: ccir=none, score=0, bucket=skip."""
@@ -69,10 +88,19 @@ def test_garbage_returns_fallback():
 
 # -- bonus: low score → bucket=maybe -----------------------------------
 
+
 def test_low_score_maybe():
     """CCIR hit with score < 7 and cnr != I → bucket=maybe."""
-    payload = json.dumps({"ccir": "PIR-1", "cnr": "II", "pmesii": "Military",
-                          "tessoc": "Sabotage", "score": 4, "why": "test"})
+    payload = json.dumps(
+        {
+            "ccir": "PIR-1",
+            "cnr": "II",
+            "pmesii": "Military",
+            "tessoc": "Sabotage",
+            "score": 4,
+            "why": "test",
+        }
+    )
     v = _score_with(payload)
     assert v["bucket"] == "maybe"
     assert v["pmesii"] == "Military"
@@ -81,10 +109,19 @@ def test_low_score_maybe():
 
 # -- bonus: cnr I → bucket=read regardless of score ---------------------
 
+
 def test_cnr_one_forces_read():
     """CAT I → bucket=read even at low score."""
-    payload = json.dumps({"ccir": "PIR-1", "cnr": "I", "pmesii": "Military",
-                          "tessoc": "Sabotage", "score": 3, "why": "test"})
+    payload = json.dumps(
+        {
+            "ccir": "PIR-1",
+            "cnr": "I",
+            "pmesii": "Military",
+            "tessoc": "Sabotage",
+            "score": 3,
+            "why": "test",
+        }
+    )
     v = _score_with(payload)
     assert v["bucket"] == "read"
     assert v["pmesii"] == "Military"
@@ -93,8 +130,7 @@ def test_cnr_one_forces_read():
 
 def test_missing_enrichment_fallback():
     """LLM omits pmesii + tessoc → falls back to 'none' gracefully."""
-    payload = json.dumps({"ccir": "FFIR-3", "cnr": "II", "score": 7,
-                          "why": "test"})
+    payload = json.dumps({"ccir": "FFIR-3", "cnr": "II", "score": 7, "why": "test"})
     v = _score_with(payload)
     assert v["pmesii"] == "none"
     assert v["tessoc"] == "none"
@@ -118,9 +154,16 @@ def test_ccir_none_forces_pmesii_and_tessoc_none():
     pipeline (filter_rows, sab_html.py TESSOC distribution, view filters)
     for items that the scorer itself said are not CCIR-relevant.
     """
-    payload = json.dumps({"ccir": "none", "cnr": "none",
-                          "pmesii": "Military", "tessoc": "Espionage",
-                          "score": 4, "why": "not ccir"})
+    payload = json.dumps(
+        {
+            "ccir": "none",
+            "cnr": "none",
+            "pmesii": "Military",
+            "tessoc": "Espionage",
+            "score": 4,
+            "why": "not ccir",
+        }
+    )
     v = _score_with(payload)
     assert v["ccir"] == "none"
     # Contract: ccir='none' → no PMESII domain, no TESSOC actor
@@ -137,9 +180,16 @@ def test_ccir_none_both_pmesii_and_tessoc_emitted_both_coerced():
     alongside a 'none' ccir — the contract coercion should still take
     precedence over the setdefault fallback for BOTH fields.
     """
-    payload = json.dumps({"ccir": "none", "cnr": "none",
-                          "pmesii": "Information", "tessoc": "Sabotage",
-                          "score": 0, "why": "irrelevant"})
+    payload = json.dumps(
+        {
+            "ccir": "none",
+            "cnr": "none",
+            "pmesii": "Information",
+            "tessoc": "Sabotage",
+            "score": 0,
+            "why": "irrelevant",
+        }
+    )
     v = _score_with(payload)
     assert v["ccir"] == "none"
     assert v["pmesii"] == "none"
@@ -159,8 +209,16 @@ def test_tessoc_terror_low_score_maybe():
     drops 'Terror' from the enumeration list, the LLM might silently start
     emitting 'none' or another label instead, and this test fails loudly.
     """
-    payload = json.dumps({"ccir": "PIR-1", "cnr": "II", "pmesii": "Military",
-                          "tessoc": "Terror", "score": 4, "why": "test"})
+    payload = json.dumps(
+        {
+            "ccir": "PIR-1",
+            "cnr": "II",
+            "pmesii": "Military",
+            "tessoc": "Terror",
+            "score": 4,
+            "why": "test",
+        }
+    )
     v = _score_with(payload)
     assert v["bucket"] == "maybe"
     assert v["pmesii"] == "Military"
@@ -175,8 +233,16 @@ def test_tessoc_subversion_low_score_maybe():
     BOTH canonically valid AND now directly tested (previously only
     Espionage and Sabotage were exercised in the test suite).
     """
-    payload = json.dumps({"ccir": "PIR-1", "cnr": "II", "pmesii": "Political",
-                          "tessoc": "Subversion", "score": 4, "why": "test"})
+    payload = json.dumps(
+        {
+            "ccir": "PIR-1",
+            "cnr": "II",
+            "pmesii": "Political",
+            "tessoc": "Subversion",
+            "score": 4,
+            "why": "test",
+        }
+    )
     v = _score_with(payload)
     assert v["bucket"] == "maybe"
     assert v["pmesii"] == "Political"
@@ -192,8 +258,16 @@ def test_tessoc_organized_crime_low_score_maybe():
     sab_html.py, which lowercases it before lookup (TESSOC_ICONS['organized crime']),
     so both the scorer and the renderer need to preserve the space.
     """
-    payload = json.dumps({"ccir": "PIR-1", "cnr": "II", "pmesii": "Economic",
-                          "tessoc": "Organized Crime", "score": 4, "why": "test"})
+    payload = json.dumps(
+        {
+            "ccir": "PIR-1",
+            "cnr": "II",
+            "pmesii": "Economic",
+            "tessoc": "Organized Crime",
+            "score": 4,
+            "why": "test",
+        }
+    )
     v = _score_with(payload)
     assert v["bucket"] == "maybe"
     assert v["pmesii"] == "Economic"
@@ -212,13 +286,21 @@ def test_ccir_none_dirty_emits_log_warning(caplog):
     coercion pmesii/tessoc values so the operator can spot drift on
     the wire before downstream consumers see the cleaned data.
     """
-    payload = json.dumps({"ccir": "none", "cnr": "none",
-                          "pmesii": "Military", "tessoc": "Espionage",
-                          "score": 4, "why": "not ccir"})
+    payload = json.dumps(
+        {
+            "ccir": "none",
+            "cnr": "none",
+            "pmesii": "Military",
+            "tessoc": "Espionage",
+            "score": 4,
+            "why": "not ccir",
+        }
+    )
     with caplog.at_level(logging.WARNING, logger=triage_score.log.name):
         _score_with(payload)
     drift_warnings = [
-        r for r in caplog.records
+        r
+        for r in caplog.records
         if r.levelno == logging.WARNING
         and "ccir=none" in r.message
         and "Military" in r.message
@@ -240,15 +322,22 @@ def test_ccir_none_clean_stays_silent(caplog):
     branch with already-clean values but via the bootstrap dict,
     not through a real LLM payload.)
     """
-    payload = json.dumps({"ccir": "none", "cnr": "none",
-                          "pmesii": "none", "tessoc": "none",
-                          "score": 0, "why": "irrelevant"})
+    payload = json.dumps(
+        {
+            "ccir": "none",
+            "cnr": "none",
+            "pmesii": "none",
+            "tessoc": "none",
+            "score": 0,
+            "why": "irrelevant",
+        }
+    )
     with caplog.at_level(logging.WARNING, logger=triage_score.log.name):
         _score_with(payload)
     drift_warnings = [
-        r for r in caplog.records
-        if r.levelno == logging.WARNING
-        and "triage_score enriched" in r.message
+        r
+        for r in caplog.records
+        if r.levelno == logging.WARNING and "triage_score enriched" in r.message
     ]
     assert not drift_warnings, (
         f"expected SILENT on clean ccir=none, "

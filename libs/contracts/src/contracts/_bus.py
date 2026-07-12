@@ -28,7 +28,8 @@ class BusClient(Protocol):
 
     async def publish(self, routing_key: str, item_id: str, payload: dict) -> None:
         """Publish payload to routing_key. Idempotent: re-publishing the same item_id
-        to the same routing_key is a no-op (the same item_id may flow through other keys)."""
+        to the same routing_key is a no-op (the same item_id may flow through other keys).
+        """
         ...
 
     async def subscribe(self, routing_key: str) -> list[dict]:
@@ -57,7 +58,7 @@ class InMemoryBus:
     async def publish(self, routing_key: str, item_id: str, payload: dict) -> None:
         key = (routing_key, item_id)
         if key in self._seen:
-            return                                # dedup: same (routing_key, item_id) → no-op
+            return  # dedup: same (routing_key, item_id) → no-op
         self._seen.add(key)
         self._queues.setdefault(routing_key, []).append(payload)
 

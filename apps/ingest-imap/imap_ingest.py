@@ -42,6 +42,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 # Mailbox configuration helpers (ported from apps/ingest/imap_to_atom.py)
 # ---------------------------------------------------------------------------
 
+
 def load_mailboxes() -> list[dict]:
     """Load mailbox list from MAILBOXES env, fallback to .mailboxes.json."""
     raw = os.environ.get("MAILBOXES", "").strip()
@@ -128,6 +129,7 @@ def fetch_entries(imap, ids: list, max_recent: int = 60) -> list[tuple]:
 
     T-04-05: max_recent=60 cap retained from imap_to_atom.py to bound fetch volume.
     """
+
     def _parse(mid):
         typ, data = imap.fetch(mid, "(RFC822)")
         if typ != "OK":

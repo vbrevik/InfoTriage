@@ -95,7 +95,9 @@ def _matches_crp(row: dict, params: dict) -> bool:
     return True
 
 
-def filter_rows(rows: list[dict], view: str | None, crp_params: dict | None = None) -> list[dict]:
+def filter_rows(
+    rows: list[dict], view: str | None, crp_params: dict | None = None
+) -> list[dict]:
     """Filter enrichment rows according to the requested picture view.
 
     Args:

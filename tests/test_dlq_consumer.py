@@ -1,4 +1,5 @@
 """Tests for apps/dlq_consumer/worker.py."""
+
 import datetime
 import json
 import logging
@@ -192,7 +193,8 @@ async def test_emit_feed_unhealthy_skips_validation_error(consumer, caplog):
     consumer._events_exchange.publish.assert_not_called()
     # + an ERROR-severity `Discarding feed.unhealthy event` log line was emitted.
     discard_logs = [
-        rec for rec in caplog.records
+        rec
+        for rec in caplog.records
         if rec.levelno >= logging.ERROR
         and "Discarding feed.unhealthy event" in rec.message
     ]

@@ -46,7 +46,9 @@ def _rabbitmq_reachable() -> bool:
 def _skip_if_unavailable() -> None:
     """Skip the current test if RabbitMQ :22001 is not reachable."""
     if not _rabbitmq_reachable():
-        pytest.skip("RabbitMQ :22001 not available — run: docker compose up -d rabbitmq")
+        pytest.skip(
+            "RabbitMQ :22001 not available — run: docker compose up -d rabbitmq"
+        )
 
 
 async def _fresh_bus() -> RabbitMQBus:
@@ -62,6 +64,7 @@ async def _fresh_bus() -> RabbitMQBus:
 # ---------------------------------------------------------------------------
 # Test 1: consume() delivers a published message to the registered handler
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.rabbitmq
 def test_consume_delivers_message() -> None:
@@ -101,6 +104,7 @@ def test_consume_delivers_message() -> None:
 # Test 2: consume() raises ValueError for an unknown routing key
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.rabbitmq
 def test_consume_unknown_routing_key_raises() -> None:
     """consume() raises ValueError when routing_key has no declared queue."""
@@ -109,6 +113,7 @@ def test_consume_unknown_routing_key_raises() -> None:
     async def _run() -> None:
         bus = await _fresh_bus()
         try:
+
             async def _handler(msg: aio_pika.IncomingMessage) -> None:
                 pass
 

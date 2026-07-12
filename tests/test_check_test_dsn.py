@@ -10,14 +10,13 @@ DSNs are composed at runtime from port constants so the
 always-run `tests/test_dsn_safety.py` prod-port regex doesn't accidentally
 match this file's source text (the guard reads the whole file).
 """
+
 import os
 import pathlib
 import subprocess
 
 SCRIPT_PATH = (
-    pathlib.Path(__file__).resolve().parent.parent
-    / "scripts"
-    / "check_test_dsn.sh"
+    pathlib.Path(__file__).resolve().parent.parent / "scripts" / "check_test_dsn.sh"
 )
 
 # Port constants — composed at runtime so the test file's source doesn't
@@ -62,26 +61,26 @@ def test_script_exists_and_parses():
 
 def test_unset_dsn_exits_zero():
     cp = _run(None)
-    assert cp.returncode == 0, (
-        f"Unset DSN should exit 0 (db_live skips cleanly).\nstdout:\n{cp.stdout}\nstderr:\n{cp.stderr}"
-    )
+    assert (
+        cp.returncode == 0
+    ), f"Unset DSN should exit 0 (db_live skips cleanly).\nstdout:\n{cp.stdout}\nstderr:\n{cp.stderr}"
 
 
 def test_prod_port_exits_one():
     cp = _run(_dsn(PROD_HOST_PORT))
-    assert cp.returncode == 1, (
-        f"DSN targeting prod host port {PROD_HOST_PORT} must exit 1.\nstdout:\n{cp.stdout}\nstderr:\n{cp.stderr}"
-    )
-    assert str(PROD_HOST_PORT) in cp.stderr or "production" in cp.stderr.lower(), (
-        f"Error message should explain why it failed. stderr was:\n{cp.stderr}"
-    )
+    assert (
+        cp.returncode == 1
+    ), f"DSN targeting prod host port {PROD_HOST_PORT} must exit 1.\nstdout:\n{cp.stdout}\nstderr:\n{cp.stderr}"
+    assert (
+        str(PROD_HOST_PORT) in cp.stderr or "production" in cp.stderr.lower()
+    ), f"Error message should explain why it failed. stderr was:\n{cp.stderr}"
 
 
 def test_default_postgres_port_exits_one():
     cp = _run(_dsn(DEFAULT_PG_PORT))
-    assert cp.returncode == 1, (
-        f"DSN targeting default Postgres port {DEFAULT_PG_PORT} must exit 1.\nstdout:\n{cp.stdout}\nstderr:\n{cp.stderr}"
-    )
+    assert (
+        cp.returncode == 1
+    ), f"DSN targeting default Postgres port {DEFAULT_PG_PORT} must exit 1.\nstdout:\n{cp.stdout}\nstderr:\n{cp.stderr}"
 
 
 def test_non_prod_port_exits_zero():
@@ -96,17 +95,17 @@ def test_non_prod_port_exits_zero():
 
 def test_malformed_dsn_exits_one():
     cp = _run("not-a-uri")
-    assert cp.returncode == 1, (
-        f"Malformed DSN must exit 1.\nstdout:\n{cp.stdout}\nstderr:\n{cp.stderr}"
-    )
-    assert "libpq" in cp.stderr.lower() or "uri" in cp.stderr.lower(), (
-        f"Error should explain format. stderr was:\n{cp.stderr}"
-    )
+    assert (
+        cp.returncode == 1
+    ), f"Malformed DSN must exit 1.\nstdout:\n{cp.stdout}\nstderr:\n{cp.stderr}"
+    assert (
+        "libpq" in cp.stderr.lower() or "uri" in cp.stderr.lower()
+    ), f"Error should explain format. stderr was:\n{cp.stderr}"
 
 
 def test_postgres_short_scheme_accepted():
     """Single-token 'postgres://' (no 'ql') is also a valid libpq prefix."""
     cp = _run(f"postgres://test:test@localhost:{SAFE_PORT}/db")
-    assert cp.returncode == 0, (
-        f"Short 'postgres://' scheme should be accepted.\nstdout:\n{cp.stdout}\nstderr:\n{cp.stderr}"
-    )
+    assert (
+        cp.returncode == 0
+    ), f"Short 'postgres://' scheme should be accepted.\nstdout:\n{cp.stdout}\nstderr:\n{cp.stderr}"

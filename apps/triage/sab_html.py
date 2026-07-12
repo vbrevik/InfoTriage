@@ -26,6 +26,7 @@ try:
         EnrichedItem,
         cluster_items_in_memory,
     )
+
     SEMANTIC_CLUSTERING_AVAILABLE = True
 except ImportError:
     SEMANTIC_CLUSTERING_AVAILABLE = False
@@ -37,21 +38,32 @@ OUT = os.path.join(ROOT, "data", "digests", "sab.html")
 OSLO = ZoneInfo("Europe/Oslo")
 
 CCIR_ORDER = [
-    ("PIR-1", "Russland / Ukraina"), ("PIR-2", "Nordområdene & Arktis"),
-    ("PIR-3", "NATO & europeisk sikkerhet"), ("PIR-4", "Hybrid- & cybertrusler"),
-    ("PIR-5", "Stormaktsrivalisering"),     ("PIR-6", "OSINT & etterforskning"),
-    ("SIR-1", "Midtøsten & US-Iran"),       ("SIR-2", "Sport — VM 2026 (FIFA)"),
+    ("PIR-1", "Russland / Ukraina"),
+    ("PIR-2", "Nordområdene & Arktis"),
+    ("PIR-3", "NATO & europeisk sikkerhet"),
+    ("PIR-4", "Hybrid- & cybertrusler"),
+    ("PIR-5", "Stormaktsrivalisering"),
+    ("PIR-6", "OSINT & etterforskning"),
+    ("SIR-1", "Midtøsten & US-Iran"),
+    ("SIR-2", "Sport — VM 2026 (FIFA)"),
     ("SIR-3", "NATO-toppmøtet i Ankara"),
-    ("FFIR-1", "Norsk forsvar & sikkerhetspolitikk"), ("FFIR-2", "Norsk politikk & samfunn"),
+    ("FFIR-1", "Norsk forsvar & sikkerhetspolitikk"),
+    ("FFIR-2", "Norsk politikk & samfunn"),
     ("FFIR-3", "Egen teknologikapabilitet"),
 ]
 
-STOP = set("the a an of to in on for and or at by with from is are as it its this that "
-           "i og å en et er på til av for som med det den de har om mot ved".split())
+STOP = set(
+    "the a an of to in on for and or at by with from is are as it its this that "
+    "i og å en et er på til av for som med det den de har om mot ved".split()
+)
 
 PMESII_ICONS = {
-    "political": "🏛️", "military": "⚔️", "economic": "💰",
-    "social": "👥", "information": "📡", "infrastructure": "🌉",
+    "political": "🏛️",
+    "military": "⚔️",
+    "economic": "💰",
+    "social": "👥",
+    "information": "📡",
+    "infrastructure": "🌉",
 }
 
 TESSOC_ICONS = {
@@ -69,12 +81,17 @@ _PLACEHOLDER_BLUF = "Intet nytt å rapportere i perioden."
 def oslo_now():
     return datetime.datetime.fromtimestamp(time.time(), OSLO)
 
+
 def default_cutoff():
     n = oslo_now()
-    return (n - datetime.timedelta(days=1)).replace(hour=16, minute=0, second=0, microsecond=0)
+    return (n - datetime.timedelta(days=1)).replace(
+        hour=16, minute=0, second=0, microsecond=0
+    )
+
 
 def stamp(dt):
     return dt.strftime("%Y-%m-%d %H:%M")
+
 
 def load_verdicts(cutoff_epoch):
     if not os.path.exists(STORE):
@@ -142,8 +159,12 @@ def aggregate_source_timestamps(verdicts: list[dict]) -> dict[str, int]:
     return latest
 
 
-def render_source_status_card(sources: list[str], last_by_source: dict[str, int],
-                                cutoff_epoch: int, generated_at: str) -> str:
+def render_source_status_card(
+    sources: list[str],
+    last_by_source: dict[str, int],
+    cutoff_epoch: int,
+    generated_at: str,
+) -> str:
     """Render the floating source-status card in the upper right corner.
 
     Sources are listed alphabetically. A green checkmark is shown if the
@@ -168,10 +189,10 @@ def render_source_status_card(sources: list[str], last_by_source: dict[str, int]
             ts_text = "Ikke hentet"
         rows.append(
             f'<div class="source-row">'
-            f'  {icon}'
+            f"  {icon}"
             f'  <span class="source-name">{escape(source)}</span>'
             f'  <span class="source-ts">{ts_text}</span>'
-            f'</div>'
+            f"</div>"
         )
 
     summary = f"{active_count}/{len(sources)} aktive"
@@ -182,26 +203,32 @@ def render_source_status_card(sources: list[str], last_by_source: dict[str, int]
         f'    <span class="source-status-title">📡 Kilder</span>\n'
         f'    <span class="source-status-summary">{escape(summary)}</span>\n'
         f'    <span class="source-status-chevron" id="sourceCardChevron">▼</span>\n'
-        f'  </div>\n'
+        f"  </div>\n"
         f'  <div class="source-status-body" id="sourceStatusBody">\n'
-        f'    {rows_html}\n'
-        f'  </div>\n'
-        f'</div>\n'
+        f"    {rows_html}\n"
+        f"  </div>\n"
+        f"</div>\n"
     )
 
+
 def keywords(title):
-    return {w for w in __import__("re").findall(
-        r"[a-zA-ZæøåÆØÅ0-9]{4,}", (title or "").lower()) if w not in STOP}
+    return {
+        w
+        for w in __import__("re").findall(
+            r"[a-zA-ZæøåÆØÅ0-9]{4,}", (title or "").lower()
+        )
+        if w not in STOP
+    }
 
 
 def _semantic_cluster(items, threshold=0.75):
     """Semantic clustering using pgvector embeddings.
-    
+
     Falls back to keyword clustering if embeddings are not available.
     """
     if not SEMANTIC_CLUSTERING_AVAILABLE:
         return _keyword_cluster(items)
-    
+
     # Build EnrichedItem objects for clustering
     items_by_ccir = {}
     for v in items:
@@ -225,7 +252,7 @@ def _semantic_cluster(items, threshold=0.75):
         )
         cid = (v.get("ccir") or "none").upper()
         items_by_ccir.setdefault(cid, []).append(item)
-    
+
     # Cluster within each CCIR section
     all_clusters = []
     for cid, items in items_by_ccir.items():
@@ -234,7 +261,7 @@ def _semantic_cluster(items, threshold=0.75):
         clusters = cluster_items_in_memory(items, threshold=threshold)
         for cluster in clusters:
             all_clusters.append({"kw": set(), "items": cluster})
-    
+
     return all_clusters
 
 
@@ -274,9 +301,7 @@ def _group_by_cluster_idx(items):
     for c in clusters:
         if len(c["items"]) > 1:
             lead = max(c["items"], key=lambda i: i.get("score", 0))
-            lead["_sources_in_cluster"] = len(
-                {i.get("source", "") for i in c["items"]}
-            )
+            lead["_sources_in_cluster"] = len({i.get("source", "") for i in c["items"]})
     return clusters
 
 
@@ -287,21 +312,30 @@ def cluster(items):
         return _group_by_cluster_idx(items)
     return _semantic_cluster(items)
 
+
 def kept(verdicts):
     return [v for v in verdicts if (v.get("ccir") or "none").lower() != "none"]
 
+
 def score_class(score):
-    if score >= 8: return "hot"
-    if score >= 6: return "warm"
+    if score >= 8:
+        return "hot"
+    if score >= 6:
+        return "warm"
     return "cool"
 
+
 def ccir_type(cid):
-    if cid.startswith("PIR"): return "pir"
-    if cid.startswith("SIR"): return "sir"
+    if cid.startswith("PIR"):
+        return "pir"
+    if cid.startswith("SIR"):
+        return "sir"
     return "ffir"
+
 
 def escape(text):
     return (text or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
 
 def render_item(v):
     score = v.get("score", 0)
@@ -310,22 +344,34 @@ def render_item(v):
     source = escape(v.get("source", ""))
     url = escape(v.get("url", ""))
     sources_count = v.get("_sources_in_cluster", 0)
-    tag = f'<span class="sources-tag">({sources_count} kilder)</span>' if sources_count > 1 else ""
+    tag = (
+        f'<span class="sources-tag">({sources_count} kilder)</span>'
+        if sources_count > 1
+        else ""
+    )
     pmesii = (v.get("pmesii") or "none").lower()
     pmesii_icon = PMESII_ICONS.get(pmesii, "")
-    pmesii_span = f'<span class="pmesii-badge" title="PMESII: {escape(pmesii.capitalize())}">{pmesii_icon}</span> ' if pmesii_icon else ""
+    pmesii_span = (
+        f'<span class="pmesii-badge" title="PMESII: {escape(pmesii.capitalize())}">{pmesii_icon}</span> '
+        if pmesii_icon
+        else ""
+    )
     tessoc = (v.get("tessoc") or "none").lower()
     tessoc_icon = TESSOC_ICONS.get(tessoc, "")
-    tessoc_span = f'<span class="pmesii-badge" title="TESSOC: {escape(tessoc.capitalize())}">{tessoc_icon}</span> ' if tessoc_icon else ""
+    tessoc_span = (
+        f'<span class="pmesii-badge" title="TESSOC: {escape(tessoc.capitalize())}">{tessoc_icon}</span> '
+        if tessoc_icon
+        else ""
+    )
     return (
         f'<a class="item" href="{url}">'
         f'<span class="item-score {cls}">{score}</span>'
         f'<div class="item-body">'
         f'<div class="item-why">{pmesii_span}{tessoc_span}{why}</div>'
         f'<div class="item-source">{source}{(" · " + tag) if tag else ""}</div>'
-        f'</div>'
+        f"</div>"
         f'<span class="item-link">les →</span>'
-        f'</a>\n'
+        f"</a>\n"
     )
 
 
@@ -342,9 +388,9 @@ def render_filtered_item(v):
         f'<div class="item-body">'
         f'<div class="item-why">{title}</div>'
         f'<div class="item-source">{source}{" · " if source and why else ""}{why}</div>'
-        f'</div>'
+        f"</div>"
         f'<span class="item-link">les →</span>'
-        f'</a>\n'
+        f"</a>\n"
     )
 
 
@@ -360,13 +406,13 @@ def render_filtered_section(items):
         f'      <div class="slide-header-left">\n'
         f'        <span class="ccir-badge" style="background:var(--text-dim);color:var(--bg);">FILTER</span>\n'
         f'        <span class="ccir-title">Filtrert ut</span>\n'
-        f'      </div>\n'
+        f"      </div>\n"
         f'      <span class="ccir-count">{len(items)} saker · vist: {min(len(items), 30)}</span>\n'
-        f'    </div>\n'
+        f"    </div>\n"
         f'    <div class="bluf">Saker vurdert som ikke CCIR-relevante i perioden.</div>\n'
         f'    <div class="items">{items_html}</div>\n'
-        f'  </div>\n'
-        f'</section>\n'
+        f"  </div>\n"
+        f"</section>\n"
     )
 
 
@@ -379,16 +425,16 @@ def render_bluf_section(blufs_by_ccir: dict[str, str], exec_bluf: str = "") -> s
         rows.append(
             f'<div class="bluf-row collapsed">\n'
             f'  <div class="bluf-row-header" role="button" tabindex="0" aria-expanded="false" onclick="toggleBlufRow(this)">\n'
-            f'    <div>\n'
+            f"    <div>\n"
             f'      <span class="ccir-badge {c_type}">{cid}</span>\n'
             f'      <span class="ccir-title-small">{escape(title)}</span>\n'
-            f'    </div>\n'
+            f"    </div>\n"
             f'    <span class="bluf-chevron">▼</span>\n'
-            f'  </div>\n'
+            f"  </div>\n"
             f'  <div class="bluf-row-body">\n'
             f'    <div class="bluf-text">{bluf}</div>\n'
-            f'  </div>\n'
-            f'</div>'
+            f"  </div>\n"
+            f"</div>"
         )
     rows_html = "\n      ".join(rows)
     exec_html = ""
@@ -397,7 +443,7 @@ def render_bluf_section(blufs_by_ccir: dict[str, str], exec_bluf: str = "") -> s
             f'<div class="exec-bluf-box">\n'
             f'  <div class="exec-bluf-title">EXECUTIVE SUMMARY</div>\n'
             f'  <div class="bluf-text">{escape(exec_bluf)}</div>\n'
-            f'</div>\n'
+            f"</div>\n"
         )
     return (
         f'<section class="slide" id="blufs">\n'
@@ -406,19 +452,20 @@ def render_bluf_section(blufs_by_ccir: dict[str, str], exec_bluf: str = "") -> s
         f'      <div class="slide-header-left">\n'
         f'        <span class="ccir-badge" style="background:var(--purple);color:#fff;">BLUF</span>\n'
         f'        <span class="ccir-title">Alle BLUF</span>\n'
-        f'      </div>\n'
+        f"      </div>\n"
         f'      <button type="button" class="copy-blufs-btn" id="copyBlufsBtn" onclick="copyAllBlufs()" title="Kopier alle BLUFs til utklippstavlen" aria-label="Kopier alle BLUFs til utklippstavlen">\n'
         f'        <span class="copy-icon">📋</span>\n'
         f'        <span class="copy-label">Kopier alle BLUFs</span>\n'
-        f'      </button>\n'
-        f'    </div>\n'
-        f'    {exec_html}'
+        f"      </button>\n"
+        f"    </div>\n"
+        f"    {exec_html}"
         f'    <div class="bluf-list" id="blufsList">\n'
-        f'      {rows_html}\n'
-        f'    </div>\n'
-        f'  </div>\n'
-        f'</section>\n'
+        f"      {rows_html}\n"
+        f"    </div>\n"
+        f"  </div>\n"
+        f"</section>\n"
     )
+
 
 def generate_exec_summary(blufs_by_ccir: dict[str, str]) -> str:
     """Generate a short executive summary from all per-CCIR BLUFs."""
@@ -433,8 +480,7 @@ def generate_exec_summary(blufs_by_ccir: dict[str, str]) -> str:
     prompt = (
         "Du er en senior etterretningsoffiser som skriver en kort overordnet "
         "oppsummering (executive summary) på norsk.\n\n"
-        "Her er de gjeldende BLUF-ene per CCIR:\n\n"
-        + "\n\n".join(valid_blufs) + "\n\n"
+        "Her er de gjeldende BLUF-ene per CCIR:\n\n" + "\n\n".join(valid_blufs) + "\n\n"
         "Instruksjoner:\n"
         "1. Skriv 1-2 setninger som oppsummerer de viktigste overordnede "
         "temaene eller trusselbildet på tvers av CCIR-ene.\n"
@@ -445,17 +491,25 @@ def generate_exec_summary(blufs_by_ccir: dict[str, str]) -> str:
         print("  …Executive Summary BLUF", file=sys.stderr, flush=True)
         return llm([{"role": "user", "content": prompt}], max_tokens=150).strip()
     except Exception as e:
-        print(f"  …Exec BLUF failure: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
-        return "_(Kunne ikke generere overordnet oppsummering — sjekk logg for detaljer)_"
+        print(
+            f"  …Exec BLUF failure: {type(e).__name__}: {e}",
+            file=sys.stderr,
+            flush=True,
+        )
+        return (
+            "_(Kunne ikke generere overordnet oppsummering — sjekk logg for detaljer)_"
+        )
 
 
 def generate_bluf(cid, title, items, top_n=12):
     top = sorted(items, key=lambda x: -x.get("score", 0))[:top_n]
     ctx = []
     for i, it in enumerate(top, 1):
-        ctx.append(f"[{i}] KILDE: {it.get('source', '')}\n"
-                   f"TITTEL: {it.get('title', '')}\n"
-                   f"OPPSUMMERING: {(it.get('summary', '') or '')[:500]}\n")
+        ctx.append(
+            f"[{i}] KILDE: {it.get('source', '')}\n"
+            f"TITTEL: {it.get('title', '')}\n"
+            f"OPPSUMMERING: {(it.get('summary', '') or '')[:500]}\n"
+        )
     prompt = (
         f"You are an intelligence analyst writing a BLUF (Bottom Line Up "
         f"Front) for the topic '{title}' ({cid}).\n\n"
@@ -467,7 +521,7 @@ def generate_bluf(cid, title, items, top_n=12):
         "[2][4]. A claim with no citation is wrong.\n"
         "3. CONTRADICTIONS: if sources disagree on facts, attribution, or "
         "intent, you MUST report both positions explicitly. Example: "
-        "\"Kildene spriker: [1] hevder X, mens [3] oppgir Y.\" Do NOT "
+        '"Kildene spriker: [1] hevder X, mens [3] oppgir Y." Do NOT '
         "silently pick one and discard the other.\n"
         "4. Output ONLY the BLUF text. No headers, no source list. "
         "If the items don't share one overarching story, write one "
@@ -477,8 +531,13 @@ def generate_bluf(cid, title, items, top_n=12):
         print(f"  …BLUF for {cid} ({len(top)} items)", file=sys.stderr, flush=True)
         return llm([{"role": "user", "content": prompt}], max_tokens=400).strip()
     except Exception as e:
-        print(f"  …BLUF failure for {cid}: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+        print(
+            f"  …BLUF failure for {cid}: {type(e).__name__}: {e}",
+            file=sys.stderr,
+            flush=True,
+        )
         return "_(Kunne ikke generere BLUF — sjekk logg for detaljer)_"
+
 
 def render_section(cid, title, items, total_scanned, bluf_text=""):
     c_type = ccir_type(cid)
@@ -491,7 +550,9 @@ def render_section(cid, title, items, total_scanned, bluf_text=""):
             lead["_sources_in_cluster"] = len({i.get("source", "") for i in c["items"]})
 
     items_html = ""
-    for c in sorted(clusters, key=lambda c: -max(i.get("score", 0) for i in c["items"]))[:6]:
+    for c in sorted(
+        clusters, key=lambda c: -max(i.get("score", 0) for i in c["items"])
+    )[:6]:
         lead = max(c["items"], key=lambda i: i.get("score", 0))
         items_html += render_item(lead)
 
@@ -513,19 +574,21 @@ def render_section(cid, title, items, total_scanned, bluf_text=""):
         f'      <div class="slide-header-left">\n'
         f'        <span class="ccir-badge {c_type}">{cid}</span>\n'
         f'        <span class="ccir-title">{escape(title)}</span>\n'
-        f'      </div>\n'
+        f"      </div>\n"
         f'      <span class="ccir-count">{len(items)} saker · {cluster_count} klynger · max {max_score}</span>\n'
-        f'    </div>\n'
-        f'    {bluf_html}\n'
-        f'    {src_footer}\n'
+        f"    </div>\n"
+        f"    {bluf_html}\n"
+        f"    {src_footer}\n"
         f'    <div class="items">{items_html}</div>\n'
-        f'  </div>\n'
-        f'</section>\n'
+        f"  </div>\n"
+        f"</section>\n"
     )
 
+
 def render_cnr(items):
-    cat1 = sorted([v for v in items if v.get("cnr") == "I"],
-                  key=lambda x: -x.get("score", 0))
+    cat1 = sorted(
+        [v for v in items if v.get("cnr") == "I"], key=lambda x: -x.get("score", 0)
+    )
     if not cat1:
         return ""
 
@@ -541,19 +604,20 @@ def render_cnr(items):
             f'<div class="alert-item">'
             f'<div class="alert-title">{escape(lead.get("title", ""))}</div>'
             f'<div class="alert-sources">{src_html}{extra}</div>'
-            f'</div>\n'
+            f"</div>\n"
         )
 
     return (
         f'<section class="slide" id="cnr">\n'
         f'  <div class="slide-inner">\n'
         f'    <div class="cnr-alert">\n'
-        f'      <h2>🚩 CNR — varsle straks</h2>\n'
-        f'      {alerts}\n'
-        f'    </div>\n'
-        f'  </div>\n'
-        f'</section>\n'
+        f"      <h2>🚩 CNR — varsle straks</h2>\n"
+        f"      {alerts}\n"
+        f"    </div>\n"
+        f"  </div>\n"
+        f"</section>\n"
     )
+
 
 def render_nav(verdicts):
     by = {}
@@ -576,6 +640,7 @@ def render_nav(verdicts):
         )
     return rows
 
+
 def build_html(verdicts, period, with_bluf=True, generated_at=None, cutoff_epoch=None):
     total = len(verdicts)
     ks = kept(verdicts)
@@ -597,7 +662,11 @@ def build_html(verdicts, period, with_bluf=True, generated_at=None, cutoff_epoch
         max_t = max(v.get("t", 0) for v in verdicts)
         if max_t > 0:
             latest_fetch_ts = stamp(datetime.datetime.fromtimestamp(max_t, OSLO))
-    fetch_line = f'<span>📥 Sist hentet: {escape(latest_fetch_ts)}</span>' if latest_fetch_ts else ""
+    fetch_line = (
+        f"<span>📥 Sist hentet: {escape(latest_fetch_ts)}</span>"
+        if latest_fetch_ts
+        else ""
+    )
 
     # Build source status card (uses all configured OPML sources)
     opml_sources = parse_opml_sources()
@@ -620,7 +689,9 @@ def build_html(verdicts, period, with_bluf=True, generated_at=None, cutoff_epoch
     if has_cnr:
         slide_num += 1
         cat1_count = len([v for v in ks if v.get("cnr") == "I"])
-        slide_index.append((slide_num, "cnr", "🚩 CNR — varsle straks", f"{cat1_count} saker"))
+        slide_index.append(
+            (slide_num, "cnr", "🚩 CNR — varsle straks", f"{cat1_count} saker")
+        )
         cnr_html = render_cnr(ks)
 
     # Generate BLUFs once for both per-CCIR sections and the aggregate BLUF slide
@@ -650,11 +721,15 @@ def build_html(verdicts, period, with_bluf=True, generated_at=None, cutoff_epoch
         sections += section_html
 
     # Filtered / non-CCIR slide
-    filtered_items = [v for v in verdicts if (v.get("ccir") or "none").lower() == "none"]
+    filtered_items = [
+        v for v in verdicts if (v.get("ccir") or "none").lower() == "none"
+    ]
     filtered_html = render_filtered_section(filtered_items)
     if filtered_html:
         slide_num += 1
-        slide_index.append((slide_num, "filtered", "Filtrert ut", f"{len(filtered_items)} saker"))
+        slide_index.append(
+            (slide_num, "filtered", "Filtrert ut", f"{len(filtered_items)} saker")
+        )
         sections += filtered_html
 
     # Aggregate BLUF slide (below all CCIR/CNR/SIR/PIR sections)
@@ -672,15 +747,19 @@ def build_html(verdicts, period, with_bluf=True, generated_at=None, cutoff_epoch
     # Build index HTML
     index_items = ""
     for num, typ, label, sub in slide_index:
-        dot_class = f"idx-{typ}" if typ in ("pir", "sir", "ffir", "cnr", "stats", "filtered") else "idx-gray"
+        dot_class = (
+            f"idx-{typ}"
+            if typ in ("pir", "sir", "ffir", "cnr", "stats", "filtered")
+            else "idx-gray"
+        )
         sub_html = f'<span class="idx-sub">{escape(sub)}</span>' if sub else ""
         index_items += (
             f'<div class="idx-item" onclick="goToSlide({num - 1})">'
             f'<span class="idx-dot {dot_class}"></span>'
             f'<span class="idx-label">{escape(label)}</span>'
-            f'{sub_html}'
+            f"{sub_html}"
             f'<span class="idx-num">{num}</span>'
-            f'</div>\n'
+            f"</div>\n"
         )
 
     nav_html = render_nav(verdicts)
@@ -695,18 +774,26 @@ def build_html(verdicts, period, with_bluf=True, generated_at=None, cutoff_epoch
         max_score = max((v.get("score", 0) for v in by.get(cid, [])), default=0)
         bar_width = min(100, max_score * 10)
         stats_ccir_list_html += (
-            f'<li>'
+            f"<li>"
             f'  <span class="sid {c_type}">{cid}</span>'
             f'  <span class="stitle">{escape(title)}</span>'
             f'  <span class="scount">{count}</span>'
             f'  <span class="sbar"><span class="sbar-fill" style="width:{bar_width}%;background:var(--{c_type})"></span></span>'
-            f'</li>\n'
+            f"</li>\n"
         )
 
     # PMESII domain distribution
     from collections import Counter
+
     pmesii_counts = Counter((v.get("pmesii") or "none").lower() for v in ks)
-    pmesii_domains = ["political", "military", "economic", "social", "information", "infrastructure"]
+    pmesii_domains = [
+        "political",
+        "military",
+        "economic",
+        "social",
+        "information",
+        "infrastructure",
+    ]
     max_pmesii = max((pmesii_counts.get(d, 0) for d in pmesii_domains), default=1) or 1
     pmesii_cards = ""
     for domain in pmesii_domains:
@@ -715,9 +802,14 @@ def build_html(verdicts, period, with_bluf=True, generated_at=None, cutoff_epoch
             continue
         icon = PMESII_ICONS.get(domain, "")
         pct = round(cnt / max_pmesii * 100)
-        color_map = {"political": "var(--blue)", "military": "var(--red)",
-                     "economic": "var(--amber)", "social": "var(--purple)",
-                     "information": "var(--cyan)", "infrastructure": "var(--green)"}
+        color_map = {
+            "political": "var(--blue)",
+            "military": "var(--red)",
+            "economic": "var(--amber)",
+            "social": "var(--purple)",
+            "information": "var(--cyan)",
+            "infrastructure": "var(--green)",
+        }
         color = color_map.get(domain, "var(--text-dim)")
         pmesii_cards += (
             f'<div class="pmesii-dist-card">'
@@ -725,9 +817,11 @@ def build_html(verdicts, period, with_bluf=True, generated_at=None, cutoff_epoch
             f'<span class="p-name">{domain}</span>'
             f'<span class="p-count">{cnt}</span>'
             f'<span class="p-bar"><span class="p-bar-fill" style="width:{pct}%;background:{color}"></span></span>'
-            f'</div>\n'
+            f"</div>\n"
         )
-    pmesii_dist_html = f'<div class="pmesii-dist">{pmesii_cards}</div>' if pmesii_cards else ""
+    pmesii_dist_html = (
+        f'<div class="pmesii-dist">{pmesii_cards}</div>' if pmesii_cards else ""
+    )
 
     # TESSOC threat-actor distribution
     tessoc_counts = Counter((v.get("tessoc") or "none").lower() for v in ks)
@@ -754,9 +848,11 @@ def build_html(verdicts, period, with_bluf=True, generated_at=None, cutoff_epoch
             f'<span class="p-name">{var}</span>'
             f'<span class="p-count">{cnt}</span>'
             f'<span class="p-bar"><span class="p-bar-fill" style="width:{pct}%;background:{color}"></span></span>'
-            f'</div>\n'
+            f"</div>\n"
         )
-    tessoc_dist_html = f'<div class="pmesii-dist">{tessoc_cards}</div>' if tessoc_cards else ""
+    tessoc_dist_html = (
+        f'<div class="pmesii-dist">{tessoc_cards}</div>' if tessoc_cards else ""
+    )
 
     return HTML_TEMPLATE.format(
         period=escape(period),
@@ -1949,18 +2045,25 @@ HTML_TEMPLATE = """\
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Generate SAB HTML presentation from verdicts.jsonl")
+    ap = argparse.ArgumentParser(
+        description="Generate SAB HTML presentation from verdicts.jsonl"
+    )
     ap.add_argument("--since", help='cutoff "YYYY-MM-DD HH:MM" (Oslo)')
     ap.add_argument("--hours", type=int, help="rolling window")
     ap.add_argument("--out", default=OUT, help="output HTML path")
-    ap.add_argument("--no-bluf", action="store_true",
-                    help="skip BLUF LLM synthesis (faster, no citations)")
+    ap.add_argument(
+        "--no-bluf",
+        action="store_true",
+        help="skip BLUF LLM synthesis (faster, no citations)",
+    )
     args = ap.parse_args()
 
     load_dotenv(os.path.join(ROOT, ".env"))
 
     if args.since:
-        cutoff = datetime.datetime.strptime(args.since, "%Y-%m-%d %H:%M").replace(tzinfo=OSLO)
+        cutoff = datetime.datetime.strptime(args.since, "%Y-%m-%d %H:%M").replace(
+            tzinfo=OSLO
+        )
     elif args.hours:
         cutoff = oslo_now() - datetime.timedelta(hours=args.hours)
     else:
@@ -1976,8 +2079,13 @@ def main():
         print("no verdicts in window — writing empty-state page", file=sys.stderr)
 
     gen_ts = stamp(oslo_now())
-    html = build_html(verdicts, period, with_bluf=not args.no_bluf, generated_at=gen_ts,
-                      cutoff_epoch=int(cutoff.timestamp()))
+    html = build_html(
+        verdicts,
+        period,
+        with_bluf=not args.no_bluf,
+        generated_at=gen_ts,
+        cutoff_epoch=int(cutoff.timestamp()),
+    )
 
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     tmp = args.out + ".tmp"

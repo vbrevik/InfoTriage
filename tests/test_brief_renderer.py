@@ -87,9 +87,15 @@ class TestRenderBriefCcirOrder(unittest.TestCase):
 
     def test_ccir_order_enforced(self):
         items = [
-            _make_item(item_id="p2", ccir="PIR-2", cnr="II", score=8, title="PIR-2 Title"),
-            _make_item(item_id="p1", ccir="PIR-1", cnr="II", score=8, title="PIR-1 Title"),
-            _make_item(item_id="p3", ccir="PIR-3", cnr="II", score=8, title="PIR-3 Title"),
+            _make_item(
+                item_id="p2", ccir="PIR-2", cnr="II", score=8, title="PIR-2 Title"
+            ),
+            _make_item(
+                item_id="p1", ccir="PIR-1", cnr="II", score=8, title="PIR-1 Title"
+            ),
+            _make_item(
+                item_id="p3", ccir="PIR-3", cnr="II", score=8, title="PIR-3 Title"
+            ),
         ]
         output = render_brief(items)
         p1_pos = output.find("PIR-1")
@@ -166,7 +172,9 @@ class TestRenderBlufCitations(unittest.TestCase):
             prompt_text = messages[0]["content"]
             # [N] in template is replaced by format(), so check for [1] and [2][4] examples
             self.assertIn("[1]", prompt_text, "Prompt must show example [1] citation")
-            self.assertIn("[2][4]", prompt_text, "Prompt must show multi-citation example")
+            self.assertIn(
+                "[2][4]", prompt_text, "Prompt must show multi-citation example"
+            )
 
     def test_prompt_includes_citation_rules(self):
         items = [_make_item(ccir="PIR-1")]
@@ -175,7 +183,9 @@ class TestRenderBlufCitations(unittest.TestCase):
             render_bluf(items, ccir_title="Test", ccir_id="PIR-1")
             messages = mock_llm.call_args[0][0]
             prompt_text = messages[0]["content"]
-            self.assertIn("citation", prompt_text.lower(), "Prompt must mention citations")
+            self.assertIn(
+                "citation", prompt_text.lower(), "Prompt must mention citations"
+            )
 
 
 class TestRenderBlufLlmFailure(unittest.TestCase):
@@ -183,9 +193,13 @@ class TestRenderBlufLlmFailure(unittest.TestCase):
 
     def test_placeholder_on_connection_error(self):
         items = [_make_item(ccir="PIR-1", score=8)]
-        with patch("apps.brief.renderer.llm", side_effect=Exception("Connection refused")):
+        with patch(
+            "apps.brief.renderer.llm", side_effect=Exception("Connection refused")
+        ):
             result = render_bluf(items, ccir_title="Test", ccir_id="PIR-1")
-            self.assertIn("unavailable", result.lower(), "Should return placeholder on failure")
+            self.assertIn(
+                "unavailable", result.lower(), "Should return placeholder on failure"
+            )
             self.assertNotIn("Exception", result, "Should not leak exception details")
 
     def test_placeholder_on_none_llm(self):
@@ -194,7 +208,11 @@ class TestRenderBlufLlmFailure(unittest.TestCase):
         with patch("apps.brief.renderer.llm", None):
             result = render_bluf(items, ccir_title="Test", ccir_id="PIR-1")
             # Norwegian placeholder: "bluf utilgjengelig"
-            self.assertIn("utilgjengelig", result.lower(), "Should return placeholder when llm is None")
+            self.assertIn(
+                "utilgjengelig",
+                result.lower(),
+                "Should return placeholder when llm is None",
+            )
 
 
 class TestRenderBlufEmptyItems(unittest.TestCase):
@@ -235,9 +253,27 @@ class TestRenderClusterGrouping(unittest.TestCase):
 
     def test_multiple_clusters_in_section(self):
         items = [
-            _make_item(item_id="a", ccir="PIR-1", cnr="I", score=10, title="Story about Ukraine war"),
-            _make_item(item_id="b", ccir="PIR-1", cnr="II", score=9, title="Ukraine conflict update"),
-            _make_item(item_id="c", ccir="PIR-1", cnr="II", score=7, title="Ukraine peace talks"),
+            _make_item(
+                item_id="a",
+                ccir="PIR-1",
+                cnr="I",
+                score=10,
+                title="Story about Ukraine war",
+            ),
+            _make_item(
+                item_id="b",
+                ccir="PIR-1",
+                cnr="II",
+                score=9,
+                title="Ukraine conflict update",
+            ),
+            _make_item(
+                item_id="c",
+                ccir="PIR-1",
+                cnr="II",
+                score=7,
+                title="Ukraine peace talks",
+            ),
         ]
         output = render_cluster(items)
         self.assertIn("Story about Ukraine war", output)
@@ -250,7 +286,9 @@ class TestRenderClusterNoCcir(unittest.TestCase):
 
     def test_items_without_ccir_have_separate_section(self):
         items = [
-            _make_item(item_id="with_ccir", ccir="PIR-1", score=8, title="With Ccir Title"),
+            _make_item(
+                item_id="with_ccir", ccir="PIR-1", score=8, title="With Ccir Title"
+            ),
             _make_item(item_id="no_ccir", ccir="none", score=5, title="No Ccir Title"),
         ]
         output = render_cluster(items)

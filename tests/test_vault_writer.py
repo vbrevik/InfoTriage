@@ -47,8 +47,10 @@ def test_write_item_obsidian(temp_vault):
         "score": 9,
         "bucket": "read",
         "why": "Important for Norway",
-        "entities": [{"name": "NATO", "mention": "NATO", "lang": "en"},
-                     {"name": "Oslo", "mention": "Oslo", "lang": "en"}],
+        "entities": [
+            {"name": "NATO", "mention": "NATO", "lang": "en"},
+            {"name": "Oslo", "mention": "Oslo", "lang": "en"},
+        ],
     }
 
     path = write_item_obsidian(item, temp_vault)
@@ -77,7 +79,7 @@ def test_write_item_obsidian_uses_codec_safe_yaml(temp_vault):
     """Front matter must survive punctuation and multiline strings."""
     item = {
         "item_id": "test:unsafe/id",
-        "title": "Status: \"quoted\"\nmultiline",
+        "title": 'Status: "quoted"\nmultiline',
         "summary": "Oslo and NATO update.",
         "source": "Example: Source",
         "url": "https://example.com/a?x=1:y",
@@ -87,8 +89,10 @@ def test_write_item_obsidian_uses_codec_safe_yaml(temp_vault):
         "score": 9,
         "bucket": "read",
         "why": "Important for Norway: yes",
-        "entities": [{"name": "NATO", "mention": "NATO", "lang": "en"},
-                     {"name": "Oslo", "mention": "Oslo", "lang": "en"}],
+        "entities": [
+            {"name": "NATO", "mention": "NATO", "lang": "en"},
+            {"name": "Oslo", "mention": "Oslo", "lang": "en"},
+        ],
     }
 
     path = write_item_obsidian(item, temp_vault)
@@ -185,16 +189,18 @@ def test_write_vault_digest_filter(temp_vault):
 def test_write_vault_digest_includes_email_by_default(temp_vault, monkeypatch):
     """Email-sourced rows are included unless explicitly disabled."""
     monkeypatch.delenv("VAULT_INCLUDE_EMAIL", raising=False)
-    rows = [{
-        "item_id": "email-1",
-        "title": "Email Item",
-        "summary": "NATO update from email.",
-        "source": "imap://inbox/message-1",
-        "url": "imap://inbox/message-1",
-        "ccir": "PIR-1",
-        "score": 9,
-        "cnr": "I",
-    }]
+    rows = [
+        {
+            "item_id": "email-1",
+            "title": "Email Item",
+            "summary": "NATO update from email.",
+            "source": "imap://inbox/message-1",
+            "url": "imap://inbox/message-1",
+            "ccir": "PIR-1",
+            "score": 9,
+            "cnr": "I",
+        }
+    ]
 
     paths = write_vault_digest(rows, temp_vault)
 
@@ -208,16 +214,18 @@ def test_gmail_row_excluded_when_email_disabled(temp_vault, monkeypatch):
     """Production gmail rows (source='gmail', url='gmail://...') must be excluded
     from the vault when VAULT_INCLUDE_EMAIL=0."""
     monkeypatch.setenv("VAULT_INCLUDE_EMAIL", "0")
-    rows = [{
-        "item_id": "gmail-1",
-        "title": "Gmail Item",
-        "summary": "Summary",
-        "source": "gmail",
-        "url": "gmail://message/abc123",
-        "ccir": "PIR-1",
-        "score": 9,
-        "cnr": "I",
-    }]
+    rows = [
+        {
+            "item_id": "gmail-1",
+            "title": "Gmail Item",
+            "summary": "Summary",
+            "source": "gmail",
+            "url": "gmail://message/abc123",
+            "ccir": "PIR-1",
+            "score": 9,
+            "cnr": "I",
+        }
+    ]
 
     write_vault_digest(rows, temp_vault)
 
@@ -229,16 +237,18 @@ def test_imap_row_excluded_when_email_disabled(temp_vault, monkeypatch):
     """Production imap rows (source=<mailbox name>, url='imap://...') must be
     excluded from the vault when VAULT_INCLUDE_EMAIL=0."""
     monkeypatch.setenv("VAULT_INCLUDE_EMAIL", "0")
-    rows = [{
-        "item_id": "imap-1",
-        "title": "Imap Item",
-        "summary": "Summary",
-        "source": "Telegraph Ukraine",
-        "url": "imap://mail.example.com/msg-1",
-        "ccir": "PIR-2",
-        "score": 9,
-        "cnr": "I",
-    }]
+    rows = [
+        {
+            "item_id": "imap-1",
+            "title": "Imap Item",
+            "summary": "Summary",
+            "source": "Telegraph Ukraine",
+            "url": "imap://mail.example.com/msg-1",
+            "ccir": "PIR-2",
+            "score": 9,
+            "cnr": "I",
+        }
+    ]
 
     write_vault_digest(rows, temp_vault)
 
@@ -249,16 +259,18 @@ def test_imap_row_excluded_when_email_disabled(temp_vault, monkeypatch):
 def test_non_email_row_not_excluded_when_email_disabled(temp_vault, monkeypatch):
     """The VAULT_INCLUDE_EMAIL toggle must not drop non-email rows."""
     monkeypatch.setenv("VAULT_INCLUDE_EMAIL", "0")
-    rows = [{
-        "item_id": "rss-1",
-        "title": "RSS Item",
-        "summary": "Summary",
-        "source": "NRK",
-        "url": "https://nrk.no/article-1",
-        "ccir": "PIR-1",
-        "score": 9,
-        "cnr": "I",
-    }]
+    rows = [
+        {
+            "item_id": "rss-1",
+            "title": "RSS Item",
+            "summary": "Summary",
+            "source": "NRK",
+            "url": "https://nrk.no/article-1",
+            "ccir": "PIR-1",
+            "score": 9,
+            "cnr": "I",
+        }
+    ]
 
     write_vault_digest(rows, temp_vault)
 
@@ -268,16 +280,18 @@ def test_non_email_row_not_excluded_when_email_disabled(temp_vault, monkeypatch)
 def test_gmail_row_included_by_default(temp_vault, monkeypatch):
     """Gmail rows are included when VAULT_INCLUDE_EMAIL is unset (default)."""
     monkeypatch.delenv("VAULT_INCLUDE_EMAIL", raising=False)
-    rows = [{
-        "item_id": "gmail-1",
-        "title": "Gmail Item",
-        "summary": "Summary",
-        "source": "gmail",
-        "url": "gmail://message/abc123",
-        "ccir": "PIR-1",
-        "score": 9,
-        "cnr": "I",
-    }]
+    rows = [
+        {
+            "item_id": "gmail-1",
+            "title": "Gmail Item",
+            "summary": "Summary",
+            "source": "gmail",
+            "url": "gmail://message/abc123",
+            "ccir": "PIR-1",
+            "score": 9,
+            "cnr": "I",
+        }
+    ]
 
     write_vault_digest(rows, temp_vault)
 
@@ -322,12 +336,16 @@ def test_write_vault_digest_view_projection(temp_vault):
     ]
 
     # First write default (items + SAB)
-    paths = write_vault_digest(rows, temp_vault, write_items=True, sab_filename="obsidian-sab.md")
+    paths = write_vault_digest(
+        rows, temp_vault, write_items=True, sab_filename="obsidian-sab.md"
+    )
     assert (temp_vault / "1.md").exists()
     assert (temp_vault / "obsidian-sab.md").exists()
 
     # Then write a view projection without re-writing items
-    paths = write_vault_digest(rows, temp_vault, write_items=False, sab_filename="obsidian-sab-cop.md")
+    paths = write_vault_digest(
+        rows, temp_vault, write_items=False, sab_filename="obsidian-sab-cop.md"
+    )
     assert (temp_vault / "obsidian-sab-cop.md").exists()
     # Should still return the SAB path even when not writing items
     assert any(p.name == "obsidian-sab-cop.md" for p in paths)

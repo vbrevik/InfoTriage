@@ -40,17 +40,25 @@ from _util import escape
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT_DIR = os.path.join(ROOT, "data", "feeds")
 
+
 def slug(s):
     s = re.sub(r"[^a-zA-Z0-9]+", "-", s).strip("-").lower()
     return (s or "untitled")[-32:] or "untitled"
+
 
 def load_dotenv(path):
     if os.path.exists(path):
         for line in open(path):
             line = line.strip()
-            if line and not line.startswith("#") and "=" in line and not line.startswith("["):
+            if (
+                line
+                and not line.startswith("#")
+                and "=" in line
+                and not line.startswith("[")
+            ):
                 k, v = line.split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip())
+
 
 def load_channels():
     raw = os.environ.get("YT_CHANNELS", "").strip()
@@ -59,41 +67,64 @@ def load_channels():
         if os.path.exists(alt):
             raw = open(alt).read().strip()
     if not raw:
-        raise SystemExit("Set YT_CHANNELS (JSON) or write .yt_channels.json with the list.")
+        raise SystemExit(
+            "Set YT_CHANNELS (JSON) or write .yt_channels.json with the list."
+        )
     return json.loads(raw)
+
 
 def which(cmd):
     """Return path to executable or None."""
     return shutil.which(cmd)
 
+
 def yt_dlp_list(channel, max_n):
     """Return list of (video_id, title) — uses yt-dlp flat-playlist (no downloads)."""
     if not which("yt-dlp"):
-        print("yt-dlp not on PATH — install with `brew install yt-dlp` or `pipx install yt-dlp`.",
-              file=sys.stderr)
+        print(
+            "yt-dlp not on PATH — install with `brew install yt-dlp` or `pipx install yt-dlp`.",
+            file=sys.stderr,
+        )
         return []
-    cmd = ["yt-dlp", "--flat-playlist", "--print", "%(id)s|||%(title)s",
-           "-I", f"1:{max_n}", channel]
+    cmd = [
+        "yt-dlp",
+        "--flat-playlist",
+        "--print",
+        "%(id)s|||%(title)s",
+        "-I",
+        f"1:{max_n}",
+        channel,
+    ]
     try:
         out = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     except subprocess.TimeoutExpired:
         print(f"yt-dlp timed out on {channel}", file=sys.stderr)
         return []
-    return [tuple(line.split("|||", 1)) for line in out.stdout.splitlines()
-            if "|||" in line]
+    return [
+        tuple(line.split("|||", 1)) for line in out.stdout.splitlines() if "|||" in line
+    ]
+
 
 def yt_audio_path(video_id):
     """Return a path to a unique audio file in a tmpdir for a given video id."""
     tmp = tempfile.mkdtemp(prefix="infotriage-yt-")
     return tmp, os.path.join(tmp, f"{video_id}.m4a")
 
+
 def fetch_audio(video_id):
     """Pull audio (.m4a) for a single video via yt-dlp -x. Returns tmpdir (caller cleans up)."""
     if not which("yt-dlp"):
         return None, None
     tmp, audio = yt_audio_path(video_id)
-    cmd = ["yt-dlp", "-x", "--audio-format", "m4a",
-           "-o", audio, f"https://youtu.be/{video_id}"]
+    cmd = [
+        "yt-dlp",
+        "-x",
+        "--audio-format",
+        "m4a",
+        "-o",
+        audio,
+        f"https://youtu.be/{video_id}",
+    ]
     try:
         r = subprocess.run(cmd, capture_output=True, timeout=180)
     except subprocess.TimeoutExpired:
@@ -102,19 +133,22 @@ def fetch_audio(video_id):
         return tmp, None
     return tmp, audio
 
+
 def transcribe_with(audio, runners):
     """Try each transcribe runner in order. Return first non-empty stdout, or None."""
     for runner in runners:
         if not which(runner[0]):
             continue
         try:
-            t = subprocess.run(runner + [audio], capture_output=True,
-                               text=True, timeout=900)
+            t = subprocess.run(
+                runner + [audio], capture_output=True, text=True, timeout=900
+            )
         except subprocess.TimeoutExpired:
             continue
         if t.returncode == 0 and t.stdout.strip():
             return t.stdout.strip()[:1000]
     return None
+
 
 def transcribe(video_id, transcribe_wanted):
     if not transcribe_wanted:
@@ -122,35 +156,44 @@ def transcribe(video_id, transcribe_wanted):
     tmp, audio = fetch_audio(video_id)
     text = None
     if audio:
-        text = transcribe_with(audio, [
-            ["mlx_whisper"],                  # mlx-whisper CLI on Apple Silicon
-            ["whisper"],                      # openai-whisper CLI fallback
-        ])
+        text = transcribe_with(
+            audio,
+            [
+                ["mlx_whisper"],  # mlx-whisper CLI on Apple Silicon
+                ["whisper"],  # openai-whisper CLI fallback
+            ],
+        )
     if tmp:
         shutil.rmtree(tmp, ignore_errors=True)
     return text or "(transcription produced no output)"
 
+
 def write_atom(name, entries):
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    parts = ['<?xml version="1.0" encoding="utf-8"?>',
-             '<feed xmlns="http://www.w3.org/2005/Atom">',
-             f'<title>InfoTriage · {name}</title>',
-             f'<updated>{now}</updated>',
-             f'<id>urn:infotriage:youtube:{slug(name)}</id>']
+    parts = [
+        '<?xml version="1.0" encoding="utf-8"?>',
+        '<feed xmlns="http://www.w3.org/2005/Atom">',
+        f"<title>InfoTriage · {name}</title>",
+        f"<updated>{now}</updated>",
+        f"<id>urn:infotriage:youtube:{slug(name)}</id>",
+    ]
     for vid, title, text in entries:
-        parts += ['<entry>',
-                  f'<title>{escape(title)}</title>',
-                  f'<id>urn:youtube:{vid}</id>',
-                  f'<link href="https://youtu.be/{vid}"/>',
-                  f'<updated>{now}</updated>',
-                  f'<summary>{escape(text)}</summary>',
-                  '</entry>']
-    parts.append('</feed>')
+        parts += [
+            "<entry>",
+            f"<title>{escape(title)}</title>",
+            f"<id>urn:youtube:{vid}</id>",
+            f'<link href="https://youtu.be/{vid}"/>',
+            f"<updated>{now}</updated>",
+            f"<summary>{escape(text)}</summary>",
+            "</entry>",
+        ]
+    parts.append("</feed>")
     os.makedirs(OUT_DIR, exist_ok=True)
     out_path = os.path.join(OUT_DIR, f"youtube-{slug(name)}.xml")
     with open(out_path, "w") as f:
         f.write("\n".join(parts))
     return out_path, len(entries)
+
 
 def main():
     load_dotenv(os.path.join(ROOT, ".env"))

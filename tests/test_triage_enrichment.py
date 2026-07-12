@@ -40,6 +40,7 @@ def _test_db_reachable() -> bool:
     from the DSN itself — never hardcoded.
     """
     import psycopg
+
     dsn = os.environ.get(TEST_DSN_ENV)
     if not dsn:
         return False
@@ -97,6 +98,7 @@ DIM = 1024  # locked embedding dimension (D-05a, mE5-large)
 # Vector fixtures
 # ---------------------------------------------------------------------------
 
+
 def _vec_base() -> list[float]:
     """1024-dim unit vector along dimension 0."""
     return [1.0] + [0.0] * (DIM - 1)
@@ -108,7 +110,7 @@ def _vec_near() -> list[float]:
     Constructed as [cos(θ), sin(θ), 0, ...] where cos(θ) = 0.9.
     Magnitude: sqrt(0.9^2 + sin^2) = 1.0 (unit vector).
     """
-    sin_val = math.sqrt(1.0 - 0.9 ** 2)  # ≈ 0.4359
+    sin_val = math.sqrt(1.0 - 0.9**2)  # ≈ 0.4359
     return [0.9, sin_val] + [0.0] * (DIM - 2)
 
 
@@ -121,6 +123,7 @@ def _vec_far() -> list[float]:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _get_dsn() -> str | None:
     """Return the isolated test-DB DSN from INFOTRIAGE_TEST_DSN — NO fallback.
 
@@ -132,6 +135,7 @@ def _get_dsn() -> str | None:
 def _truncate_all(dsn: str) -> None:
     """TRUNCATE all infotriage tables for per-test isolation."""
     import psycopg
+
     with psycopg.connect(dsn, autocommit=True) as conn:
         conn.execute(
             "TRUNCATE infotriage.entity_links, infotriage.embeddings, "
@@ -161,6 +165,7 @@ def _make_item(**kwargs) -> Item:
 # Parametrized store fixture
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(
     params=[
         "inmemory",
@@ -177,6 +182,7 @@ def store(request, tmp_path):
         yield InMemoryStore(blob_root=tmp_path / "blobs")
     else:
         from store import PostgresStore
+
         dsn = _get_dsn()
         # Bootstrap first: on a fresh test DB (docker-compose.test.yml) the
         # infotriage schema/extension don't exist yet — init_schema() must run
@@ -190,6 +196,7 @@ def store(request, tmp_path):
 # ---------------------------------------------------------------------------
 # Seed helper: enrichment FK references infotriage.articles(id)
 # ---------------------------------------------------------------------------
+
 
 def _seed_item(store) -> Item:
     """Put a minimal Item into the store and return it.
@@ -207,6 +214,7 @@ def _seed_item(store) -> Item:
 # Tests — enrichment round-trip and idempotency
 # ---------------------------------------------------------------------------
 
+
 def test_put_get_enrichment(store):
     """put_enrichment then get_enrichment returns dict with all 7 fields equal to what was written."""
     item = _seed_item(store)
@@ -223,22 +231,38 @@ def test_put_get_enrichment(store):
     got = store.get_enrichment(item.id)
     assert got is not None, "get_enrichment must return dict after put_enrichment"
     for key, expected in fields.items():
-        assert got[key] == expected, f"Field '{key}': expected {expected!r}, got {got[key]!r}"
+        assert (
+            got[key] == expected
+        ), f"Field '{key}': expected {expected!r}, got {got[key]!r}"
 
 
 def test_put_enrichment_idempotent(store):
     """put_enrichment twice for the same item_id updates in place — no duplicate-row error."""
     item = _seed_item(store)
-    store.put_enrichment(item.id, {
-        "ccir": "PIR-1", "cnr": "I", "score": 5,
-        "bucket": "keep", "why": "first write",
-        "pmesii": "Political", "tessoc": "Neutral",
-    })
-    store.put_enrichment(item.id, {
-        "ccir": "PIR-2", "cnr": "II", "score": 3,
-        "bucket": "maybe", "why": "second write",
-        "pmesii": "Military", "tessoc": "Enemy",
-    })
+    store.put_enrichment(
+        item.id,
+        {
+            "ccir": "PIR-1",
+            "cnr": "I",
+            "score": 5,
+            "bucket": "keep",
+            "why": "first write",
+            "pmesii": "Political",
+            "tessoc": "Neutral",
+        },
+    )
+    store.put_enrichment(
+        item.id,
+        {
+            "ccir": "PIR-2",
+            "cnr": "II",
+            "score": 3,
+            "bucket": "maybe",
+            "why": "second write",
+            "pmesii": "Military",
+            "tessoc": "Enemy",
+        },
+    )
     got = store.get_enrichment(item.id)
     assert got is not None
     assert got["ccir"] == "PIR-2", "Second write must win (idempotent upsert)"
@@ -250,6 +274,7 @@ def test_put_enrichment_idempotent(store):
 # Test — score CHECK constraint (postgres only, db_live)
 # ---------------------------------------------------------------------------
 
+
 @db_live
 def test_enrichment_score_check(tmp_path):
     """put_enrichment with score=11 raises a DB error — CHECK (score BETWEEN 0 AND 10).
@@ -258,6 +283,7 @@ def test_enrichment_score_check(tmp_path):
     The worker is responsible for clamping score to [0, 10] before calling put_enrichment.
     """
     from store import PostgresStore
+
     dsn = _get_dsn()
     # Bootstrap before TRUNCATE — see the store fixture for rationale.
     PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs").init_schema()
@@ -266,11 +292,18 @@ def test_enrichment_score_check(tmp_path):
         item = _make_item()
         s.put_item(item)
         with pytest.raises(Exception):
-            s.put_enrichment(item.id, {
-                "ccir": "X", "cnr": "I", "score": 11,
-                "bucket": "skip", "why": "out-of-range score test",
-                "pmesii": "P", "tessoc": "T",
-            })
+            s.put_enrichment(
+                item.id,
+                {
+                    "ccir": "X",
+                    "cnr": "I",
+                    "score": 11,
+                    "bucket": "skip",
+                    "why": "out-of-range score test",
+                    "pmesii": "P",
+                    "tessoc": "T",
+                },
+            )
         # Rollback aborted transaction so context-manager __exit__ can close cleanly
         s._conn.rollback()
 
@@ -279,6 +312,7 @@ def test_enrichment_score_check(tmp_path):
 # Tests — embedding dedup (find_near_duplicate)
 # ---------------------------------------------------------------------------
 
+
 def test_find_near_duplicate(store):
     """put_embedding then find_near_duplicate with near vec returns item_id; far vec returns None."""
     item = _seed_item(store)
@@ -286,15 +320,15 @@ def test_find_near_duplicate(store):
 
     # Near vector: cosine_sim = 0.9 >= 0.84 → should match
     result_near = store.find_near_duplicate(_vec_near())
-    assert result_near == item.id, (
-        f"Near vector (cos_sim=0.9) must match stored item_id; got {result_near!r}"
-    )
+    assert (
+        result_near == item.id
+    ), f"Near vector (cos_sim=0.9) must match stored item_id; got {result_near!r}"
 
     # Far vector: cosine_sim = 0.0 < 0.84 → should NOT match
     result_far = store.find_near_duplicate(_vec_far())
-    assert result_far is None, (
-        f"Far vector (cos_sim=0.0) must return None; got {result_far!r}"
-    )
+    assert (
+        result_far is None
+    ), f"Far vector (cos_sim=0.0) must return None; got {result_far!r}"
 
 
 def test_find_near_duplicate_empty(store):
@@ -303,16 +337,18 @@ def test_find_near_duplicate_empty(store):
     First article in a window is never a false-positive duplicate (R4 unclassified edge).
     """
     result = store.find_near_duplicate(_vec_base())
-    assert result is None, (
-        f"Empty store must return None from find_near_duplicate; got {result!r}"
-    )
+    assert (
+        result is None
+    ), f"Empty store must return None from find_near_duplicate; got {result!r}"
 
 
 def test_put_embedding_idempotent(store):
     """put_embedding twice for same item_id updates in place — stored vector is the second write."""
     item = _seed_item(store)
     store.put_embedding(item.id, _vec_base())
-    store.put_embedding(item.id, _vec_far())  # second write: far vector replaces base vector
+    store.put_embedding(
+        item.id, _vec_far()
+    )  # second write: far vector replaces base vector
 
     # After second write, the stored vector is _vec_far (cosine_sim=0 with _vec_base).
     # find_near_duplicate(_vec_base) must return None (stored vector is far, not near).
@@ -327,6 +363,7 @@ def test_put_embedding_idempotent(store):
 # Test — enrichment schema columns (postgres only, db_live)
 # ---------------------------------------------------------------------------
 
+
 @db_live
 def test_enrichment_schema(tmp_path):
     """After init_schema(), infotriage.enrichment has all 7 scoring columns.
@@ -335,6 +372,7 @@ def test_enrichment_schema(tmp_path):
     bucket, why, pmesii, tessoc to the bare stub table from 005-stubs.sql (D-10, R1).
     """
     from store import PostgresStore
+
     dsn = _get_dsn()
     # Bootstrap before TRUNCATE — see the store fixture for rationale.
     PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs").init_schema()

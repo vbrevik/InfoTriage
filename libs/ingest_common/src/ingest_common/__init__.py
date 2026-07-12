@@ -14,6 +14,7 @@ Public API:
     build_bus() -> RabbitMQBus
         Reads INFOTRIAGE_AMQP_DSN from env (never logged — T-04-01).
 """
+
 from .persist import persist_and_publish
 from .trigger import make_trigger_app
 from .runtime import build_store, build_bus

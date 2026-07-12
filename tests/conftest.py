@@ -1,4 +1,5 @@
 """tests/conftest.py — shared pytest fixtures and markers for InfoTriage tests."""
+
 from __future__ import annotations
 
 import os

@@ -19,6 +19,7 @@ from contracts import to_frontmatter
 # source field holds the adapter/mailbox name (e.g. "gmail" or "Telegraph Ukraine").
 _EMAIL_URL_SCHEMES = ("imap://", "gmail://")
 
+
 def extract_entities(text: str, known_topics: Optional[list[str]] = None) -> list[str]:
     """DEPRECATED: use the entity graph (item['entities']) instead.
 
@@ -27,6 +28,7 @@ def extract_entities(text: str, known_topics: Optional[list[str]] = None) -> lis
     empty list when no topics are supplied.
     """
     import warnings
+
     warnings.warn(
         "extract_entities() is deprecated; use the entity graph via item['entities']",
         DeprecationWarning,
@@ -63,7 +65,7 @@ def render_wikilinked(text: str, entities: list[str]) -> str:
     # Longest-first so prefix entities ("Ukraine") don't corrupt longer forms
     # ("Ukrainian"); word boundaries + lookarounds skip text already wikilinked.
     for entity in sorted(entities, key=len, reverse=True):
-        pattern = r'(?<!\[)\b' + re.escape(entity) + r'\b(?!\])'
+        pattern = r"(?<!\[)\b" + re.escape(entity) + r"\b(?!\])"
         result = re.sub(pattern, f"[[{entity}]]", result)
     return result
 
@@ -84,30 +86,32 @@ def write_item_obsidian(item: dict, vault_path: Path) -> Path:
     # Use simple item_id or slug for filename
     item_id = item.get("item_id", "unknown")
     # Sanitize filename: remove special characters
-    safe_id = re.sub(r'[^\w\-]', '', str(item_id))
+    safe_id = re.sub(r"[^\w\-]", "", str(item_id))
     filename = f"{safe_id}.md"
     filepath = vault_path / filename
 
     # Project canonical entities from the entity graph (Phase 8).
-    summary = (item.get("summary") or "")
-    why = (item.get("why") or "")
+    summary = item.get("summary") or ""
+    why = item.get("why") or ""
     entities = _entity_names(item)
 
     # Render entities in summary and why with wikilinks
     summary_wikilinked = render_wikilinked(summary, entities)
     why_wikilinked = render_wikilinked(why, entities)
 
-    frontmatter = to_frontmatter({
-        "title": item.get("title", ""),
-        "date": item.get("ts", ""),
-        "ccir": item.get("ccir", ""),
-        "score": item.get("score", 0),
-        "cnr": item.get("cnr", ""),
-        "bucket": item.get("bucket", ""),
-        "source": item.get("source", ""),
-        "url": item.get("url", ""),
-        "item_id": item.get("item_id", ""),
-    })
+    frontmatter = to_frontmatter(
+        {
+            "title": item.get("title", ""),
+            "date": item.get("ts", ""),
+            "ccir": item.get("ccir", ""),
+            "score": item.get("score", 0),
+            "cnr": item.get("cnr", ""),
+            "bucket": item.get("bucket", ""),
+            "source": item.get("source", ""),
+            "url": item.get("url", ""),
+            "item_id": item.get("item_id", ""),
+        }
+    )
     file_content = f"""{frontmatter}
 
 ## Summary
@@ -223,20 +227,26 @@ def write_vault_digest(
 
     # Include email-sourced items unless VAULT_INCLUDE_EMAIL is explicitly falsy
     # (accepts common truthy strings like "true"/"yes" without inverting intent)
-    include_email = os.environ.get("VAULT_INCLUDE_EMAIL", "1").strip().lower() not in ("0", "false", "no")
+    include_email = os.environ.get("VAULT_INCLUDE_EMAIL", "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+    )
 
     # Filter: items with score >= 8, or all items with CCIR (but not none)
     kept = [
-        r for r in enrichment_rows
-        if (r.get("score") or 0) >= 8
-        or (r.get("ccir") or "none").lower() != "none"
+        r
+        for r in enrichment_rows
+        if (r.get("score") or 0) >= 8 or (r.get("ccir") or "none").lower() != "none"
     ]
 
     # Exclude email items if VAULT_INCLUDE_EMAIL=0. The url scheme is the
     # reliable email signal (see _EMAIL_URL_SCHEMES comment above); web-clip/
     # RSS/YouTube rows keep their http(s)/other schemes and are unaffected.
     if not include_email:
-        kept = [r for r in kept if not (r.get("url") or "").startswith(_EMAIL_URL_SCHEMES)]
+        kept = [
+            r for r in kept if not (r.get("url") or "").startswith(_EMAIL_URL_SCHEMES)
+        ]
 
     paths: list[Path] = []
 

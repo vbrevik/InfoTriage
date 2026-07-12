@@ -19,8 +19,22 @@ TS = datetime.datetime(2026, 6, 27, 10, 0, 0, tzinfo=datetime.timezone.utc)
 
 def test_item_id_deterministic():
     """Same source_type+url+title -> same id (idempotent)."""
-    a = Item(source="NRK", source_type="rss", url="https://nrk.no/1", title="Test", ts=TS, lang="no")
-    b = Item(source="NRK", source_type="rss", url="https://nrk.no/1", title="Test", ts=TS, lang="no")
+    a = Item(
+        source="NRK",
+        source_type="rss",
+        url="https://nrk.no/1",
+        title="Test",
+        ts=TS,
+        lang="no",
+    )
+    b = Item(
+        source="NRK",
+        source_type="rss",
+        url="https://nrk.no/1",
+        title="Test",
+        ts=TS,
+        lang="no",
+    )
     assert a.id == b.id
 
 
@@ -47,7 +61,9 @@ def test_item_missing_required_field_raises():
 def test_item_missing_source_type_raises():
     """Omitting source_type (required) raises ValidationError."""
     with pytest.raises(ValidationError):
-        Item(source="NRK", url="", title="Test", ts=TS, lang="no")  # missing source_type
+        Item(
+            source="NRK", url="", title="Test", ts=TS, lang="no"
+        )  # missing source_type
 
 
 def test_item_naive_ts_raises():
@@ -71,7 +87,13 @@ def test_item_payload_open_dict():
         title="Test",
         ts=TS,
         lang="no",
-        payload={"ccir": "PIR-1", "cnr": "I", "score": 8, "bucket": "keep", "why": "CCIR match"},
+        payload={
+            "ccir": "PIR-1",
+            "cnr": "I",
+            "score": 8,
+            "bucket": "keep",
+            "why": "CCIR match",
+        },
     )
     assert item.payload["ccir"] == "PIR-1"
     assert item.payload["score"] == 8
@@ -163,7 +185,16 @@ def test_sab_published_valid():
         snapshot_day="2026-06-27",
         ccir_topics=["PIR-1", "PIR-2"],
         bluf_by_topic={"PIR-1": "Russland angrep [1] infrastruktur."},
-        item_refs=[{"item_id": "abc", "n": 1, "title": "Test", "source": "NRK", "url": "https://nrk.no/1", "ts": TS}],
+        item_refs=[
+            {
+                "item_id": "abc",
+                "n": 1,
+                "title": "Test",
+                "source": "NRK",
+                "url": "https://nrk.no/1",
+                "ts": TS,
+            }
+        ],
         total_keep=5,
         since_ts=None,
     )
@@ -193,16 +224,27 @@ def test_sab_published_roundtrip():
         snapshot_day="2026-06-27",
         ccir_topics=["PIR-1", "PIR-2"],
         bluf_by_topic={"PIR-1": "Russland angrep [1] infrastruktur — Åse Ø-test."},
-        item_refs=[{"item_id": "abc", "ccir": "PIR-1", "cnr": "I", "n": 1, "title": "Test", "source": "NRK", "url": "https://nrk.no/1", "ts": TS}],
+        item_refs=[
+            {
+                "item_id": "abc",
+                "ccir": "PIR-1",
+                "cnr": "I",
+                "n": 1,
+                "title": "Test",
+                "source": "NRK",
+                "url": "https://nrk.no/1",
+                "ts": TS,
+            }
+        ],
         total_keep=5,
         since_ts=None,
     )
     text = to_frontmatter(ev.model_dump())
     restored = SabPublished(**from_frontmatter(text))
     assert restored == ev
-    assert restored.pub_ts == TS                        # tz-aware datetime value preserved
-    assert "[1]" in restored.bluf_by_topic["PIR-1"]     # citation markers preserved
-    assert restored.item_refs[0]["ts"] == TS            # nested datetime preserved
+    assert restored.pub_ts == TS  # tz-aware datetime value preserved
+    assert "[1]" in restored.bluf_by_topic["PIR-1"]  # citation markers preserved
+    assert restored.item_refs[0]["ts"] == TS  # nested datetime preserved
 
 
 def test_feed_unhealthy_valid():
@@ -278,12 +320,14 @@ def test_codec_round_trip():
     assert text.endswith("---\n")
     result = from_frontmatter(text)
 
-    assert result["ts"] == payload["ts"]       # datetime VALUE preserved (UTC offset matches)
-    assert result["bluf"] == payload["bluf"]   # [N] citation markers preserved
+    assert (
+        result["ts"] == payload["ts"]
+    )  # datetime VALUE preserved (UTC offset matches)
+    assert result["bluf"] == payload["bluf"]  # [N] citation markers preserved
     assert result["nested"] == payload["nested"]
     assert result["refs"] == payload["refs"]
     assert result["nothing"] is None
-    assert result["name"] == payload["name"]   # Norwegian unicode
+    assert result["name"] == payload["name"]  # Norwegian unicode
 
 
 def test_codec_from_frontmatter_no_delimiters_raises():
@@ -368,7 +412,9 @@ async def test_bus_same_item_id_across_routing_keys_not_deduped():
     """
     bus = InMemoryBus()
     await bus.publish("item.ingested", item_id="id1", payload={"event": "ingested"})
-    await bus.publish("verdict.ready", item_id="id1", payload={"event": "verdict"})  # same id, different key
+    await bus.publish(
+        "verdict.ready", item_id="id1", payload={"event": "verdict"}
+    )  # same id, different key
     assert (await bus.subscribe("item.ingested"))[0]["event"] == "ingested"
     assert (await bus.subscribe("verdict.ready"))[0]["event"] == "verdict"
 

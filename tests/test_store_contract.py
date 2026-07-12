@@ -43,6 +43,7 @@ def _test_db_reachable() -> bool:
     from the DSN itself — never hardcoded.
     """
     import psycopg
+
     dsn = os.environ.get(TEST_DSN_ENV)
     if not dsn:
         return False
@@ -76,6 +77,7 @@ db_live = (
 # Helper factories
 # ---------------------------------------------------------------------------
 
+
 def _ts(offset_seconds: int = 0) -> datetime.datetime:
     """Return a UTC-aware datetime offset from epoch for deterministic ordering."""
     base = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
@@ -102,6 +104,7 @@ def _item(
 # ---------------------------------------------------------------------------
 # Parametrized store fixture
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(
     params=[
@@ -143,16 +146,18 @@ def store(request, tmp_path):
 # Protocol satisfaction
 # ---------------------------------------------------------------------------
 
+
 def test_protocol_satisfied(store):
     """Store implementation must satisfy isinstance check (runtime_checkable Protocol)."""
-    assert isinstance(store, Store), (
-        f"{type(store).__name__} does not satisfy Store Protocol"
-    )
+    assert isinstance(
+        store, Store
+    ), f"{type(store).__name__} does not satisfy Store Protocol"
 
 
 # ---------------------------------------------------------------------------
 # put_item / get_item
 # ---------------------------------------------------------------------------
+
 
 def test_put_get_roundtrip(store):
     item = _item(title="Roundtrip Item")
@@ -173,6 +178,7 @@ def test_get_miss_returns_none(store):
 # ---------------------------------------------------------------------------
 # list_items — empty / ordering
 # ---------------------------------------------------------------------------
+
 
 def test_list_empty_returns_empty_list(store):
     """list_items() on a fresh store must return an empty list (not None)."""
@@ -205,7 +211,9 @@ def test_list_items_source_type_filter(store):
     ids = {i.id for i in result}
     assert rss.id in ids
     assert yt.id in ids
-    assert imap.id not in ids, "imap/email items must be excluded from the filtered list"
+    assert (
+        imap.id not in ids
+    ), "imap/email items must be excluded from the filtered list"
 
 
 def test_list_items_limit(store):
@@ -219,6 +227,7 @@ def test_list_items_limit(store):
 # ---------------------------------------------------------------------------
 # Upsert semantics — last-write-wins
 # ---------------------------------------------------------------------------
+
 
 def test_put_item_upsert_last_write_wins(store):
     """put_item called twice with the same id must produce one entry, latest content.
@@ -254,6 +263,7 @@ def test_put_item_upsert_get_reflects_update(store):
 # Blob round-trip via _blob helpers
 # ---------------------------------------------------------------------------
 
+
 def test_blob_roundtrip(store, tmp_path):
     data = b"binary content for blob round-trip test"
     h = store.put_blob(data)
@@ -272,6 +282,7 @@ def test_blob_dedup(store):
 # ---------------------------------------------------------------------------
 # must-NOT: failed persist raises — no silent success
 # ---------------------------------------------------------------------------
+
 
 def test_write_failure_raises(store, tmp_path, monkeypatch):
     """A failed blob write must raise, not silently return success.

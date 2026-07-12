@@ -6,6 +6,7 @@ the load-bearing invariants after any future edit.
 MUST be a unit test (NOT db_live) so it runs on every pytest invocation,
 matching the always-on pattern of tests/test_dsn_safety.py.
 """
+
 import json
 from importlib import resources
 
@@ -23,9 +24,9 @@ def _load_json_ssot() -> dict:
 
 
 def test_logging_config_is_a_dict():
-    assert isinstance(LOGGING_CONFIG, dict), (
-        "LOGGING_CONFIG must be a dict (uvicorn.run expects log_config=dict)."
-    )
+    assert isinstance(
+        LOGGING_CONFIG, dict
+    ), "LOGGING_CONFIG must be a dict (uvicorn.run expects log_config=dict)."
 
 
 def test_logging_config_disable_existing_loggers_is_false():
@@ -46,9 +47,9 @@ def test_logging_config_uses_json_formatter():
     formatter = LOGGING_CONFIG["formatters"].get("json")
     assert formatter is not None, "json formatter missing"
     # json_log_formatter uses a callable string reference ('()' key in dictConfig).
-    assert formatter.get("()") == "json_log_formatter.JSONFormatter", (
-        "json formatter must reference json_log_formatter.JSONFormatter."
-    )
+    assert (
+        formatter.get("()") == "json_log_formatter.JSONFormatter"
+    ), "json formatter must reference json_log_formatter.JSONFormatter."
 
 
 def test_logging_config_routes_uvicorn_loggers_to_json():
@@ -60,9 +61,9 @@ def test_logging_config_routes_uvicorn_loggers_to_json():
     # via the root logger's stdout handler).
     access = loggers["uvicorn.access"]
     assert "default" in access["handlers"], "uvicorn.access must use the json handler"
-    assert access.get("propagate") is False, (
-        "uvicorn.access.propagate must be False to avoid duplicate emission via root."
-    )
+    assert (
+        access.get("propagate") is False
+    ), "uvicorn.access.propagate must be False to avoid duplicate emission via root."
 
 
 def test_logging_config_matches_json_ssot():

@@ -41,13 +41,20 @@ from _util import escape
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT_DIR = os.path.join(ROOT, "data", "feeds")
 
+
 def load_dotenv(path):
     if os.path.exists(path):
         for line in open(path):
             line = line.strip()
-            if line and not line.startswith("#") and "=" in line and not line.startswith("["):
+            if (
+                line
+                and not line.startswith("#")
+                and "=" in line
+                and not line.startswith("[")
+            ):
                 k, v = line.split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip())
+
 
 def load_mailboxes():
     """Load mailbox list from MAILBOXES env, fallback to .mailboxes.json."""
@@ -63,12 +70,15 @@ def load_mailboxes():
     except json.JSONDecodeError as e:
         raise SystemExit(f"MAILBOXES JSON parse error: {e}")
 
+
 def dec(s):
     if not s:
         return ""
     return "".join(
         (t.decode(enc or "utf-8", "replace") if isinstance(t, bytes) else t)
-        for t, enc in decode_header(s))
+        for t, enc in decode_header(s)
+    )
+
 
 def infer_provider(host):
     h = host.lower()
@@ -77,20 +87,23 @@ def infer_provider(host):
         return "gmail"
     return "imap"  # standard IMAP SEARCH works for Outlook / Fastmail / ProtonMail / custom
 
+
 def connect(host, user, pw):
     imap = imaplib.IMAP4_SSL(host)
     imap.login(user, pw)
     return imap
 
+
 def search_ids(imap, query, provider):
     """Provider-aware SEARCH. Gmail uses X-GM-RAW; everything else standard SEARCH."""
     if provider == "gmail":
-        typ, data = imap.search(None, 'X-GM-RAW', f'"{query}"')
+        typ, data = imap.search(None, "X-GM-RAW", f'"{query}"')
     else:
         typ, data = imap.search(None, query)
     if typ != "OK" or not data or not data[0]:
         return []
     return data[0].split()
+
 
 def body_text(msg):
     """Concatenate visible text content of an email message."""
@@ -99,15 +112,18 @@ def body_text(msg):
             if part.get_content_type() == "text/plain":
                 try:
                     return part.get_payload(decode=True).decode(
-                        part.get_content_charset() or "utf-8", "replace")
+                        part.get_content_charset() or "utf-8", "replace"
+                    )
                 except Exception:
                     pass
         return msg.get("subject", "")
     try:
         return msg.get_payload(decode=True).decode(
-            msg.get_content_charset() or "utf-8", "replace")
+            msg.get_content_charset() or "utf-8", "replace"
+        )
     except Exception:
         return ""
+
 
 def fetch_entries(imap, ids, max_recent=60):
     out = []
@@ -116,34 +132,43 @@ def fetch_entries(imap, ids, max_recent=60):
         if typ != "OK":
             continue
         msg = email.message_from_bytes(data[0][1])
-        out.append((
-            dec(msg.get("subject")) or "(no subject)",
-            dec(msg.get("from")) or "(unknown sender)",
-            " ".join(body_text(msg).split())[:500],
-            msg.get("Message-ID", str(mid))))
+        out.append(
+            (
+                dec(msg.get("subject")) or "(no subject)",
+                dec(msg.get("from")) or "(unknown sender)",
+                " ".join(body_text(msg).split())[:500],
+                msg.get("Message-ID", str(mid)),
+            )
+        )
     return out
+
 
 def write_atom(name, entries):
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    parts = ['<?xml version="1.0" encoding="utf-8"?>',
-             '<feed xmlns="http://www.w3.org/2005/Atom">',
-             f'<title>InfoTriage · {name}</title>',
-             f'<updated>{now}</updated>',
-             f'<id>urn:infotriage:{name}</id>']
+    parts = [
+        '<?xml version="1.0" encoding="utf-8"?>',
+        '<feed xmlns="http://www.w3.org/2005/Atom">',
+        f"<title>InfoTriage · {name}</title>",
+        f"<updated>{now}</updated>",
+        f"<id>urn:infotriage:{name}</id>",
+    ]
     for subj, frm, snippet, mid in reversed(entries):
-        parts += ['<entry>',
-                  f'<title>{escape(subj)}</title>',
-                  f'<id>{escape(mid)}</id>',
-                  f'<author><name>{escape(frm)}</name></author>',
-                  f'<updated>{now}</updated>',
-                  f'<summary>{escape(snippet)}</summary>',
-                  '</entry>']
-    parts.append('</feed>')
+        parts += [
+            "<entry>",
+            f"<title>{escape(subj)}</title>",
+            f"<id>{escape(mid)}</id>",
+            f"<author><name>{escape(frm)}</name></author>",
+            f"<updated>{now}</updated>",
+            f"<summary>{escape(snippet)}</summary>",
+            "</entry>",
+        ]
+    parts.append("</feed>")
     os.makedirs(OUT_DIR, exist_ok=True)
     out_path = os.path.join(OUT_DIR, f"{name}.xml")
     with open(out_path, "w") as f:
         f.write("\n".join(parts))
     return out_path, len(entries)
+
 
 def main():
     load_dotenv(os.path.join(ROOT, ".env"))
@@ -159,7 +184,9 @@ def main():
         print(f"[{name}] connecting to {host} as {user}…", file=sys.stderr, flush=True)
         try:
             imap = connect(host, user, pw)
-            imap.select("INBOX", readonly=True)            # read-only posture, cannot modify mailbox
+            imap.select(
+                "INBOX", readonly=True
+            )  # read-only posture, cannot modify mailbox
             ids = search_ids(imap, query, provider)
             entries = fetch_entries(imap, ids)
             imap.logout()

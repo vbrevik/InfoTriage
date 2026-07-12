@@ -19,6 +19,7 @@ Closes the regression class surfaced in Phase 7 07-03 (3 services crashed
 because their reqs.txt was missing transitive deps). See
 ``.planning/phases/07-ops-cutover/07-03-SUMMARY.md`` for the prior incident.
 """
+
 import re
 import tomllib
 from pathlib import Path
@@ -48,9 +49,7 @@ _CONTRACTS_IMPORT_RE = re.compile(
 # Note the word-boundary after `<X>` (between the lib name and the next char)
 # — `libs.ingest_common_X` won't match. Treats `import libs.<X>` and
 # `from libs.<X> import Y` identically (both forms resolve the package).
-_LIBS_IMPORT_RE = re.compile(
-    r"""\b(?:import|from)\s+libs\.([A-Za-z0-9_]+)\b"""
-)
+_LIBS_IMPORT_RE = re.compile(r"""\b(?:import|from)\s+libs\.([A-Za-z0-9_]+)\b""")
 
 
 def _contracts_dep_names() -> set[str]:
@@ -83,7 +82,9 @@ def _transitively_consumes_contracts(app_dir: Path) -> bool:
     """
     siblings: set[str] = set()
     for py in app_dir.rglob("*.py"):
-        for m in _LIBS_IMPORT_RE.finditer(py.read_text(encoding="utf-8", errors="ignore")):
+        for m in _LIBS_IMPORT_RE.finditer(
+            py.read_text(encoding="utf-8", errors="ignore")
+        ):
             siblings.add(m.group(1))
     for lib_name in siblings:
         lib_pyproject = LIBS_DIR / lib_name / "pyproject.toml"

@@ -11,8 +11,10 @@ import xml.etree.ElementTree as ET
 
 OPML = os.path.join(os.path.dirname(__file__), "..", "apps", "opml", "feeds.opml")
 
-EXPECTED_TOP_OUTLINES = 12  # Norske aviser, Offentlig Norge, ... , NewsAPI.org, Sport VM 2026 (SIR-2)
-EXPECTED_RSS_FEEDS = 70     # total type="rss" outlines (verified 2026-06-24)
+EXPECTED_TOP_OUTLINES = (
+    12  # Norske aviser, Offentlig Norge, ... , NewsAPI.org, Sport VM 2026 (SIR-2)
+)
+EXPECTED_RSS_FEEDS = 70  # total type="rss" outlines (verified 2026-06-24)
 
 
 def _parse(path):
@@ -27,10 +29,12 @@ def _parse(path):
 def test_parse_counts():
     """OPML has expected number of top-level outlines and RSS feeds."""
     _, top, rss = _parse(OPML)
-    assert len(top) == EXPECTED_TOP_OUTLINES, \
-        f"Expected {EXPECTED_TOP_OUTLINES} top outlines, got {len(top)}"
-    assert len(rss) == EXPECTED_RSS_FEEDS, \
-        f"Expected {EXPECTED_RSS_FEEDS} RSS feeds, got {len(rss)}"
+    assert (
+        len(top) == EXPECTED_TOP_OUTLINES
+    ), f"Expected {EXPECTED_TOP_OUTLINES} top outlines, got {len(top)}"
+    assert (
+        len(rss) == EXPECTED_RSS_FEEDS
+    ), f"Expected {EXPECTED_RSS_FEEDS} RSS feeds, got {len(rss)}"
 
 
 def test_all_rss_have_xmlurl():

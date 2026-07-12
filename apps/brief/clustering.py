@@ -45,6 +45,7 @@ class EnrichedItem:
       title, summary, source, url
     Plus embedding from infotriage.embeddings table.
     """
+
     item_id: str
     title: str
     source: str
@@ -64,7 +65,7 @@ def _as_list(vec) -> list[float]:
     """Convert pgvector Vector or any iterable to list[float]."""
     if isinstance(vec, list):
         return vec
-    if hasattr(vec, 'to_list'):
+    if hasattr(vec, "to_list"):
         return vec.to_list()
     return list(vec)
 
@@ -157,9 +158,7 @@ def cluster_items(
         WHERE item_id = ANY(%s)
     """
     emb_cursor = store.cursor()
-    emb_rows = emb_cursor.execute(
-        emb_query, (item_ids,)
-    ).fetchall()
+    emb_rows = emb_cursor.execute(emb_query, (item_ids,)).fetchall()
     emb_cursor.close()
 
     # Build embedding lookup: item_id -> embedding vector

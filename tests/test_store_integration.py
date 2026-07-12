@@ -34,8 +34,8 @@ from tests.conftest import db_live, pg_store  # noqa: F401
 # Constants
 # ---------------------------------------------------------------------------
 
-DIM = 1024           # locked embedding dimension (D-05a)
-THRESHOLD = 0.85     # inclusive cosine link threshold (D-05b)
+DIM = 1024  # locked embedding dimension (D-05a)
+THRESHOLD = 0.85  # inclusive cosine link threshold (D-05b)
 
 
 # ---------------------------------------------------------------------------
@@ -152,9 +152,7 @@ def test_all_tables_exist(pg_store):
         "entities",
         "entity_links",
     }
-    assert tables == expected, (
-        f"Expected {sorted(expected)}, got {sorted(tables)}"
-    )
+    assert tables == expected, f"Expected {sorted(expected)}, got {sorted(tables)}"
 
 
 # ---------------------------------------------------------------------------
@@ -173,7 +171,12 @@ def test_item_roundtrip(pg_store):
         lang="no",
         summary="BLUF: integration roundtrip summary",
         body_ref="a" * 64,  # fake sha256 hex (body blob reference)
-        payload={"score": 8, "ccir": "PIR-2", "tags": ["nato", "norway"], "nested": {"x": 1}},
+        payload={
+            "score": 8,
+            "ccir": "PIR-2",
+            "tags": ["nato", "norway"],
+            "nested": {"x": 1},
+        },
     )
     pg_store.put_item(item)
     got = pg_store.get_item(item.id)
@@ -186,10 +189,12 @@ def test_item_roundtrip(pg_store):
     assert got.title == item.title
     assert got.lang == item.lang
     assert got.summary == item.summary, f"summary: {got.summary!r} != {item.summary!r}"
-    assert got.body_ref == item.body_ref, f"body_ref: {got.body_ref!r} != {item.body_ref!r}"
-    assert got.payload == item.payload, (
-        f"JSONB payload round-trip mismatch:\n  got: {got.payload!r}\n  exp: {item.payload!r}"
-    )
+    assert (
+        got.body_ref == item.body_ref
+    ), f"body_ref: {got.body_ref!r} != {item.body_ref!r}"
+    assert (
+        got.payload == item.payload
+    ), f"JSONB payload round-trip mismatch:\n  got: {got.payload!r}\n  exp: {item.payload!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -211,9 +216,9 @@ def test_put_item_upsert_live(pg_store):
     )
     # model_copy changing summary preserves source_type + url + title → same id
     item_v2 = item_v1.model_copy(update={"summary": "Second write (upsert wins)"})
-    assert item_v1.id == item_v2.id, (
-        "Sanity: summary update must not change computed id"
-    )
+    assert (
+        item_v1.id == item_v2.id
+    ), "Sanity: summary update must not change computed id"
 
     pg_store.put_item(item_v1)
     pg_store.put_item(item_v2)
@@ -228,9 +233,9 @@ def test_put_item_upsert_live(pg_store):
     # Latest content recovered via get_item
     got = pg_store.get_item(item_v1.id)
     assert got is not None
-    assert got.summary == "Second write (upsert wins)", (
-        f"Upsert: last-write must win; got {got.summary!r}"
-    )
+    assert (
+        got.summary == "Second write (upsert wins)"
+    ), f"Upsert: last-write must win; got {got.summary!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -265,12 +270,12 @@ def test_dimension_is_1024(pg_store):
     ).fetchall()
     type_map = {r["relname"]: r["dtype"] for r in rows}
 
-    assert type_map.get("embeddings") == "vector(1024)", (
-        f"embeddings.embedding: expected 'vector(1024)', got {type_map.get('embeddings')!r}"
-    )
-    assert type_map.get("entities") == "vector(1024)", (
-        f"entities.embedding: expected 'vector(1024)', got {type_map.get('entities')!r}"
-    )
+    assert (
+        type_map.get("embeddings") == "vector(1024)"
+    ), f"embeddings.embedding: expected 'vector(1024)', got {type_map.get('embeddings')!r}"
+    assert (
+        type_map.get("entities") == "vector(1024)"
+    ), f"entities.embedding: expected 'vector(1024)', got {type_map.get('entities')!r}"
 
     # 2. Behavioral: 1024-dim insert must succeed
     vec_1024 = np.zeros(DIM, dtype=np.float32)
@@ -317,12 +322,12 @@ def test_vector_cosine_threshold(pg_store):
     # Pre-flight: verify fixture cosine similarities
     sim_nato = float(nato1.dot(nato2))
     sim_putin = float(nato1.dot(putin))
-    assert sim_nato >= THRESHOLD, (
-        f"Fixture: NATO pair sim {sim_nato:.4f} must be >= {THRESHOLD} (got wrong vectors)"
-    )
-    assert sim_putin < THRESHOLD, (
-        f"Fixture: Putin sim {sim_putin:.4f} must be < {THRESHOLD} (got wrong vectors)"
-    )
+    assert (
+        sim_nato >= THRESHOLD
+    ), f"Fixture: NATO pair sim {sim_nato:.4f} must be >= {THRESHOLD} (got wrong vectors)"
+    assert (
+        sim_putin < THRESHOLD
+    ), f"Fixture: Putin sim {sim_putin:.4f} must be < {THRESHOLD} (got wrong vectors)"
 
     conn = pg_store._conn
 
@@ -354,17 +359,17 @@ def test_vector_cosine_threshold(pg_store):
     found = {r["name"]: float(r["sim"]) for r in rows}
 
     # NATO_A (self — sim = 1.0) must appear
-    assert "NATO_A" in found, (
-        f"Self-match NATO_A (sim=1.0) missing from results; got {found}"
-    )
+    assert (
+        "NATO_A" in found
+    ), f"Self-match NATO_A (sim=1.0) missing from results; got {found}"
     # NATO_B (sim ≈ 0.92, above threshold) must be linked
-    assert "NATO_B" in found, (
-        f"NATO_B (sim≈{sim_nato:.3f} >= {THRESHOLD}) must be linked; got {found}"
-    )
+    assert (
+        "NATO_B" in found
+    ), f"NATO_B (sim≈{sim_nato:.3f} >= {THRESHOLD}) must be linked; got {found}"
     # TRUMP_PUTIN (sim ≈ 0.72, below threshold) must remain distinct
-    assert "TRUMP_PUTIN" not in found, (
-        f"TRUMP_PUTIN (sim≈{sim_putin:.3f} < {THRESHOLD}) must NOT be linked; got {found}"
-    )
+    assert (
+        "TRUMP_PUTIN" not in found
+    ), f"TRUMP_PUTIN (sim≈{sim_putin:.3f} < {THRESHOLD}) must NOT be linked; got {found}"
 
 
 # ---------------------------------------------------------------------------

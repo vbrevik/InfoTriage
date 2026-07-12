@@ -19,6 +19,7 @@ Environment:
     INFOTRIAGE_OPML_HEALTH_PORT          HTTP port (default: 22032)
     INFOTRIAGE_OPML_HEALTH_SINCE_HOURS   minimum silent hours before emitting (default: 24)
 """
+
 import asyncio
 import argparse
 import concurrent.futures
@@ -49,6 +50,7 @@ from apps.opml._check import (  # noqa: E402
 
 log = logging.getLogger("opml.health")
 
+
 # --- health-check dispatcher ---
 def run_health_check(
     opml_path: Optional[str] = None,
@@ -74,8 +76,9 @@ def run_health_check(
     results = []
     unhealthy = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
-        futures = {ex.submit(probe_and_classify, o, ua, timeout): (cat, o)
-                   for cat, o in flat}
+        futures = {
+            ex.submit(probe_and_classify, o, ua, timeout): (cat, o) for cat, o in flat
+        }
         for fut in concurrent.futures.as_completed(futures):
             _cat, o = futures[fut]
             try:
@@ -94,18 +97,21 @@ def run_health_check(
                 # the ValidationError locally so a single over-long reason can't
                 # cascade-kill the remaining feeds in the batch.
                 try:
-                    unhealthy.append(FeedUnhealthy(
-                        event="feed.unhealthy",
-                        feed_url=url,
-                        feed_name=text,
-                        reason=f"{emoji} {reason}",
-                        ts=datetime.datetime.now(datetime.timezone.utc),
-                    ))
+                    unhealthy.append(
+                        FeedUnhealthy(
+                            event="feed.unhealthy",
+                            feed_url=url,
+                            feed_name=text,
+                            reason=f"{emoji} {reason}",
+                            ts=datetime.datetime.now(datetime.timezone.utc),
+                        )
+                    )
                 except ValidationError as e:
                     log.error(
                         "Discarding feed.unhealthy event for %s due to schema "
                         "validation failure (reason > 120 chars? malformed ts?): %s",
-                        url, e,
+                        url,
+                        e,
                     )
     return results, unhealthy
 
@@ -125,20 +131,25 @@ async def emit_unhealthy_events(unhealthy: list[FeedUnhealthy]) -> None:
         for evt in unhealthy:
             d = evt.model_dump(mode="json")
             item_id = d.get("item_id", f"uh-{abs(hash(d['feed_url'])) % (10**12)}")
-            await bus.publish("feed.unhealthy", item_id=item_id, payload={
-                "event": "feed.unhealthy",
-                "feed_url": d["feed_url"],
-                "feed_name": d["feed_name"],
-                "reason": d["reason"],
-                "last_ok_at": d.get("last_ok_at"),
-                "ts": d["ts"],
-            })
+            await bus.publish(
+                "feed.unhealthy",
+                item_id=item_id,
+                payload={
+                    "event": "feed.unhealthy",
+                    "feed_url": d["feed_url"],
+                    "feed_name": d["feed_name"],
+                    "reason": d["reason"],
+                    "last_ok_at": d.get("last_ok_at"),
+                    "ts": d["ts"],
+                },
+            )
     finally:
         await bus.close()
 
 
 # --- FastAPI app (HTTP layer on :22032) ---
 app = FastAPI(title="opml-health", version="0.1.0")
+
 
 @app.get("/health")
 async def health() -> Response:
@@ -154,10 +165,16 @@ async def report() -> dict:
 # --- standalone entry ---
 async def run_main() -> None:
     """Async entry: probe, emit unhealthy events, exit."""
-    ap = argparse.ArgumentParser(description="opml-health: probe feeds, emit unhealthy events")
+    ap = argparse.ArgumentParser(
+        description="opml-health: probe feeds, emit unhealthy events"
+    )
     ap.add_argument("--opml", default=None, help="path to feeds.opml")
-    ap.add_argument("--no-emit", action="store_true", help="probe but don't emit to RabbitMQ")
-    ap.add_argument("--since-hours", type=float, default=24, help="flag feeds silent > N hours")
+    ap.add_argument(
+        "--no-emit", action="store_true", help="probe but don't emit to RabbitMQ"
+    )
+    ap.add_argument(
+        "--since-hours", type=float, default=24, help="flag feeds silent > N hours"
+    )
     args = ap.parse_args()
 
     results, unhealthy = run_health_check(opml_path=args.opml)

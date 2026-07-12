@@ -204,11 +204,13 @@ class InMemoryStore:
             # Preserve existing embedding if new embedding is None.
             if embedding is None:
                 embedding = existing.get("embedding")
-            existing.update({
-                "name": name,
-                "type": type,
-                "embedding": embedding,
-            })
+            existing.update(
+                {
+                    "name": name,
+                    "type": type,
+                    "embedding": embedding,
+                }
+            )
             return existing["id"]
         entity_id = str(len(self._entities) + 1)
         self._entities[key] = {
@@ -257,7 +259,9 @@ class InMemoryStore:
             return {"entity_id": best_id, "name": best_name}
         return None
 
-    def link_entity(self, entity_id: str, item_id: str, mention: str, lang: str) -> None:
+    def link_entity(
+        self, entity_id: str, item_id: str, mention: str, lang: str
+    ) -> None:
         """Link an entity to an item with the surface mention and mention language."""
         key = (entity_id, item_id, mention)
         if key not in self._entity_links:
@@ -275,11 +279,13 @@ class InMemoryStore:
             if link["item_id"] == item_id:
                 entity = self.get_entity(link["entity_id"])
                 if entity is not None:
-                    results.append({
-                        "entity_id": link["entity_id"],
-                        "name": entity["name"],
-                        "mention": link["mention"],
-                        "lang": link["lang"],
-                    })
+                    results.append(
+                        {
+                            "entity_id": link["entity_id"],
+                            "name": entity["name"],
+                            "mention": link["mention"],
+                            "lang": link["lang"],
+                        }
+                    )
         results.sort(key=lambda r: (r["name"], r["mention"]))
         return results

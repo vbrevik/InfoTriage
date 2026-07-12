@@ -14,7 +14,9 @@ import math
 import sys
 import unittest
 
-sys.path.insert(0, __import__("os").path.join(__import__("os").path.dirname(__file__), ".."))
+sys.path.insert(
+    0, __import__("os").path.join(__import__("os").path.dirname(__file__), "..")
+)
 
 from apps.brief.clustering import (
     EnrichedItem,
@@ -125,18 +127,46 @@ class TestMultipleClusters(unittest.TestCase):
 
     def test_two_merge_two_singleton(self):
         items = [
-            _item(item_id="1", title="A", summary="m", why="w",
-                  ccir="PIR-1", cnr="I", score=9,
-                  embedding=[1.0, 0.0, 0.0, 0.0]),
-            _item(item_id="2", title="B", summary="m", why="w",
-                  ccir="PIR-1", cnr="I", score=8,
-                  embedding=[0.9, 0.1, 0.0, 0.0]),
-            _item(item_id="3", title="C", summary="m", why="w",
-                  ccir="PIR-1", cnr="I", score=7,
-                  embedding=[0.0, 1.0, 0.0, 0.0]),
-            _item(item_id="4", title="D", summary="m", why="w",
-                  ccir="PIR-1", cnr="I", score=6,
-                  embedding=[0.0, 0.0, 1.0, 0.0]),
+            _item(
+                item_id="1",
+                title="A",
+                summary="m",
+                why="w",
+                ccir="PIR-1",
+                cnr="I",
+                score=9,
+                embedding=[1.0, 0.0, 0.0, 0.0],
+            ),
+            _item(
+                item_id="2",
+                title="B",
+                summary="m",
+                why="w",
+                ccir="PIR-1",
+                cnr="I",
+                score=8,
+                embedding=[0.9, 0.1, 0.0, 0.0],
+            ),
+            _item(
+                item_id="3",
+                title="C",
+                summary="m",
+                why="w",
+                ccir="PIR-1",
+                cnr="I",
+                score=7,
+                embedding=[0.0, 1.0, 0.0, 0.0],
+            ),
+            _item(
+                item_id="4",
+                title="D",
+                summary="m",
+                why="w",
+                ccir="PIR-1",
+                cnr="I",
+                score=6,
+                embedding=[0.0, 0.0, 1.0, 0.0],
+            ),
         ]
         clusters = cluster_items_in_memory(items, threshold=0.75)
         self.assertEqual(len(clusters), 3, "Expected 3 clusters")
@@ -164,20 +194,24 @@ class TestCcirBoundary(unittest.TestCase):
     def test_no_cross_ccir_clustering(self):
         # Create 5 items: 2 in PIR-1 (similar), 2 in PIR-2 (similar), 1 in PIR-3
         items = []
-        for i, (ccir_id, emb) in enumerate([
-            ("PIR-1", [0.9, 0.1, 0.0, 0.0]),
-            ("PIR-1", [0.85, 0.12, 0.03, 0.0]),  # similar to first
-            ("PIR-2", [0.9, 0.1, 0.0, 0.0]),      # same embedding but different CCIR
-            ("PIR-2", [0.88, 0.08, 0.04, 0.0]),   # similar to previous CCIR-2
-            ("PIR-3", [0.1, 0.1, 0.7, 0.1]),
-        ]):
-            items.append(_item(
-                item_id=str(i),
-                title=f"A{i}",
-                ccir=ccir_id,
-                score=9 - i,
-                embedding=emb,
-            ))
+        for i, (ccir_id, emb) in enumerate(
+            [
+                ("PIR-1", [0.9, 0.1, 0.0, 0.0]),
+                ("PIR-1", [0.85, 0.12, 0.03, 0.0]),  # similar to first
+                ("PIR-2", [0.9, 0.1, 0.0, 0.0]),  # same embedding but different CCIR
+                ("PIR-2", [0.88, 0.08, 0.04, 0.0]),  # similar to previous CCIR-2
+                ("PIR-3", [0.1, 0.1, 0.7, 0.1]),
+            ]
+        ):
+            items.append(
+                _item(
+                    item_id=str(i),
+                    title=f"A{i}",
+                    ccir=ccir_id,
+                    score=9 - i,
+                    embedding=emb,
+                )
+            )
 
         clusters = cluster_items_in_memory(items, threshold=0.75)
 
@@ -202,12 +236,9 @@ class TestSingleItemCluster(unittest.TestCase):
 
     def test_all_singletons(self):
         items = [
-            _item(item_id="1", ccir="PIR-1", score=9,
-                  embedding=[1.0, 0.0, 0.0, 0.0]),
-            _item(item_id="2", ccir="PIR-1", score=8,
-                  embedding=[0.0, 1.0, 0.0, 0.0]),
-            _item(item_id="3", ccir="PIR-1", score=7,
-                  embedding=[0.0, 0.0, 1.0, 0.0]),
+            _item(item_id="1", ccir="PIR-1", score=9, embedding=[1.0, 0.0, 0.0, 0.0]),
+            _item(item_id="2", ccir="PIR-1", score=8, embedding=[0.0, 1.0, 0.0, 0.0]),
+            _item(item_id="3", ccir="PIR-1", score=7, embedding=[0.0, 0.0, 1.0, 0.0]),
         ]
         clusters = cluster_items_in_memory(items, threshold=0.75)
         self.assertEqual(len(clusters), 3)
@@ -216,7 +247,9 @@ class TestSingleItemCluster(unittest.TestCase):
 
     def test_missing_embedding_passes_through_as_singleton(self):
         items = [
-            _item(item_id="with-embedding", ccir="PIR-1", score=9, embedding=[1.0, 0.0]),
+            _item(
+                item_id="with-embedding", ccir="PIR-1", score=9, embedding=[1.0, 0.0]
+            ),
             EnrichedItem(
                 item_id="without-embedding",
                 title="No embedding",

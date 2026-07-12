@@ -71,8 +71,8 @@ class RabbitMQBus:
         self._exchange: aio_pika.RobustExchange | None = None
         self._dlx: aio_pika.RobustExchange | None = None
         self._dlq: aio_pika.RobustQueue | None = None
-        self._queues: dict[str, aio_pika.RobustQueue] = {}   # routing_key → queue
-        self._consumers: list[Any] = []   # active consumer tags for clean shutdown
+        self._queues: dict[str, aio_pika.RobustQueue] = {}  # routing_key → queue
+        self._consumers: list[Any] = []  # active consumer tags for clean shutdown
         self._dedup_lock = asyncio.Lock()
         self._seen: set[tuple[str, str]] = set()
 
@@ -94,7 +94,9 @@ class RabbitMQBus:
             except Exception as e:
                 # Check for topology mismatch (406 PRECONDITION_FAILED) before generic retry
                 if "406" in str(e) or "PRECONDITION_FAILED" in str(e):
-                    log.warning("Topology mismatch detected — rebuilding (migration): %s", e)
+                    log.warning(
+                        "Topology mismatch detected — rebuilding (migration): %s", e
+                    )
                     try:
                         await self._rebuild_topology()
                         break
@@ -163,7 +165,7 @@ class RabbitMQBus:
                 durable=True,
                 arguments={
                     "x-dead-letter-exchange": DLX_NAME,
-                    "x-dead-letter-routing-key": DLQ_ROUTING_KEY,   # "dead" for all queues
+                    "x-dead-letter-routing-key": DLQ_ROUTING_KEY,  # "dead" for all queues
                 },
             )
             await queue.bind(self._exchange, rk)

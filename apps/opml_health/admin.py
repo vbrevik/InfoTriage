@@ -2,6 +2,7 @@
 
 Polls all containerized services' /health endpoints and returns aggregated status.
 """
+
 import asyncio
 import logging
 import os
@@ -68,10 +69,7 @@ async def admin_health() -> dict:
         }
     """
     results: dict[str, dict] = {}
-    coros = [
-        _probe_health(host, port, path)
-        for name, host, port, path in SERVICES
-    ]
+    coros = [_probe_health(host, port, path) for name, host, port, path in SERVICES]
     gathered = await asyncio.gather(*coros, return_exceptions=True)
 
     for i, res in enumerate(gathered):
@@ -93,7 +91,9 @@ async def admin_health() -> dict:
 
     log.info(
         "Health check: %d up, %d down, overall=%s",
-        up, down, overall,
+        up,
+        down,
+        overall,
     )
 
     return {

@@ -107,9 +107,9 @@ class PostgresStore:
         connections serialize access internally, so cursors from multiple
         threads (asyncio.to_thread callers) are safe.
         """
-        assert self._conn is not None, (
-            "PostgresStore used outside 'with' block — connection not open"
-        )
+        assert (
+            self._conn is not None
+        ), "PostgresStore used outside 'with' block — connection not open"
         if row_factory is None:
             return self._conn.cursor()
         return self._conn.cursor(row_factory=row_factory)
@@ -196,9 +196,7 @@ class PostgresStore:
 
     def get_item(self, item_id: str) -> Item | None:
         """Return the Item for item_id, or None on miss. Never raises on absence."""
-        assert self._conn is not None, (
-            "PostgresStore must be used as a context manager"
-        )
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
         row = self._conn.execute(
             """
             SELECT source, source_type, url, title, ts, lang, summary, body_ref, payload
@@ -234,9 +232,7 @@ class PostgresStore:
                             Uses psycopg3 ANY(%s) for safe list params (Open Q3).
             limit: max items returned (T-02-05 DoS mitigation).
         """
-        assert self._conn is not None, (
-            "PostgresStore must be used as a context manager"
-        )
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
         if source_type_in is not None:
             rows = self._conn.execute(
                 """
@@ -354,9 +350,7 @@ class PostgresStore:
 
     def get_enrichment(self, item_id: str) -> "dict | None":
         """Return enrichment dict for item_id, or None if absent."""
-        assert self._conn is not None, (
-            "PostgresStore must be used as a context manager"
-        )
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
         row = self._conn.execute(
             """
             SELECT ccir, cnr, score, bucket, why, pmesii, tessoc
@@ -389,9 +383,7 @@ class PostgresStore:
         (006-enrichment.sql). Second write updates the stored vector in place.
         Security (V5/T-05-01): all values via %s bind params; vector never interpolated.
         """
-        assert self._conn is not None, (
-            "PostgresStore must be used as a context manager"
-        )
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
         model = "intfloat/multilingual-e5-large"
         self._conn.execute(
             """
@@ -420,9 +412,7 @@ class PostgresStore:
 
         cosine_distance = 1 - cosine_similarity, so threshold 0.84 → distance < 0.16.
         """
-        assert self._conn is not None, (
-            "PostgresStore must be used as a context manager"
-        )
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
         # INTERVAL %s is invalid Postgres syntax; CAST(%s AS interval) is the correct
         # parameterized form. The string "7 days" is a valid interval literal.
         row = self._conn.execute(
@@ -458,9 +448,7 @@ class PostgresStore:
         A None embedding is stored as NULL and does not overwrite an existing vector
         (COALESCE preserves the prior vector).
         """
-        assert self._conn is not None, (
-            "PostgresStore must be used as a context manager"
-        )
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
         # Convert empty list to None so psycopg inserts NULL, not an empty vector.
         if embedding is not None and len(embedding) == 0:
             embedding = None
@@ -481,9 +469,7 @@ class PostgresStore:
 
     def get_entity(self, entity_id: str) -> "dict | None":
         """Return entity dict for entity_id, or None if absent."""
-        assert self._conn is not None, (
-            "PostgresStore must be used as a context manager"
-        )
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
         row = self._conn.execute(
             """
             SELECT id, name, name_norm, lang, type, embedding
@@ -506,9 +492,7 @@ class PostgresStore:
 
     def get_entity_by_name_norm(self, name_norm: str, lang: str) -> "dict | None":
         """Return entity dict for (name_norm, lang), or None if absent."""
-        assert self._conn is not None, (
-            "PostgresStore must be used as a context manager"
-        )
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
         row = self._conn.execute(
             """
             SELECT id, name, name_norm, lang, type, embedding
@@ -540,9 +524,7 @@ class PostgresStore:
         infotriage.entities.embedding. Only entities with non-NULL embeddings are
         considered.
         """
-        assert self._conn is not None, (
-            "PostgresStore must be used as a context manager"
-        )
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
         row = self._conn.execute(
             """
             SELECT id, name, (embedding <=> %s::vector) AS dist
@@ -561,14 +543,14 @@ class PostgresStore:
             }
         return None
 
-    def link_entity(self, entity_id: str, item_id: str, mention: str, lang: str) -> None:
+    def link_entity(
+        self, entity_id: str, item_id: str, mention: str, lang: str
+    ) -> None:
         """Link an entity to an item with the surface mention and mention language.
 
         Idempotent: duplicate (entity_id, item_id, mention) links are ignored.
         """
-        assert self._conn is not None, (
-            "PostgresStore must be used as a context manager"
-        )
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
         self._conn.execute(
             """
             INSERT INTO infotriage.entity_links (entity_id, item_id, mention, lang)
@@ -581,9 +563,7 @@ class PostgresStore:
 
     def get_entity_links(self, item_id: str) -> list[dict]:
         """Return entity-link rows for item_id joined to canonical entity names."""
-        assert self._conn is not None, (
-            "PostgresStore must be used as a context manager"
-        )
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
         rows = self._conn.execute(
             """
             SELECT el.entity_id, e.name, el.mention, el.lang

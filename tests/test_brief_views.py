@@ -150,7 +150,9 @@ class TestCaseInsensitiveNormalization(unittest.TestCase):
         # case-insensitive (tessoc.lower()) to correctly reject it.
         rows = [_make_item(ccir="PIR-1", pmesii="military", tessoc="none")]
         result = filter_rows(rows, "cip")
-        self.assertEqual(result, [], 'tessoc="none" must not be treated as a real TESSOC label')
+        self.assertEqual(
+            result, [], 'tessoc="none" must not be treated as a real TESSOC label'
+        )
 
     def test_crp_accepts_lowercase_user_param(self):
         rows = [_make_item(pmesii="Military")]

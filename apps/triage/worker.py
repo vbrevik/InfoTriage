@@ -36,6 +36,7 @@ HEALTH_PORT = 22030
 # Embedding call (mirrors triage_score.llm() exactly — same env vars, ADR-004)
 # ---------------------------------------------------------------------------
 
+
 def get_embedding(text: str) -> list[float]:
     """POST text to LLM_BASE_URL + '/embeddings' (local oMLX/Spark — no cloud host).
 
@@ -44,14 +45,17 @@ def get_embedding(text: str) -> list[float]:
     """
     base = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:8000/v1")
     key = os.environ.get("LLM_API_KEY", "omlx")
-    body = json.dumps({
-        "model": "intfloat/multilingual-e5-large",
-        "input": text,
-    }).encode()
+    body = json.dumps(
+        {
+            "model": "intfloat/multilingual-e5-large",
+            "input": text,
+        }
+    ).encode()
     req = urllib.request.Request(
-        base.rstrip("/") + "/embeddings", data=body,
-        headers={"Content-Type": "application/json",
-                 "Authorization": f"Bearer {key}"})
+        base.rstrip("/") + "/embeddings",
+        data=body,
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"},
+    )
     with urllib.request.urlopen(req, timeout=120) as r:
         return json.load(r)["data"][0]["embedding"]
 
@@ -61,6 +65,7 @@ def get_embedding(text: str) -> list[float]:
 # Enrichment rows store RAW vocabulary (cnr none|I|II, bucket read|maybe|skip);
 # these mappers are applied ONLY when constructing the VerdictReady event.
 # ---------------------------------------------------------------------------
+
 
 def map_cnr(cnr: str) -> str:
     """Map raw score_item cnr ('none'|'I'|'II') to VerdictReady's Literal."""
@@ -88,7 +93,10 @@ def clamp_score(value) -> int:
 # process_item — the testable async core (R2, R3, R4, R5)
 # ---------------------------------------------------------------------------
 
-async def process_item(item_id, store, bus, *, embed=get_embedding, score=score_item) -> None:
+
+async def process_item(
+    item_id, store, bus, *, embed=get_embedding, score=score_item
+) -> None:
     """Fetch, dedup, score, persist, and publish a single item.ingested item.
 
     Each blocking call (store I/O, embedding HTTP call, LLM HTTP call) runs via
@@ -103,7 +111,9 @@ async def process_item(item_id, store, bus, *, embed=get_embedding, score=score_
     """
     item = await asyncio.to_thread(store.get_item, item_id)
     if item is None:
-        log.warning("item.ingested for unknown item_id=%s — acking, nothing to score", item_id)
+        log.warning(
+            "item.ingested for unknown item_id=%s — acking, nothing to score", item_id
+        )
         return
 
     text = item.title + " " + (item.summary or "")[:512]
@@ -112,8 +122,13 @@ async def process_item(item_id, store, bus, *, embed=get_embedding, score=score_
 
     if dup:
         fields = {
-            "ccir": "none", "cnr": "none", "score": 0, "bucket": "skip",
-            "why": f"duplicate of {dup}", "pmesii": "none", "tessoc": "none",
+            "ccir": "none",
+            "cnr": "none",
+            "score": 0,
+            "bucket": "skip",
+            "why": f"duplicate of {dup}",
+            "pmesii": "none",
+            "tessoc": "none",
         }
     else:
         result = await asyncio.to_thread(
@@ -139,7 +154,9 @@ async def process_item(item_id, store, bus, *, embed=get_embedding, score=score_
     # prevent the verdict.ready event from being published.
     try:
         entity_text = item.title + " " + (item.summary or "")
-        await resolve_entities_async(item_id, entity_text, item.lang or "en", store, embed)
+        await resolve_entities_async(
+            item_id, entity_text, item.lang or "en", store, embed
+        )
     except Exception as exc:
         log.warning("entity resolution failed for item_id=%s: %s", item_id, exc)
 
@@ -159,6 +176,7 @@ async def process_item(item_id, store, bus, *, embed=get_embedding, score=score_
 # ---------------------------------------------------------------------------
 # on_message — RabbitMQ consumer callback (D-03)
 # ---------------------------------------------------------------------------
+
 
 async def on_message(message, store, bus) -> None:
     """Decode an item.ingested message and run process_item; ack only on clean exit.
@@ -180,6 +198,7 @@ async def on_message(message, store, bus) -> None:
 # run_consumer — wires on_message to the bus's persistent consumer (D-01, D-03)
 # ---------------------------------------------------------------------------
 
+
 async def run_consumer(bus, store) -> None:
     """Register the item.ingested consumer and run forever.
 
@@ -199,7 +218,10 @@ async def run_consumer(bus, store) -> None:
 # run_health_server — stdlib liveness-only /health (D-04, filled in Task 3)
 # ---------------------------------------------------------------------------
 
-async def _handle_health(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+
+async def _handle_health(
+    reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+) -> None:
     """Connection handler for the liveness-only /health endpoint (D-04).
 
     Module-level (not nested) so tests can drive it directly via
@@ -232,6 +254,7 @@ async def run_health_server(host: str = HEALTH_HOST, port: int = HEALTH_PORT) ->
 # ---------------------------------------------------------------------------
 # main — D-03: asyncio.gather of consumer + health server under asyncio.run
 # ---------------------------------------------------------------------------
+
 
 async def main() -> None:
     pg_dsn = os.environ["INFOTRIAGE_PG_DSN"]

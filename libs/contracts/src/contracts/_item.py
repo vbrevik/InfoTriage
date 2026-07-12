@@ -22,11 +22,11 @@ class Item(BaseModel):
     """
 
     # Core fields
-    source: str           # human-readable source name ("NRK Nyheter")
-    source_type: str      # machine-readable type ("rss", "imap", "yt")
-    url: str = ""         # empty string when absent (per SPEC R1)
+    source: str  # human-readable source name ("NRK Nyheter")
+    source_type: str  # machine-readable type ("rss", "imap", "yt")
+    url: str = ""  # empty string when absent (per SPEC R1)
     title: str
-    ts: AwareDatetime     # requires tz-aware — naive datetime raises ValidationError
+    ts: AwareDatetime  # requires tz-aware — naive datetime raises ValidationError
     lang: str
 
     # Content fields
@@ -34,7 +34,7 @@ class Item(BaseModel):
     body_ref: Optional[str] = None
 
     # Rich / open
-    payload: dict = {}    # open dict — Phase 5 writes ccir, cnr, score, bucket, why
+    payload: dict = {}  # open dict — Phase 5 writes ccir, cnr, score, bucket, why
     attachments: list = []
 
     @computed_field

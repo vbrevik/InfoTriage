@@ -47,9 +47,9 @@ async def process_verdict(
     cluster_threshold: float = 0.75,
 ) -> SabPublished | None:
     """Process a verdict.ready for item_id: fetch enrichment, render SAB, publish event.
-    
+
     Returns the SabPublished event on success, None if item not found.
-    
+
     R1: Consumes verdict.ready from q.brief
     R2: Renders brief.md, cluster.md, list.md, bluf.md from Postgres enrichment rows
     R5: Publishes SabPublished with topic BLUFs and item refs
@@ -85,7 +85,7 @@ async def process_verdict(
 
     # Map row to enrichment dict
     from psycopg.rows import dict_row  # noqa: E402
-    
+
     def _fetch_all():
         with store.cursor(row_factory=dict_row) as cur:
             try:
@@ -119,7 +119,9 @@ async def process_verdict(
         """Render the four digest files for a given row set."""
         brief_md, cluster_md, list_md, bluf_md = await asyncio.gather(
             asyncio.to_thread(render_brief, rows, cluster_threshold=cluster_threshold),
-            asyncio.to_thread(render_cluster, rows, cluster_threshold=cluster_threshold),
+            asyncio.to_thread(
+                render_cluster, rows, cluster_threshold=cluster_threshold
+            ),
             asyncio.to_thread(render_list, rows),
             asyncio.to_thread(_render_bluf_all_sections, rows),
         )
@@ -147,25 +149,36 @@ async def process_verdict(
     # Write Obsidian vault projection (SC2, SC3)
     vault_dir = Path(os.environ.get("INFOTRIAGE_VAULT_PATH", "data/obsidian"))
     await asyncio.to_thread(
-        write_vault_digest, enrichment_rows, vault_dir,
-        write_items=True, sab_filename="obsidian-sab.md",
+        write_vault_digest,
+        enrichment_rows,
+        vault_dir,
+        write_items=True,
+        sab_filename="obsidian-sab.md",
     )
     await asyncio.to_thread(
-        write_vault_digest, cop_rows, vault_dir,
-        write_items=False, sab_filename="obsidian-sab-cop.md",
+        write_vault_digest,
+        cop_rows,
+        vault_dir,
+        write_items=False,
+        sab_filename="obsidian-sab-cop.md",
     )
     await asyncio.to_thread(
-        write_vault_digest, cip_rows, vault_dir,
-        write_items=False, sab_filename="obsidian-sab-cip.md",
+        write_vault_digest,
+        cip_rows,
+        vault_dir,
+        write_items=False,
+        sab_filename="obsidian-sab-cip.md",
     )
     log.info("wrote Obsidian vault projections (default, cop, cip)")
 
     # Publish SabPublished event
-    ccir_topics = sorted({
-        (r.get("ccir") or "none").upper()
-        for r in enrichment_rows
-        if (r.get("ccir") or "none").lower() != "none"
-    })
+    ccir_topics = sorted(
+        {
+            (r.get("ccir") or "none").upper()
+            for r in enrichment_rows
+            if (r.get("ccir") or "none").lower() != "none"
+        }
+    )
 
     # Count bluf topics (topics that got a BLUF)
     bluf_by_topic: dict[str, str] = {}
@@ -174,7 +187,7 @@ async def process_verdict(
         if ccir in ccir_topics and r.get("score", 0) >= 8:
             if ccir not in bluf_by_topic:
                 bluf_by_topic[ccir] = "_(awaiting LLM synthesis)_"
-    
+
     item_refs = [
         {
             "item_id": r["item_id"],
@@ -191,7 +204,9 @@ async def process_verdict(
 
     event = SabPublished(
         event="sab.published",
-        pub_ts=__import__("datetime").datetime.now(tz=__import__("datetime").timezone.utc),
+        pub_ts=__import__("datetime").datetime.now(
+            tz=__import__("datetime").timezone.utc
+        ),
         snapshot_day=snap_day,
         ccir_topics=ccir_topics,
         bluf_by_topic=bluf_by_topic,
@@ -204,7 +219,9 @@ async def process_verdict(
         item_id,
         event.model_dump(mode="json"),
     )
-    log.info("published SabPublished for day=%s, %d items", snap_day, len(enrichment_rows))
+    log.info(
+        "published SabPublished for day=%s, %d items", snap_day, len(enrichment_rows)
+    )
     return event
 
 
@@ -213,14 +230,14 @@ def _render_bluf_all_sections(enrichment_rows: list[dict]) -> str:
     # un-awaited coroutine to write_text (TypeError: data must be str)
     """Render BLUF for all CCIR sections with items score >= 8."""
     from apps.brief.renderer import CCIR_ORDER, render_bluf  # noqa: E402
-    
+
     lines = ["# InfoTriage · BLUF", ""]
     by_ccir: dict[str, list[dict]] = {}
     for r in enrichment_rows:
         ccir = (r.get("ccir") or "none").upper()
         if ccir in dict(CCIR_ORDER) and r.get("score", 0) >= 8:
             by_ccir.setdefault(ccir, []).append(r)
-    
+
     for ccir, title in CCIR_ORDER:
         items = by_ccir.get(ccir, [])
         if not items:
@@ -231,7 +248,7 @@ def _render_bluf_all_sections(enrichment_rows: list[dict]) -> str:
         lines.append(f"## {ccir} · {title}")
         lines.append(bluf)
         lines.append("")
-    
+
     return "\n".join(lines)
 
 
@@ -240,15 +257,17 @@ def _render_bluf_all_sections(enrichment_rows: list[dict]) -> str:
 # ---------------------------------------------------------------------------
 
 
-async def on_verdict_message(message, store, bus, *, cluster_threshold: float = 0.75) -> None:
+async def on_verdict_message(
+    message, store, bus, *, cluster_threshold: float = 0.75
+) -> None:
     """Decode a verdict.ready message and run process_verdict.
-    
+
     message.process() acks on clean return, nacks (requeue=False -> DLQ) on error.
     """
     async with message.process():
         item_id = message.headers["item_id"]
         log.info("verdict.ready item_id=%s", item_id)
-        
+
         snap_day = __import__("datetime").date.today().isoformat()
         try:
             await process_verdict(
@@ -259,7 +278,9 @@ async def on_verdict_message(message, store, bus, *, cluster_threshold: float = 
                 cluster_threshold=cluster_threshold,
             )
         except Exception as e:
-            log.error("process_verdict failed for item_id=%s: %s", item_id, e, exc_info=True)
+            log.error(
+                "process_verdict failed for item_id=%s: %s", item_id, e, exc_info=True
+            )
             raise  # re-raise so message.process() nacks
 
 
@@ -273,7 +294,9 @@ async def run_consumer(bus, store, *, cluster_threshold: float = 0.75) -> None:
     await bus._ensure_connection()
 
     async def _handler(message) -> None:
-        await on_verdict_message(message, store, bus, cluster_threshold=cluster_threshold)
+        await on_verdict_message(
+            message, store, bus, cluster_threshold=cluster_threshold
+        )
 
     await bus.consume("verdict.ready", _handler, prefetch_count=1)
     await asyncio.Future()  # run forever

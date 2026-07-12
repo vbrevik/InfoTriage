@@ -24,7 +24,7 @@ from worker import on_message, process_item
 # Fixtures + helpers
 # ---------------------------------------------------------------------------
 
-VEC_A = [1.0, 0.0]   # orthogonal to VEC_B (cosine 0.0) — never a false dedup match
+VEC_A = [1.0, 0.0]  # orthogonal to VEC_B (cosine 0.0) — never a false dedup match
 VEC_B = [0.0, 1.0]
 
 
@@ -35,7 +35,9 @@ class FakeBus:
         self.published: list[dict] = []
 
     async def publish(self, routing_key: str, item_id: str, payload: dict) -> None:
-        self.published.append({"routing_key": routing_key, "item_id": item_id, "payload": payload})
+        self.published.append(
+            {"routing_key": routing_key, "item_id": item_id, "payload": payload}
+        )
 
 
 class FakeMessage:
@@ -97,6 +99,7 @@ def bus():
 # Tests
 # ---------------------------------------------------------------------------
 
+
 def test_missing_article_acks(store, bus):
     """process_item for an absent item_id logs a warning and returns normally — no crash."""
     asyncio.run(
@@ -123,11 +126,20 @@ def test_enrichment_failure_nacks(store, bus):
     store.put_enrichment = _raise
 
     score = _fake_score(
-        {"ccir": "PIR-1", "cnr": "II", "score": 6, "bucket": "maybe",
-         "why": "test", "pmesii": "Military", "tessoc": "Terror"}
+        {
+            "ccir": "PIR-1",
+            "cnr": "II",
+            "score": 6,
+            "bucket": "maybe",
+            "why": "test",
+            "pmesii": "Military",
+            "tessoc": "Terror",
+        }
     )
     with pytest.raises(RuntimeError):
-        asyncio.run(process_item(item.id, store, bus, embed=lambda text: VEC_A, score=score))
+        asyncio.run(
+            process_item(item.id, store, bus, embed=lambda text: VEC_A, score=score)
+        )
     assert bus.published == []
 
 
@@ -142,11 +154,20 @@ def test_no_verdict_on_enrichment_failure(store, bus):
     store.put_enrichment = _raise
 
     score = _fake_score(
-        {"ccir": "PIR-1", "cnr": "II", "score": 6, "bucket": "maybe",
-         "why": "test", "pmesii": "Military", "tessoc": "Terror"}
+        {
+            "ccir": "PIR-1",
+            "cnr": "II",
+            "score": 6,
+            "bucket": "maybe",
+            "why": "test",
+            "pmesii": "Military",
+            "tessoc": "Terror",
+        }
     )
     with pytest.raises(RuntimeError):
-        asyncio.run(process_item(item.id, store, bus, embed=lambda text: VEC_A, score=score))
+        asyncio.run(
+            process_item(item.id, store, bus, embed=lambda text: VEC_A, score=score)
+        )
     assert len(bus.published) == 0
 
 
@@ -156,11 +177,18 @@ def test_malformed_llm_fallback(store, bus):
     store.put_item(item)
 
     fallback = {
-        "ccir": "none", "cnr": "none", "pmesii": "none", "tessoc": "none",
-        "score": 0, "bucket": "skip", "why": "uleselig modell-svar",
+        "ccir": "none",
+        "cnr": "none",
+        "pmesii": "none",
+        "tessoc": "none",
+        "score": 0,
+        "bucket": "skip",
+        "why": "uleselig modell-svar",
     }
     asyncio.run(
-        process_item(item.id, store, bus, embed=lambda text: VEC_A, score=_fake_score(fallback))
+        process_item(
+            item.id, store, bus, embed=lambda text: VEC_A, score=_fake_score(fallback)
+        )
     )
 
     enrichment = store.get_enrichment(item.id)
@@ -177,10 +205,21 @@ def test_score_clamped(store, bus):
     item_high = _item("High Score Item")
     store.put_item(item_high)
     score_high = _fake_score(
-        {"ccir": "PIR-1", "cnr": "II", "score": 42, "bucket": "maybe",
-         "why": "test", "pmesii": "Military", "tessoc": "Terror"}
+        {
+            "ccir": "PIR-1",
+            "cnr": "II",
+            "score": 42,
+            "bucket": "maybe",
+            "why": "test",
+            "pmesii": "Military",
+            "tessoc": "Terror",
+        }
     )
-    asyncio.run(process_item(item_high.id, store, bus, embed=lambda text: VEC_A, score=score_high))
+    asyncio.run(
+        process_item(
+            item_high.id, store, bus, embed=lambda text: VEC_A, score=score_high
+        )
+    )
     enrichment_high = store.get_enrichment(item_high.id)
     assert enrichment_high["score"] == 10
     assert bus.published[0]["payload"]["score"] == 10
@@ -188,10 +227,19 @@ def test_score_clamped(store, bus):
     item_low = _item("Negative Score Item")
     store.put_item(item_low)
     score_low = _fake_score(
-        {"ccir": "PIR-1", "cnr": "II", "score": -3, "bucket": "maybe",
-         "why": "test", "pmesii": "Military", "tessoc": "Terror"}
+        {
+            "ccir": "PIR-1",
+            "cnr": "II",
+            "score": -3,
+            "bucket": "maybe",
+            "why": "test",
+            "pmesii": "Military",
+            "tessoc": "Terror",
+        }
     )
-    asyncio.run(process_item(item_low.id, store, bus, embed=lambda text: VEC_B, score=score_low))
+    asyncio.run(
+        process_item(item_low.id, store, bus, embed=lambda text: VEC_B, score=score_low)
+    )
     enrichment_low = store.get_enrichment(item_low.id)
     assert enrichment_low["score"] == 0
     assert bus.published[1]["payload"]["score"] == 0
@@ -207,17 +255,29 @@ def test_dedup_skip(store, bus):
 
     def score(it):
         score_calls.append(it)
-        return {**it, "ccir": "PIR-1", "cnr": "II", "score": 7, "bucket": "maybe",
-                "why": "must not be used", "pmesii": "Military", "tessoc": "Terror"}
+        return {
+            **it,
+            "ccir": "PIR-1",
+            "cnr": "II",
+            "score": 7,
+            "bucket": "maybe",
+            "why": "must not be used",
+            "pmesii": "Military",
+            "tessoc": "Terror",
+        }
 
-    asyncio.run(process_item(item.id, store, bus, embed=lambda text: VEC_A, score=score))
+    asyncio.run(
+        process_item(item.id, store, bus, embed=lambda text: VEC_A, score=score)
+    )
 
     enrichment = store.get_enrichment(item.id)
     assert enrichment is not None
     assert enrichment["bucket"] == "skip"
     assert "duplicate" in enrichment["why"]
     assert score_calls == [], "score callable must NOT be called on a dedup hit"
-    assert store._embeddings.get(item.id) == VEC_A, "embedding must still be written for a duplicate"
+    assert (
+        store._embeddings.get(item.id) == VEC_A
+    ), "embedding must still be written for a duplicate"
     assert len(bus.published) == 1
     assert bus.published[0]["payload"]["bucket"] == "skip"
 
@@ -233,11 +293,23 @@ def test_dedup_distinct(store, bus):
 
     def score(it):
         score_calls.append(it)
-        return {**it, "ccir": "PIR-1", "cnr": "II", "score": 6, "bucket": "maybe",
-                "why": "distinct", "pmesii": "Military", "tessoc": "Terror"}
+        return {
+            **it,
+            "ccir": "PIR-1",
+            "cnr": "II",
+            "score": 6,
+            "bucket": "maybe",
+            "why": "distinct",
+            "pmesii": "Military",
+            "tessoc": "Terror",
+        }
 
-    asyncio.run(process_item(item_a.id, store, bus, embed=lambda text: VEC_A, score=score))
-    asyncio.run(process_item(item_b.id, store, bus, embed=lambda text: VEC_B, score=score))
+    asyncio.run(
+        process_item(item_a.id, store, bus, embed=lambda text: VEC_A, score=score)
+    )
+    asyncio.run(
+        process_item(item_b.id, store, bus, embed=lambda text: VEC_B, score=score)
+    )
 
     assert len(score_calls) == 2, "both distinct items must reach score()"
     enrichment_a = store.get_enrichment(item_a.id)
@@ -251,8 +323,15 @@ def test_entity_resolution_links_entities(store, bus):
     item = _item("NATO Summit in Oslo")
     store.put_item(item)
     score = _fake_score(
-        {"ccir": "PIR-3", "cnr": "II", "score": 7, "bucket": "maybe",
-         "why": "NATO toppmote", "pmesii": "Political", "tessoc": "Subversion"}
+        {
+            "ccir": "PIR-3",
+            "cnr": "II",
+            "score": 7,
+            "bucket": "maybe",
+            "why": "NATO toppmote",
+            "pmesii": "Political",
+            "tessoc": "Subversion",
+        }
     )
 
     def fake_embed(text):
@@ -276,10 +355,19 @@ def test_verdict_ready_fields(store, bus):
     item = _item("Normal Scored Item")
     store.put_item(item)
     score = _fake_score(
-        {"ccir": "PIR-3", "cnr": "II", "score": 7, "bucket": "maybe",
-         "why": "NATO toppmote", "pmesii": "Political", "tessoc": "Subversion"}
+        {
+            "ccir": "PIR-3",
+            "cnr": "II",
+            "score": 7,
+            "bucket": "maybe",
+            "why": "NATO toppmote",
+            "pmesii": "Political",
+            "tessoc": "Subversion",
+        }
     )
-    asyncio.run(process_item(item.id, store, bus, embed=lambda text: VEC_A, score=score))
+    asyncio.run(
+        process_item(item.id, store, bus, embed=lambda text: VEC_A, score=score)
+    )
 
     assert len(bus.published) == 1
     record = bus.published[0]
@@ -310,11 +398,15 @@ def test_on_message_reads_item_id_from_headers_not_body(store, bus, monkeypatch)
 
     message = FakeMessage(
         item.id,
-        {"source": item.source, "source_type": item.source_type, "ts": item.ts.isoformat()},
+        {
+            "source": item.source,
+            "source_type": item.source_type,
+            "ts": item.ts.isoformat(),
+        },
     )
-    assert "item_id" not in json.loads(message.body.decode()), (
-        "test fixture must match publish()'s real wire format: no item_id in body"
-    )
+    assert "item_id" not in json.loads(
+        message.body.decode()
+    ), "test fixture must match publish()'s real wire format: no item_id in body"
 
     asyncio.run(on_message(message, store, bus))
 

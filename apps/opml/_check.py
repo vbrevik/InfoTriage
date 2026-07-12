@@ -52,9 +52,11 @@ import xml.etree.ElementTree as ET
 # Must be pure ASCII: urllib sends the User-Agent header as a latin-1-encoded
 # byte string; any non-latin-1 codepoint (e.g. em-dash U+2014) raises
 # UnicodeEncodeError on EVERY probe. Keep this string ASCII only.
-DEFAULT_UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-              "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 "
-              "(FreshRSS-style; lawfaremedia/ISW sites still 403 -- known)")
+DEFAULT_UA = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 "
+    "(FreshRSS-style; lawfaremedia/ISW sites still 403 -- known)"
+)
 DEFAULT_TIMEOUT = 10
 DEFAULT_WORKERS = 8
 PROBE_BODY_BYTES = 2048  # enough to detect <rss>/<feed> in first 1-2 KB of any feed
@@ -71,11 +73,16 @@ def probe(url, ua=DEFAULT_UA, timeout=DEFAULT_TIMEOUT):
     are exactly what we want to detect (bot-block, retired URL, server down).
     """
     try:
-        req = urllib.request.Request(url, headers={
-            "User-Agent": ua,
-            "Accept": ("application/rss+xml,application/atom+xml,"
-                       "application/xml;q=0.9,text/xml;q=0.8,*/*;q=0.5"),
-        })
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": ua,
+                "Accept": (
+                    "application/rss+xml,application/atom+xml,"
+                    "application/xml;q=0.9,text/xml;q=0.8,*/*;q=0.5"
+                ),
+            },
+        )
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return r.status, r.headers.get("Content-Type", ""), r.read(PROBE_BODY_BYTES)
     except urllib.error.HTTPError as e:
@@ -198,14 +205,22 @@ def probe_and_classify(outline, ua, timeout):
 def run(opml_path, url_filter, ua, timeout, workers):
     """Probe every feed, render a markdown report. Pure: no side effects."""
     groups = load_opml(opml_path)
-    flat = [(cat, o) for cat, outlines in groups for o in filter_outlines(outlines, url_filter)]
+    flat = [
+        (cat, o)
+        for cat, outlines in groups
+        for o in filter_outlines(outlines, url_filter)
+    ]
     if not flat:
-        return f"# InfoTriage · feed health\n\nNo feeds match `--url-filter {url_filter!r}`.\n", []
+        return (
+            f"# InfoTriage · feed health\n\nNo feeds match `--url-filter {url_filter!r}`.\n",
+            [],
+        )
 
     results = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
-        futures = {ex.submit(probe_and_classify, o, ua, timeout): (cat, o)
-                   for cat, o in flat}
+        futures = {
+            ex.submit(probe_and_classify, o, ua, timeout): (cat, o) for cat, o in flat
+        }
         for fut in concurrent.futures.as_completed(futures):
             cat, _o = futures[fut]
             try:
@@ -232,14 +247,18 @@ def run(opml_path, url_filter, ua, timeout, workers):
     L = [
         f"# InfoTriage · feed health — {today}",
         "",
-        (f"_Probed {n_total} feeds · ✅ {n_ok} live · "
-         f"🟡 {n_transient} transient · "
-         f"⚠️ {n_warn} broken · ❌ {n_bad} unreachable_"),
+        (
+            f"_Probed {n_total} feeds · ✅ {n_ok} live · "
+            f"🟡 {n_transient} transient · "
+            f"⚠️ {n_warn} broken · ❌ {n_bad} unreachable_"
+        ),
         "",
-        ("**Status legend:** ✅ HTTP 200 + body is RSS/Atom XML · "
-         "🟡 HTTP 429 Too Many Requests (back off) · "
-         "⚠️ 403 / 404 / 200 with HTML body · "
-         "❌ 5xx / network error"),
+        (
+            "**Status legend:** ✅ HTTP 200 + body is RSS/Atom XML · "
+            "🟡 HTTP 429 Too Many Requests (back off) · "
+            "⚠️ 403 / 404 / 200 with HTML body · "
+            "❌ 5xx / network error"
+        ),
         "",
     ]
     for cat in cat_order:
@@ -271,11 +290,13 @@ def run(opml_path, url_filter, ua, timeout, workers):
         for cat, _o, text, url, emoji, reason in transients:
             L.append(f"- **{text}** ({cat}) — {reason} · {url}")
         L.append("")
-        L.append("_Recovery: rate-limit / slow FreshRSS so it doesn't hit the "
-                 "1 req / 5 s upstream cap. FreshRSS auto-removes feeds after "
-                 "N consecutive failures, so the goal is zero 429s — not just "
-                 "a longer interval. Do NOT drop or recreate — GDELT is alive, "
-                 "just throttled._")
+        L.append(
+            "_Recovery: rate-limit / slow FreshRSS so it doesn't hit the "
+            "1 req / 5 s upstream cap. FreshRSS auto-removes feeds after "
+            "N consecutive failures, so the goal is zero 429s — not just "
+            "a longer interval. Do NOT drop or recreate — GDELT is alive, "
+            "just throttled._"
+        )
         L.append("")
     if broken:
         L.append("---")
@@ -321,7 +342,8 @@ def emit_working_opml(results, out_path, today_str):
         out = ET.Element("opml", attrib={"version": "2.0"})
         head = ET.SubElement(out, "head")
         ET.SubElement(head, "title").text = (
-            f"InfoTriage — working feeds (probe-passed, {today_str})")
+            f"InfoTriage — working feeds (probe-passed, {today_str})"
+        )
         ET.SubElement(out, "body")
         tree = ET.ElementTree(out)
         with io.open(out_path, "wb") as f:
@@ -331,11 +353,11 @@ def emit_working_opml(results, out_path, today_str):
     out = ET.Element("opml", attrib={"version": "2.0"})
     head = ET.SubElement(out, "head")
     ET.SubElement(head, "title").text = (
-        f"InfoTriage — working feeds (probe-passed, {today_str})")
+        f"InfoTriage — working feeds (probe-passed, {today_str})"
+    )
     body = ET.SubElement(out, "body")
     for cat in cat_order:
-        cat_outline = ET.SubElement(body, "outline",
-                                    attrib={"text": cat, "title": cat})
+        cat_outline = ET.SubElement(body, "outline", attrib={"text": cat, "title": cat})
         for o in by_cat[cat]:
             # Preserve original xmlUrl, htmlUrl, type, etc.
             attrs = {k: v for k, v in o.attrib.items() if v is not None}
@@ -359,24 +381,43 @@ def main():
             stream.reconfigure(encoding="utf-8", errors="replace")
 
     ap = argparse.ArgumentParser(
-        description="Bulk health-check of every feed in opml/feeds.opml.")
-    ap.add_argument("--opml", default=OPML_HERE,
-                    help=f"path to feeds.opml (default: {OPML_HERE})")
-    ap.add_argument("--out", help="write markdown report to file (in addition to stdout)")
-    ap.add_argument("--url-filter",
-                    help="only probe feeds whose xmlUrl contains this substring")
+        description="Bulk health-check of every feed in opml/feeds.opml."
+    )
+    ap.add_argument(
+        "--opml", default=OPML_HERE, help=f"path to feeds.opml (default: {OPML_HERE})"
+    )
+    ap.add_argument(
+        "--out", help="write markdown report to file (in addition to stdout)"
+    )
+    ap.add_argument(
+        "--url-filter", help="only probe feeds whose xmlUrl contains this substring"
+    )
     ap.add_argument("--ua", default=DEFAULT_UA, help="User-Agent string")
-    ap.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT,
-                    help=f"per-feed timeout (sec, default {DEFAULT_TIMEOUT})")
-    ap.add_argument("--workers", type=int, default=DEFAULT_WORKERS,
-                    help=f"parallel probe workers (default {DEFAULT_WORKERS})")
-    ap.add_argument("--allow-broken", action="store_true",
-                    help="exit 0 even if ⚠️ feeds exist (informational run; dashboards etc.).")
-    ap.add_argument("--exit-on-error-only", action="store_true",
-                    help="exit 1 only on ❌ (5xx / network); 🟡 and ⚠️ exit 0. "
-                         "Use when transient 429s are not actionable in this CI "
-                         "run AND broken feeds are tolerated. Combine with "
-                         "--allow-broken for an always-exit-0 informational run.")
+    ap.add_argument(
+        "--timeout",
+        type=int,
+        default=DEFAULT_TIMEOUT,
+        help=f"per-feed timeout (sec, default {DEFAULT_TIMEOUT})",
+    )
+    ap.add_argument(
+        "--workers",
+        type=int,
+        default=DEFAULT_WORKERS,
+        help=f"parallel probe workers (default {DEFAULT_WORKERS})",
+    )
+    ap.add_argument(
+        "--allow-broken",
+        action="store_true",
+        help="exit 0 even if ⚠️ feeds exist (informational run; dashboards etc.).",
+    )
+    ap.add_argument(
+        "--exit-on-error-only",
+        action="store_true",
+        help="exit 1 only on ❌ (5xx / network); 🟡 and ⚠️ exit 0. "
+        "Use when transient 429s are not actionable in this CI "
+        "run AND broken feeds are tolerated. Combine with "
+        "--allow-broken for an always-exit-0 informational run.",
+    )
     args = ap.parse_args()
 
     md, results = run(args.opml, args.url_filter, args.ua, args.timeout, args.workers)
@@ -393,11 +434,14 @@ def main():
             # Markdown report + OPML XML have different formats; if the user
             # redirects --out and the auto-emit to the same path, one is
             # silently lost. Refuse with a clear message.
-            print(f"\nERROR: --out {args.out} resolves to the same path as the "
-                  f"auto-emitted opml/working.opml. These are different formats "
-                  f"(markdown vs. OPML 2.0) and cannot share a single file. "
-                  f"Either pass --out to a different path, or run with --url-filter "
-                  f"to suppress working.opml emission.", file=sys.stderr)
+            print(
+                f"\nERROR: --out {args.out} resolves to the same path as the "
+                f"auto-emitted opml/working.opml. These are different formats "
+                f"(markdown vs. OPML 2.0) and cannot share a single file. "
+                f"Either pass --out to a different path, or run with --url-filter "
+                f"to suppress working.opml emission.",
+                file=sys.stderr,
+            )
             sys.exit(2)
         with open(args.out, "w", encoding="utf-8") as f:
             f.write(md)
@@ -407,8 +451,9 @@ def main():
     # only) so it stays co-current with this report. Skipped when --url-filter
     # narrows the probe (we'd silently truncate the working file otherwise).
     if not args.url_filter:
-        emit_working_opml(results, working_path_default,
-                          datetime.date.today().isoformat())
+        emit_working_opml(
+            results, working_path_default, datetime.date.today().isoformat()
+        )
         print(f"\n_wrote {working_path_default}_", file=sys.stderr)
 
     # Exit policy (quad-state):
@@ -429,10 +474,11 @@ def main():
     if bad:
         sys.exit(1)
     if (warn or transient) and not args.exit_on_error_only:
-        n_attention = (md.count("| ⚠️ ") + md.count("| 🟡 ")
-                       + md.count("| ❌ "))
-        print(f"\n({n_attention} feeds need attention — run with --out for full report)",
-              file=sys.stderr)
+        n_attention = md.count("| ⚠️ ") + md.count("| 🟡 ") + md.count("| ❌ ")
+        print(
+            f"\n({n_attention} feeds need attention — run with --out for full report)",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
 

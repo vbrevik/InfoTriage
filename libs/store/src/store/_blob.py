@@ -65,7 +65,9 @@ def put_blob(root: Path, data: bytes) -> str:
     tmp = dest.with_suffix(".tmp")
     try:
         tmp.write_bytes(data)
-        os.replace(str(tmp), str(dest))  # atomic POSIX rename; NOT os.rename (anti-pattern)
+        os.replace(
+            str(tmp), str(dest)
+        )  # atomic POSIX rename; NOT os.rename (anti-pattern)
     except Exception:
         tmp.unlink(missing_ok=True)  # never leave a partial write on disk
         raise  # fail loud — caller must see the error
@@ -80,6 +82,8 @@ def get_blob(root: Path, blob_hash: str) -> bytes:
                     (path-traversal guard T-02-02 — validated before any I/O).
         FileNotFoundError: if no blob with that hash has been stored.
     """
-    _validate_hash(blob_hash)  # traversal guard first — no filesystem access before this
+    _validate_hash(
+        blob_hash
+    )  # traversal guard first — no filesystem access before this
     return _shard_path(root, blob_hash).read_bytes()
     # FileNotFoundError propagates — caller handles; we never swallow misses

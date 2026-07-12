@@ -9,6 +9,7 @@ Single source of truth for all InfoTriage apps:
     from contracts import setup_logging
     from contracts import LOGGING_CONFIG  # Phase 7 07-02: uvicorn JSON access logs
 """
+
 from ._item import Item
 from ._events import ItemIngested, VerdictReady, SabPublished, FeedUnhealthy
 from ._codec import to_frontmatter, from_frontmatter

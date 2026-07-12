@@ -10,6 +10,7 @@ Fires each adapter's POST /run on a per-adapter cron schedule.
 IMPORTANT: APScheduler 3.x jobs run in a thread-pool (no event loop).
 Use httpx.Client (SYNC) — async HTTP client is forbidden here (RESEARCH Pitfall 1).
 """
+
 import logging
 import os
 import time

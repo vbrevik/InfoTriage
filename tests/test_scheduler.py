@@ -3,6 +3,7 @@ tests/test_scheduler.py — R5: scheduler fires adapters; 409 logged as 'skipped
 
 APScheduler 3.x + sync httpx pattern verified here.
 """
+
 import logging
 import pathlib
 from unittest.mock import MagicMock, patch
@@ -13,6 +14,7 @@ import pytest
 # Import smoke: verify APScheduler 3.x import path (not 4.x)
 # ---------------------------------------------------------------------------
 
+
 def test_apscheduler_3x_import():
     """Regression: ensure we use 3.x BackgroundScheduler, not 4.x Scheduler."""
     from apscheduler.schedulers.background import BackgroundScheduler  # noqa: F401
@@ -22,6 +24,7 @@ def test_apscheduler_3x_import():
 # ---------------------------------------------------------------------------
 # fire_adapter behaviour
 # ---------------------------------------------------------------------------
+
 
 def _make_response(status_code: int) -> MagicMock:
     resp = MagicMock()
@@ -50,9 +53,9 @@ def test_fire_adapter_200_logs_started(caplog):
             mock_cls.return_value = _make_mock_client(post_return=_make_response(200))
             scheduler_main.fire_adapter("ingest-imap", "http://ingest-imap:8000/run")
 
-    assert any("started" in r.message for r in caplog.records), (
-        f"Expected 'started' in logs; got: {[r.message for r in caplog.records]}"
-    )
+    assert any(
+        "started" in r.message for r in caplog.records
+    ), f"Expected 'started' in logs; got: {[r.message for r in caplog.records]}"
 
 
 def test_fire_adapter_409_logs_skipped(caplog):
@@ -64,9 +67,9 @@ def test_fire_adapter_409_logs_skipped(caplog):
             mock_cls.return_value = _make_mock_client(post_return=_make_response(409))
             scheduler_main.fire_adapter("ingest-imap", "http://ingest-imap:8000/run")
 
-    assert any("skipped" in r.message for r in caplog.records), (
-        f"Expected 'skipped' in logs; got: {[r.message for r in caplog.records]}"
-    )
+    assert any(
+        "skipped" in r.message for r in caplog.records
+    ), f"Expected 'skipped' in logs; got: {[r.message for r in caplog.records]}"
 
 
 def test_fire_adapter_200_then_409_sequence(caplog):
@@ -117,25 +120,31 @@ def test_fire_adapter_connection_error_does_not_raise(caplog):
 def test_no_async_client_in_scheduler_main():
     """Regression: httpx.AsyncClient MUST NOT be used in scheduler_main (APScheduler 3.x jobs are threaded)."""
     import re
+
     src = pathlib.Path("apps/scheduler/scheduler_main.py").read_text()
     # Match actual usage/import of httpx.AsyncClient — comments referencing it are OK
-    assert not re.search(r"httpx\.AsyncClient", src), (
-        "scheduler_main.py must use httpx.Client (sync) — APScheduler 3.x jobs run in threads"
-    )
+    assert not re.search(
+        r"httpx\.AsyncClient", src
+    ), "scheduler_main.py must use httpx.Client (sync) — APScheduler 3.x jobs run in threads"
 
 
 def test_no_apscheduler4x_api_in_scheduler_main():
     """Regression: 4.x import 'from apscheduler import Scheduler' must not appear."""
     src = pathlib.Path("apps/scheduler/scheduler_main.py").read_text()
-    assert "from apscheduler import Scheduler" not in src, (
-        "Forbidden: 4.x APScheduler API detected in scheduler_main.py"
-    )
+    assert (
+        "from apscheduler import Scheduler" not in src
+    ), "Forbidden: 4.x APScheduler API detected in scheduler_main.py"
 
 
 def test_schedule_env_vars_referenced():
     """scheduler_main must reference all four SCHEDULE_* env vars."""
     src = pathlib.Path("apps/scheduler/scheduler_main.py").read_text()
-    for var in ("SCHEDULE_IMAP", "SCHEDULE_YOUTUBE", "SCHEDULE_GMAIL", "SCHEDULE_OBSIDIAN"):
+    for var in (
+        "SCHEDULE_IMAP",
+        "SCHEDULE_YOUTUBE",
+        "SCHEDULE_GMAIL",
+        "SCHEDULE_OBSIDIAN",
+    ):
         assert var in src, f"scheduler_main.py is missing env var reference: {var}"
 
 
@@ -143,6 +152,6 @@ def test_adapter_urls_use_internal_port():
     """All adapter URLs must use service name + internal port 8000 (not 2201x)."""
     src = pathlib.Path("apps/scheduler/scheduler_main.py").read_text()
     for name in ("ingest-imap", "ingest-youtube", "ingest-gmail", "ingest-obsidian"):
-        assert f"http://{name}:8000/run" in src, (
-            f"scheduler_main.py missing internal URL for {name}"
-        )
+        assert (
+            f"http://{name}:8000/run" in src
+        ), f"scheduler_main.py missing internal URL for {name}"

@@ -34,6 +34,7 @@ _id_counter = itertools.count(1)
 # Core JSON-RPC helpers
 # ---------------------------------------------------------------------------
 
+
 async def mcp_call(
     client: httpx.AsyncClient,
     session_id: str,
@@ -104,6 +105,7 @@ async def init_mcp_session(client: httpx.AsyncClient) -> str:
 # Read-only Gmail tool wrappers (list/get only — no mutating operations)
 # ---------------------------------------------------------------------------
 
+
 async def list_messages(
     client: httpx.AsyncClient,
     session_id: str,
@@ -128,6 +130,7 @@ async def list_messages(
     )
     # @shinzolabs/gmail-mcp wraps the result in content[0].text as JSON string
     import json as _json
+
     content = result.get("result", {}).get("content", [])
     if content and content[0].get("type") == "text":
         try:
@@ -161,6 +164,7 @@ async def get_message(
         },
     )
     import json as _json
+
     content = result.get("result", {}).get("content", [])
     if content and content[0].get("type") == "text":
         try:

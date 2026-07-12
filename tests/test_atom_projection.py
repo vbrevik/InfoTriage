@@ -22,6 +22,7 @@ from store import InMemoryStore, render_atom
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _ts(offset_seconds: int = 0) -> datetime.datetime:
     base = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
     return base + datetime.timedelta(seconds=offset_seconds)
@@ -37,7 +38,8 @@ def _item(
     return Item(
         source="Test Source",
         source_type=source_type,
-        url=url or f"https://example.com/{source_type}/{title.lower().replace(' ', '-')}",
+        url=url
+        or f"https://example.com/{source_type}/{title.lower().replace(' ', '-')}",
         title=title,
         ts=_ts(ts_offset),
         lang="en",
@@ -65,9 +67,12 @@ def empty_store(tmp_path):
 # Atom XML validity
 # ---------------------------------------------------------------------------
 
+
 def test_render_atom_is_bytes(mixed_store):
     result = render_atom(mixed_store)
-    assert isinstance(result, bytes), "render_atom must return bytes (feedgen Pitfall 6)"
+    assert isinstance(
+        result, bytes
+    ), "render_atom must return bytes (feedgen Pitfall 6)"
 
 
 def test_render_atom_is_parseable_xml(mixed_store):
@@ -88,6 +93,7 @@ def test_render_atom_is_atom_feed(mixed_store):
 # Content filtering (D-04a)
 # ---------------------------------------------------------------------------
 
+
 def test_rss_items_included(mixed_store):
     result = render_atom(mixed_store).decode("utf-8")
     assert "RSS Article One" in result, "RSS items must appear in Atom output"
@@ -100,9 +106,9 @@ def test_yt_items_included(mixed_store):
 
 def test_imap_items_excluded(mixed_store):
     result = render_atom(mixed_store).decode("utf-8")
-    assert "Email Subject One" not in result, (
-        "IMAP/email items must be excluded from Atom output (D-04a)"
-    )
+    assert (
+        "Email Subject One" not in result
+    ), "IMAP/email items must be excluded from Atom output (D-04a)"
 
 
 def test_only_rss_yt_in_output(tmp_path):
@@ -125,16 +131,20 @@ def test_only_rss_yt_in_output(tmp_path):
 # Determinism (R7 idempotency)
 # ---------------------------------------------------------------------------
 
+
 def test_render_atom_deterministic(mixed_store):
     """Two calls on the same store state must return identical bytes."""
     result1 = render_atom(mixed_store)
     result2 = render_atom(mixed_store)
-    assert result1 == result2, "render_atom must be deterministic for the same store state"
+    assert (
+        result1 == result2
+    ), "render_atom must be deterministic for the same store state"
 
 
 # ---------------------------------------------------------------------------
 # Empty store
 # ---------------------------------------------------------------------------
+
 
 def test_empty_store_renders_valid_atom(empty_store):
     result = render_atom(empty_store)
@@ -156,6 +166,7 @@ def test_empty_store_no_entries(empty_store):
 # URL and summary in entries
 # ---------------------------------------------------------------------------
 
+
 def test_entry_contains_url(tmp_path):
     store = InMemoryStore(blob_root=tmp_path / "blobs")
     item = _item("rss", "Link Test Item", url="https://example.com/specific-url")
@@ -176,7 +187,9 @@ def test_entry_contains_summary(tmp_path):
 # from store import render_atom resolution
 # ---------------------------------------------------------------------------
 
+
 def test_render_atom_importable():
     """render_atom must be importable from the store package."""
     from store import render_atom as _ra  # noqa: PLC0415
+
     assert callable(_ra)

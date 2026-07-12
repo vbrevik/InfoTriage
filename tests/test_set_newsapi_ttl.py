@@ -38,9 +38,9 @@ def test_script_has_main():
     assert "main" in names, f"{SCRIPT} should define a main() function"
 
     # Simpler check: source contains the standard guard
-    assert "if __name__ == \"__main__\":" in SCRIPT.read_text(encoding="utf-8"), (
-        f"{SCRIPT} should contain a standard __main__ guard"
-    )
+    assert 'if __name__ == "__main__":' in SCRIPT.read_text(
+        encoding="utf-8"
+    ), f"{SCRIPT} should contain a standard __main__ guard"
 
 
 def test_script_rejects_invalid_ttl():
@@ -51,4 +51,6 @@ def test_script_rejects_invalid_ttl():
         text=True,
         check=False,
     )
-    assert result.returncode == 2, f"Expected usage error for invalid TTL, got {result.returncode}"
+    assert (
+        result.returncode == 2
+    ), f"Expected usage error for invalid TTL, got {result.returncode}"

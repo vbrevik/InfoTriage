@@ -14,7 +14,6 @@ from tests.conftest import db_live, pg_store  # noqa: F401
 # The actual implementation lives in tests/conftest.py.
 
 
-
 def test_enrichment_sql_joins_embeddings():
     """Assert _ENRICHMENT_SQL (in main.py) contains emb.embedding and LEFT JOIN."""
     main_py_path = Path(__file__).parent.parent.parent / "apps" / "brief" / "main.py"
@@ -26,7 +25,9 @@ def test_enrichment_sql_joins_embeddings():
 
 def test_enrichment_fetch_includes_embedding():
     """Assert that consumer.py's _SELECT joins embeddings."""
-    consumer_py_path = Path(__file__).parent.parent.parent / "apps" / "brief" / "consumer.py"
+    consumer_py_path = (
+        Path(__file__).parent.parent.parent / "apps" / "brief" / "consumer.py"
+    )
     consumer_content = consumer_py_path.read_text()
 
     assert "emb.embedding" in consumer_content
@@ -35,10 +36,15 @@ def test_enrichment_fetch_includes_embedding():
 
 def test_cluster_threshold_wired_to_renderer():
     """Assert renderer.py _cluster_rows accepts threshold parameter."""
-    renderer_py_path = Path(__file__).parent.parent.parent / "apps" / "brief" / "renderer.py"
+    renderer_py_path = (
+        Path(__file__).parent.parent.parent / "apps" / "brief" / "renderer.py"
+    )
     renderer_content = renderer_py_path.read_text()
 
-    assert "_cluster_rows(rows: list[dict], threshold: float | None = None)" in renderer_content
+    assert (
+        "_cluster_rows(rows: list[dict], threshold: float | None = None)"
+        in renderer_content
+    )
     assert "threshold=0.75" not in renderer_content or "os.getenv" in renderer_content
 
 
@@ -52,7 +58,15 @@ def test_enrichment_row_has_embedding_column(pg_store):
         cur.execute(
             "INSERT INTO infotriage.articles (id, source, source_type, url, title, ts, lang, summary) "
             "VALUES (%s, %s, %s, %s, %s, now(), %s, %s) ON CONFLICT (id) DO NOTHING",
-            ("test-embedding-001", "test", "rss", "https://test.example/1", "Test Article", "en", "summary"),
+            (
+                "test-embedding-001",
+                "test",
+                "rss",
+                "https://test.example/1",
+                "Test Article",
+                "en",
+                "summary",
+            ),
         )
         cur.execute(
             "INSERT INTO infotriage.enrichment (item_id, ccir, cnr, score, bucket, why) "
@@ -61,7 +75,11 @@ def test_enrichment_row_has_embedding_column(pg_store):
         )
         cur.execute(
             "INSERT INTO infotriage.embeddings (item_id, embedding, model) VALUES (%s, %s, %s)",
-            ("test-embedding-001", np.zeros(1024, dtype=np.float32).tolist(), "test-model"),
+            (
+                "test-embedding-001",
+                np.zeros(1024, dtype=np.float32).tolist(),
+                "test-model",
+            ),
         )
         pg_store._conn.commit()
 
@@ -84,9 +102,10 @@ def test_enrichment_row_has_embedding_column(pg_store):
         assert "embedding" in row, "embedding column missing from row"
 
     assert len(rows) > 0, "No enrichment rows found to test"
-    assert any(row["item_id"] == "test-embedding-001" and row["embedding"] is not None for row in rows), (
-        "Seeded embedding should be returned by the LEFT JOIN"
-    )
+    assert any(
+        row["item_id"] == "test-embedding-001" and row["embedding"] is not None
+        for row in rows
+    ), "Seeded embedding should be returned by the LEFT JOIN"
 
 
 def test_pgvector_clustering_merges_similar_items():
@@ -139,8 +158,23 @@ def test_pgvector_clustering_merges_similar_items():
 
     assert len(clusters) == 2, f"Expected 2 clusters, got {len(clusters)}"
 
-    cluster_1_2 = next((c for c in clusters if len(c["items"]) == 2 and {"test-1", "test-2"} == {i["item_id"] for i in c["items"]}), None)
+    cluster_1_2 = next(
+        (
+            c
+            for c in clusters
+            if len(c["items"]) == 2
+            and {"test-1", "test-2"} == {i["item_id"] for i in c["items"]}
+        ),
+        None,
+    )
     assert cluster_1_2 is not None, "test-1 and test-2 should be in the same cluster"
 
-    cluster_3 = next((c for c in clusters if len(c["items"]) == 1 and c["items"][0]["item_id"] == "test-3"), None)
+    cluster_3 = next(
+        (
+            c
+            for c in clusters
+            if len(c["items"]) == 1 and c["items"][0]["item_id"] == "test-3"
+        ),
+        None,
+    )
     assert cluster_3 is not None, "test-3 should be in a separate cluster"

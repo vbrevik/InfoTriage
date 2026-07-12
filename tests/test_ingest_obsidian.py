@@ -98,17 +98,17 @@ async def test_ingest_d09_field_mapping(tmp_path: pathlib.Path, monkeypatch) -> 
     # --- full clip assertions (D-09 mapping) ---
     full = by_url["https://example.com/climate"]
     assert full.source_type == "obsidian"
-    assert full.source == "Example News"      # site → source
+    assert full.source == "Example News"  # site → source
     assert full.title == "Climate Change Report 2026"
     assert full.summary == "A summary of climate findings"  # description → summary
     assert full.lang == "en"
-    assert full.ts.tzinfo is not None          # tz-aware
+    assert full.ts.tzinfo is not None  # tz-aware
 
     # --- Norwegian clip assertions ---
     no_item = by_url["https://nrk.no/article/1"]
     assert no_item.source_type == "obsidian"
     assert no_item.source == "NRK"
-    assert no_item.lang == "no"                # æ/ø/å in title → "no"
+    assert no_item.lang == "no"  # æ/ø/å in title → "no"
 
 
 @pytest.mark.asyncio
@@ -146,10 +146,10 @@ async def test_ingest_missing_fields_not_rejected(
 
     item = items[0]
     assert item.source_type == "obsidian"
-    assert item.title == ""              # fallback: empty string
-    assert item.url == ""               # fallback: empty string
-    assert item.ts.tzinfo is not None   # fallback ts is tz-aware
-    assert item.lang == "und"           # empty title → indeterminate
+    assert item.title == ""  # fallback: empty string
+    assert item.url == ""  # fallback: empty string
+    assert item.ts.tzinfo is not None  # fallback ts is tz-aware
+    assert item.lang == "und"  # empty title → indeterminate
 
     # Warning must have been logged (missing fields)
     warning_records = [r for r in caplog.records if r.levelno >= logging.WARNING]

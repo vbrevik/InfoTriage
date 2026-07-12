@@ -29,6 +29,7 @@ from apps.brief.clustering import (
     cluster_items_in_memory,
 )  # noqa: E402
 
+
 def _row_to_verdict(row: dict) -> dict:
     """Map an enrichment row to the verdict-dict shape build_html() expects.
 
@@ -51,7 +52,9 @@ def _row_to_verdict(row: dict) -> dict:
     }
 
 
-def _apply_semantic_clustering(verdicts: list[dict], threshold: float = 0.75) -> list[dict]:
+def _apply_semantic_clustering(
+    verdicts: list[dict], threshold: float = 0.75
+) -> list[dict]:
     """Apply semantic clustering to verdicts using pgvector embeddings.
 
     Mirrors the clustering logic in renderer.py: per-CCIR semantic clustering
@@ -114,18 +117,21 @@ def _apply_semantic_clustering(verdicts: list[dict], threshold: float = 0.75) ->
                     if v.get("item_id") == item.item_id:
                         v["_cluster_idx"] = cluster_idx
                         v["_cluster_size"] = len(cluster)
-                        v["_sources_in_cluster"] = len(
-                            {i.source for i in cluster}
-                        )
+                        v["_sources_in_cluster"] = len({i.source for i in cluster})
                         break
 
     return verdicts
 
 
-def build_html(enrichment_rows: list[dict], period: str,
-               with_bluf: bool = True, generated_at: str | None = None,
-               *, cluster_threshold: float = 0.75,
-               cutoff_epoch: int | None = None) -> str:
+def build_html(
+    enrichment_rows: list[dict],
+    period: str,
+    with_bluf: bool = True,
+    generated_at: str | None = None,
+    *,
+    cluster_threshold: float = 0.75,
+    cutoff_epoch: int | None = None
+) -> str:
     """Render the full SAB HTML page from enrichment rows.
 
     Delegates to sab_html.build_html() after row mapping and semantic
@@ -145,6 +151,10 @@ def build_html(enrichment_rows: list[dict], period: str,
     verdicts = [_row_to_verdict(r) for r in enrichment_rows]
     verdicts = _apply_semantic_clustering(verdicts, threshold=cluster_threshold)
 
-    return _sab_build_html(verdicts, period, with_bluf=with_bluf,
-                           generated_at=generated_at,
-                           cutoff_epoch=cutoff_epoch)
+    return _sab_build_html(
+        verdicts,
+        period,
+        with_bluf=with_bluf,
+        generated_at=generated_at,
+        cutoff_epoch=cutoff_epoch,
+    )

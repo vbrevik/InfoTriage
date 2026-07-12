@@ -118,12 +118,14 @@ class FakeStore:
         return None
 
     def link_entity(self, entity_id, item_id, mention, lang):
-        self.links.append({
-            "entity_id": entity_id,
-            "item_id": item_id,
-            "mention": mention,
-            "lang": lang,
-        })
+        self.links.append(
+            {
+                "entity_id": entity_id,
+                "item_id": item_id,
+                "mention": mention,
+                "lang": lang,
+            }
+        )
 
 
 def test_resolve_entities_stores_and_links():
