@@ -25,7 +25,10 @@ Design decisions (from CONTEXT.md / RESEARCH.md):
 - Pitfall 4: init_schema uses autocommit connection (so HNSW INDEX works without CONCURRENTLY)
 - Pitfall 5: all table names fully-qualified infotriage.* (no search_path reliance)
 """
+from __future__ import annotations
+
 from pathlib import Path
+from typing import Any
 
 import psycopg
 from psycopg.rows import dict_row
@@ -61,7 +64,7 @@ class PostgresStore:
         """
         self._dsn = dsn
         self._blob_root = blob_root
-        self._conn: psycopg.Connection | None = None  # opened in __enter__
+        self._conn: psycopg.Connection[dict[str, Any]] | None = None  # opened in __enter__
 
     # -------------------------------------------------------------------------
     # Context manager — one connection per "with" block (D-03)
@@ -465,6 +468,7 @@ class PostgresStore:
             (name, name_norm, lang, type, embedding),
         ).fetchone()
         self._conn.commit()
+        assert row is not None, "put_entity RETURNING id produced no row"
         return str(row["id"])
 
     def get_entity(self, entity_id: str) -> "dict | None":
@@ -575,12 +579,16 @@ class PostgresStore:
             (item_id,),
         ).fetchall()
         self._conn.rollback()
-        return [
-            {
-                "entity_id": str(r["entity_id"]),
-                "name": r["name"],
-                "mention": r["mention"],
-                "lang": r["lang"],
-            }
-            for r in rows
-        ]
+        result: list[dict] = []
+        for r in rows:
+            if r is None:
+                continue
+            result.append(
+                {
+                    "entity_id": str(r["entity_id"]),
+                    "name": r["name"],
+                    "mention": r["mention"],
+                    "lang": r["lang"],
+                }
+            )
+        return result
