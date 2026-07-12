@@ -26,10 +26,10 @@ production). The default here is a dev-only fallback; never log the DSN (T-03-01
 import asyncio
 import json
 import logging
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 import aio_pika
-from aio_pika.abc import AbstractRobustConnection
+import aio_pika.abc
 
 from ._bus import BusClient  # noqa: F401 (imported for Protocol type annotations)
 
@@ -66,12 +66,12 @@ class RabbitMQBus:
     def __init__(self, amqp_url: str = RABBITMQ_DEFAULT_URL) -> None:
         # DSN: caller must pass from env (T-03-01 — never logged)
         self.amqp_url = amqp_url
-        self._connection: AbstractRobustConnection | None = None
-        self._channel: aio_pika.RobustChannel | None = None
-        self._exchange: aio_pika.RobustExchange | None = None
-        self._dlx: aio_pika.RobustExchange | None = None
-        self._dlq: aio_pika.RobustQueue | None = None
-        self._queues: dict[str, aio_pika.RobustQueue] = {}  # routing_key → queue
+        self._connection: aio_pika.abc.AbstractRobustConnection | None = None
+        self._channel: aio_pika.abc.AbstractChannel | None = None
+        self._exchange: aio_pika.abc.AbstractExchange | None = None
+        self._dlx: aio_pika.abc.AbstractExchange | None = None
+        self._dlq: aio_pika.abc.AbstractQueue | None = None
+        self._queues: dict[str, aio_pika.abc.AbstractQueue] = {}  # routing_key → queue
         self._consumers: list[Any] = []  # active consumer tags for clean shutdown
         self._dedup_lock = asyncio.Lock()
         self._seen: set[tuple[str, str]] = set()
@@ -88,6 +88,7 @@ class RabbitMQBus:
             try:
                 self._connection = await aio_pika.connect_robust(self.amqp_url)
                 self._channel = await self._connection.channel(publisher_confirms=True)
+                assert self._channel is not None
                 await self._channel.set_qos(prefetch_count=10)
                 await self._declare_topology()
                 break
@@ -125,6 +126,7 @@ class RabbitMQBus:
         await ch.close()
         # Now open the real channel and declare fresh
         self._channel = await self._connection.channel(publisher_confirms=True)
+        assert self._channel is not None
         await self._channel.set_qos(prefetch_count=10)
         await self._declare_topology()
 
@@ -227,7 +229,12 @@ class RabbitMQBus:
 
         return messages
 
-    async def consume(self, routing_key: str, handler, prefetch_count: int = 1) -> str:
+    async def consume(
+        self,
+        routing_key: str,
+        handler: Callable[[aio_pika.abc.AbstractIncomingMessage], Awaitable[Any]],
+        prefetch_count: int = 1,
+    ) -> str:
         """Register a persistent consumer on routing_key's queue. Does not block.
 
         Reuses the topology declared by _ensure_connection/_declare_topology — does
