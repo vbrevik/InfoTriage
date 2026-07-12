@@ -504,6 +504,63 @@ class PostgresStore:
             "embedding": row["embedding"],
         }
 
+    def get_entity_by_name_norm(self, name_norm: str, lang: str) -> "dict | None":
+        """Return entity dict for (name_norm, lang), or None if absent."""
+        assert self._conn is not None, (
+            "PostgresStore must be used as a context manager"
+        )
+        row = self._conn.execute(
+            """
+            SELECT id, name, name_norm, lang, type, embedding
+            FROM infotriage.entities
+            WHERE name_norm = %s AND lang = %s
+            """,
+            (name_norm, lang),
+        ).fetchone()
+        self._conn.rollback()
+        if row is None:
+            return None
+        return {
+            "id": str(row["id"]),
+            "name": row["name"],
+            "name_norm": row["name_norm"],
+            "lang": row["lang"],
+            "type": row["type"],
+            "embedding": row["embedding"],
+        }
+
+    def find_similar_entity(
+        self,
+        vector: list[float],
+        threshold: float = 0.85,
+    ) -> "dict | None":
+        """Return the nearest entity with cosine similarity >= threshold, or None.
+
+        Uses the pgvector <=> cosine distance operator against the HNSW index on
+        infotriage.entities.embedding. Only entities with non-NULL embeddings are
+        considered.
+        """
+        assert self._conn is not None, (
+            "PostgresStore must be used as a context manager"
+        )
+        row = self._conn.execute(
+            """
+            SELECT id, name, (embedding <=> %s::vector) AS dist
+            FROM infotriage.entities
+            WHERE embedding IS NOT NULL
+            ORDER BY embedding <=> %s::vector
+            LIMIT 1
+            """,
+            (vector, vector),
+        ).fetchone()
+        self._conn.rollback()
+        if row is not None and row["dist"] < (1.0 - threshold):
+            return {
+                "entity_id": str(row["id"]),
+                "name": row["name"],
+            }
+        return None
+
     def link_entity(self, entity_id: str, item_id: str, mention: str, lang: str) -> None:
         """Link an entity to an item with the surface mention and mention language.
 

@@ -10,7 +10,8 @@
 
 2. **NER + embedding + linking module**
    - Created `apps/triage/entities.py` with lightweight regex/heuristic NER, mE5-large embedding, and entity linking.
-   - Added `LINK_THRESHOLD = 0.85` constant for future similarity-based linking.
+   - Added `LINK_THRESHOLD = 0.85` constant and similarity-based cross-language linking.
+   - Entity resolution order: exact `(name_norm, lang)` match → similar entity by cosine >= LINK_THRESHOLD → create new entity.
    - Added unit tests in `tests/test_triage_entities.py`.
 
 3. **Triage worker integration**
@@ -37,8 +38,9 @@
 
 ## Known limitations / future work
 
-- The current implementation uses exact normalised-name matching for entity identity. Similarity-based cross-language alias merging is documented and threshold-validated but not yet implemented.
+- Similarity-based linking merges cross-language mentions into a single entity but discards the variant's embedding. Future work could store aliases with their own embeddings (requires schema change).
 - The regex NER is intentionally lightweight; it may miss complex entity mentions that a full NER model would catch.
+- Multi-word Cyrillic phrases (e.g. "Саммит НАТО") may be extracted as a single entity; more domain stop words or a proper NER model would help.
 
 ## Files changed
 

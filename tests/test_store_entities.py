@@ -188,6 +188,43 @@ def test_get_entity_links(store):
     assert links[0]["lang"] == "en"
 
 
+def test_get_entity_by_name_norm(store):
+    """get_entity_by_name_norm returns the entity for (name_norm, lang)."""
+    _seed_item(store)
+    entity_id = store.put_entity(
+        name="NATO", name_norm="nato", lang="en", type="ORG", embedding=None
+    )
+    got = store.get_entity_by_name_norm("nato", "en")
+    assert got is not None
+    assert got["id"] == entity_id
+    assert got["name"] == "NATO"
+    assert store.get_entity_by_name_norm("nato", "no") is None
+    assert store.get_entity_by_name_norm("oslo", "en") is None
+
+
+def test_find_similar_entity_returns_match_above_threshold(store):
+    """find_similar_entity returns the nearest entity with cosine >= threshold."""
+    _seed_item(store)
+    vec_a = [1.0] + [0.0] * 1023
+    vec_b = [0.99] + [0.01] * 1023  # very similar to vec_a
+    vec_c = [0.0, 1.0] + [0.0] * 1022  # orthogonal to vec_a
+    store.put_entity(name="NATO", name_norm="nato", lang="en", type="ORG", embedding=vec_a)
+    store.put_entity(name="Oslo", name_norm="oslo", lang="en", type="GPE", embedding=vec_c)
+
+    match = store.find_similar_entity(vec_b, threshold=0.85)
+    assert match is not None
+    assert match["name"] == "NATO"
+    assert "entity_id" in match
+
+
+def test_find_similar_entity_ignores_null_embeddings(store):
+    """find_similar_entity must not return entities without embeddings."""
+    _seed_item(store)
+    store.put_entity(name="NATO", name_norm="nato", lang="en", type="ORG", embedding=None)
+    match = store.find_similar_entity([1.0] + [0.0] * 1023, threshold=0.85)
+    assert match is None
+
+
 @pytest.mark.skipif(not _PG_UP, reason="INFOTRIAGE_TEST_DSN unset or test DB unreachable — db_live test skipped")
 @pytest.mark.db_live
 def test_entity_links_cross_language(tmp_path):

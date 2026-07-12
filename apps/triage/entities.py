@@ -15,7 +15,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from typing import Optional
+
 
 log = logging.getLogger(__name__)
 
@@ -57,14 +57,22 @@ _STOP_WORDS = {
     "av", "med", "for", "i", "om", "den", "de", "dette", "disse",
     "hans", "hennes", "deres", "vår", "min", "din", "nå", "her", "da", "så",
     "hvis", "når", "hvor", "hva", "hvem", "hvorfor", "hvordan",
+    # Russian common words (capitalised forms may be mistaken for entities)
+    "в", "и", "на", "по", "с", "к", "о", "у", "от", "для", "из", "за", "под",
+    "над", "при", "через", "а", "но", "или", "если", "когда", "где", "кто",
+    "что", "как", "почему", "зачем", "этот", "эта", "это", "эти", "тот", "та",
+    "то", "те", "саммит", "встреча", "конференция",
 }
+
+# Character class for entity word bodies: Latin, Norwegian, and Cyrillic.
+_WORD_CHARS = r"a-zæøåA-ZÆØÅа-яёА-ЯЁ"
 
 # Capitalised phrase: one or more capitalised words optionally joined by
 # lowercase connecting words (e.g. "European Union", "Ministry of Defence").
 _ENTITY_RE = re.compile(
-    r"\b[A-ZÆØÅ][a-zæøåA-ZÆØÅ]*"
-    r"(?:\s+[A-ZÆØÅ][a-zæøåA-ZÆØÅ]+){0,3}"
-    r"(?:\s+(?:of|the|&|for|in|on|de|del|di|von|van|da|dos|e)\s+[A-ZÆØÅ][a-zæøåA-ZÆØÅ]+)*"
+    rf"\b[A-ZÆØÅА-ЯЁ][{_WORD_CHARS}]*"
+    rf"(?:\s+[A-ZÆØÅА-ЯЁ][{_WORD_CHARS}]+){{0,3}}"
+    rf"(?:\s+(?:of|the|&|for|in|on|de|del|di|von|van|da|dos|e)\s+[A-ZÆØÅА-ЯЁ][{_WORD_CHARS}]+)*"
     r"\b",
     re.UNICODE,
 )
@@ -140,6 +148,45 @@ def embed_entity_name(
         return None
 
 
+def _find_or_create_entity(
+    mention: str,
+    lang: str,
+    store,
+    embed_fn,
+) -> str | None:
+    """Return an entity id for mention, creating a new entity if necessary.
+
+    Resolution order:
+      1. Exact (name_norm, lang) match.
+      2. Similar existing entity by mE5-large cosine similarity >= LINK_THRESHOLD.
+      3. Create a new entity.
+
+    Returns None for mentions that normalise to a stop word or empty string.
+    """
+    name_norm = normalize_name(mention)
+    if not name_norm or name_norm in _STOP_WORDS:
+        return None
+
+    existing = store.get_entity_by_name_norm(name_norm, lang)
+    if existing is not None:
+        return existing["id"]
+
+    embedding = embed_entity_name(name_norm, lang, embed_fn)
+
+    if embedding is not None:
+        similar = store.find_similar_entity(embedding, LINK_THRESHOLD)
+        if similar is not None:
+            return similar["entity_id"]
+
+    return store.put_entity(
+        name=mention,
+        name_norm=name_norm,
+        lang=lang,
+        type=None,
+        embedding=embedding,
+    )
+
+
 def resolve_entities(
     item_id: str,
     text: str,
@@ -153,18 +200,9 @@ def resolve_entities(
     """
     mentions = extract_mentions(text)
     for mention in mentions:
-        name_norm = normalize_name(mention)
-        if not name_norm or name_norm in _STOP_WORDS:
-            continue
-        embedding = embed_entity_name(name_norm, lang, embed_fn)
-        entity_id = store.put_entity(
-            name=mention,
-            name_norm=name_norm,
-            lang=lang,
-            type=None,
-            embedding=embedding,
-        )
-        store.link_entity(entity_id, item_id, mention, lang)
+        entity_id = _find_or_create_entity(mention, lang, store, embed_fn)
+        if entity_id is not None:
+            store.link_entity(entity_id, item_id, mention, lang)
 
 
 async def resolve_entities_async(

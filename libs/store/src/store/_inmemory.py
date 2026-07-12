@@ -228,6 +228,35 @@ class InMemoryStore:
                 return dict(entity)
         return None
 
+    def get_entity_by_name_norm(self, name_norm: str, lang: str) -> Optional[dict]:
+        """Return entity dict for (name_norm, lang), or None if absent."""
+        entity = self._entities.get((name_norm, lang))
+        if entity is not None:
+            return dict(entity)
+        return None
+
+    def find_similar_entity(
+        self,
+        vector: list[float],
+        threshold: float = 0.85,
+    ) -> Optional[dict]:
+        """Return the nearest entity with cosine similarity >= threshold, or None."""
+        best_id: Optional[str] = None
+        best_name: Optional[str] = None
+        best_sim: float = -1.0
+        for entity in self._entities.values():
+            stored = entity.get("embedding")
+            if stored is None:
+                continue
+            sim = _cosine_sim(vector, stored)
+            if sim > best_sim:
+                best_sim = sim
+                best_id = entity["id"]
+                best_name = entity["name"]
+        if best_sim >= threshold:
+            return {"entity_id": best_id, "name": best_name}
+        return None
+
     def link_entity(self, entity_id: str, item_id: str, mention: str, lang: str) -> None:
         """Link an entity to an item with the surface mention and mention language."""
         key = (entity_id, item_id, mention)

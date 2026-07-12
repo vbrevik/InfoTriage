@@ -180,6 +180,22 @@ class Store(Protocol):
         """Return entity dict for entity_id, or None if absent."""
         ...
 
+    def get_entity_by_name_norm(self, name_norm: str, lang: str) -> Optional[dict]:
+        """Return entity dict for (name_norm, lang), or None if absent."""
+        ...
+
+    def find_similar_entity(
+        self,
+        vector: list[float],
+        threshold: float = 0.85,
+    ) -> Optional[dict]:
+        """Return the nearest entity with cosine similarity >= threshold, or None.
+
+        Only entities with a non-NULL embedding are considered. The returned dict
+        contains at least ``entity_id`` and ``name``.
+        """
+        ...
+
     def link_entity(self, entity_id: str, item_id: str, mention: str, lang: str) -> None:
         """Link an entity to an item with the surface mention and mention language.
 

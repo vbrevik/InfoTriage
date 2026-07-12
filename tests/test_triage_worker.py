@@ -254,7 +254,16 @@ def test_entity_resolution_links_entities(store, bus):
         {"ccir": "PIR-3", "cnr": "II", "score": 7, "bucket": "maybe",
          "why": "NATO toppmote", "pmesii": "Political", "tessoc": "Subversion"}
     )
-    asyncio.run(process_item(item.id, store, bus, embed=lambda text: VEC_A, score=score))
+
+    def fake_embed(text):
+        # Distinct vectors so NATO and Oslo do not collapse via similarity.
+        if "nato" in text.lower():
+            return VEC_A
+        if "oslo" in text.lower():
+            return VEC_B
+        return [0.5, 0.5]
+
+    asyncio.run(process_item(item.id, store, bus, embed=fake_embed, score=score))
 
     links = store.get_entity_links(item.id)
     names = {l["name"] for l in links}
