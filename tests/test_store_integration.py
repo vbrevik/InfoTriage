@@ -19,6 +19,7 @@ run can never touch the production database.
 """
 import datetime
 import os
+from typing import Any
 
 import numpy as np
 import psycopg
@@ -57,7 +58,7 @@ def _ts(offset_seconds: int = 0) -> datetime.datetime:
 
 
 def _item(**kwargs) -> Item:
-    defaults = dict(
+    defaults: dict[str, Any] = dict(
         source="IntegrationTestSource",
         source_type="rss",
         url="https://example.com/integration/test",

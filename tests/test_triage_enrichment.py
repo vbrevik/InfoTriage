@@ -18,6 +18,7 @@ import datetime
 import math
 import os
 import socket
+from typing import Any
 
 import pytest
 
@@ -149,7 +150,7 @@ def _ts() -> datetime.datetime:
 
 
 def _make_item(**kwargs) -> Item:
-    defaults = dict(
+    defaults: dict[str, Any] = dict(
         source="TestSource",
         source_type="rss",
         url="https://example.com/enrichment-test",

@@ -19,13 +19,7 @@ markers = [
 ]
 
 [tool.mypy]
-# Use directory structure to infer package boundaries; required for the
-# src-layout libs above.
-explicit_package_bases = true
-namespace_packages = true
 # Default targets: the shared libs (by their package directories) and tests.
-# Pointing mypy at the package roots (e.g. libs/contracts/src/contracts)
-# instead of the whole repo tree avoids duplicate-module errors.
 files = [
     "libs/contracts/src/contracts",
     "libs/store/src/store",

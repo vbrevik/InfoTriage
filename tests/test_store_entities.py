@@ -4,6 +4,7 @@
 Tests run against both InMemoryStore and PostgresStore. The postgres param is
 auto-skipped when INFOTRIAGE_TEST_DSN is unset or the test DB is unreachable.
 """
+import datetime
 import os
 import socket
 
@@ -47,10 +48,10 @@ _pg_live_skipif = (
 )
 
 
-def _ts() -> str:
-    from datetime import datetime, timezone
+def _ts() -> datetime.datetime:
+    from datetime import timezone
 
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.datetime.now(timezone.utc)
 
 
 def _make_item(item_id: str = "item-001") -> Item:

@@ -79,6 +79,7 @@ def _cleanup_test_topology():
         try:
             connection = await aio_pika.connect_robust(AMQP_URL)
             channel = await connection.channel()
+            assert channel is not None
             # Delete test queues first (queues must be removed before exchanges)
             for q_name in list(TEST_ROUTING_KEY_TO_QUEUE.values()) + [TEST_DLQ_NAME]:
                 try:
@@ -123,6 +124,7 @@ def _skip_if_unavailable() -> None:
 async def _fresh_bus() -> RabbitMQBus:
     bus = RabbitMQBus(amqp_url=AMQP_URL)
     await bus._ensure_connection()
+    assert bus._channel is not None
     # Purge all test-isolated queues for clean test isolation
     for rk, q in bus._queues.items():
         live_q = await bus._channel.get_queue(q.name)
@@ -312,12 +314,13 @@ def test_dlq_poison() -> None:
             await asyncio.sleep(0.2)
 
             # Consume from test-isolated q.triage and NACK with requeue=False
+            assert bus._channel is not None
             q_triage = await bus._channel.get_queue(
                 TEST_ROUTING_KEY_TO_QUEUE["item.ingested"]
             )
             nacked = asyncio.Event()
 
-            async def _consumer(msg: aio_pika.IncomingMessage) -> None:
+            async def _consumer(msg: aio_pika.abc.AbstractIncomingMessage) -> None:
                 body = json.loads(msg.body.decode())
                 if body.get("__poison__"):
                     await msg.nack(requeue=False)  # triggers dead-lettering
@@ -332,6 +335,7 @@ def test_dlq_poison() -> None:
                 await q_triage.cancel(consumer_tag)
 
             # Wait for dead-letter routing (up to 5s)
+            assert bus._channel is not None
             dlq = await bus._channel.get_queue(TEST_DLQ_NAME)
             dlq_payload = None
             deadline = time.monotonic() + 5.0

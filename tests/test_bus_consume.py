@@ -55,6 +55,7 @@ async def _fresh_bus() -> RabbitMQBus:
     """Return a connected RabbitMQBus with all queues purged for test isolation."""
     bus = RabbitMQBus(amqp_url=AMQP_URL)
     await bus._ensure_connection()
+    assert bus._channel is not None
     for rk, q in bus._queues.items():
         live_q = await bus._channel.get_queue(q.name)
         await live_q.purge()
@@ -82,7 +83,7 @@ def test_consume_delivers_message() -> None:
             received = asyncio.Event()
             received_payload = {}
 
-            async def _handler(msg: aio_pika.IncomingMessage) -> None:
+            async def _handler(msg: aio_pika.abc.AbstractIncomingMessage) -> None:
                 async with msg.process():
                     received_payload.update(json.loads(msg.body.decode()))
                     received.set()
@@ -114,7 +115,7 @@ def test_consume_unknown_routing_key_raises() -> None:
         bus = await _fresh_bus()
         try:
 
-            async def _handler(msg: aio_pika.IncomingMessage) -> None:
+            async def _handler(msg: aio_pika.abc.AbstractIncomingMessage) -> None:
                 pass
 
             with pytest.raises(ValueError):

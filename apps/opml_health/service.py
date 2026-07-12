@@ -119,7 +119,7 @@ def run_health_check(
 # --- RabbitMQ publisher (async) ---
 async def emit_unhealthy_events(unhealthy: list[FeedUnhealthy]) -> None:
     """Publish each unhealthy event to q.ops via RabbitMQ bus."""
-    from libs.contracts.src.contracts._bus_rabbitmq import RabbitMQBus
+    from contracts import RabbitMQBus
 
     amqp_url = os.environ.get(
         "INFOTRIAGE_OPML_HEALTH_RABBITMQ_URL",
