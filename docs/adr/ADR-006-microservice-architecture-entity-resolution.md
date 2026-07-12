@@ -54,6 +54,19 @@ half (ADR-005, Phase 8).
   transferable across embedding models without re-measurement. See SPIKE-FINDINGS.md "R3/R2
   Embedding-Model Divergence Note".
 
+  **Resolution (2026-07-12, backlog 999.3 closed).** Realtime re-validation on real mE5-large vectors
+  via ModuleSpec-mocked torchvision bypass + `transformers.XLMRobertaModel` direct load (mirrors R3
+  workaround; mean-pool with attention mask + L2 normalize, 1024-dim, `query:`-prefixed). Default
+  12-entity cross-language corpus + curated distinct control set. Sweep T=0.75..0.98 echoed in
+  `.planning/phases/999.3-entity-resolution-cross-language-coverage-and-mE5-large-re-validation/999.3-VERDICT.md`.
+  **`LINK_THRESHOLD` (entity-level) updated to 0.92** per conservative overmerge==0 fallback
+  (1 missed cross-lang merge accepted in exchange for zero false-merge safety). Production ships
+  this value in `apps/triage/entities.py::LINK_THRESHOLD` AND
+  `libs/store/_postgres.py::find_similar_entity` default. Item-level dedup threshold (R2 mE5-large
+  @ 0.84) is a separate problem and stays unchanged. Verdict on 999.3 itself: PARTIAL (mechanism
+  works; no T clears both bars — controls on `Norway/Sweden` and `United States/USA` are 0.9151
+  and 0.9580 in cosine, sitting close to the same-entity floor of 0.9169).
+
 - **Dependency note.** The spike used a torchvision-mock workaround (`torchvision 0.24.0.dev` vs
   `torch 2.11.0` broken `nms`); Phase 8 needs a resolved dependency environment, not the throwaway
   workaround.

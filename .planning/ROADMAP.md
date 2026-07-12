@@ -342,29 +342,24 @@ Plans:
 
 - [ ] TBD (promote with /gsd-review-backlog when ready)
 
-### Phase 999.3: Entity resolution cross-language coverage and mE5-large re-validation (BACKLOG)
+### Phase 999.3: Entity resolution cross-language coverage and mE5-large re-validation (CLOSED 2026-07-12)
 
 **Goal:** Ensure Phase 8 entity resolution meets the cross-language bar (entities merged across >=2 languages) and validates entity linking on the chosen embedding model (mE5-large).
 
-**Context:** Phase 00 concept spike (R3) found PARTIAL: pgvector cosine linking mechanism proven (NATO merged across 5 items, HNSW index validated at threshold 0.85), but the cross-language bar was not met because the test date's NRK/BBC feeds had zero NATO mentions — all 5 NATO extractions came from TASS (single language). This is a corpus coverage limitation, not a mechanism failure.
+**Verdict:** **PARTIAL** on default 12-entity corpus. Mechanism works (min(same)=0.9169 > max(distinct)=0.9151). At the chosen production-recommended T*=0.92: 0 over-merges and 0.857 collapse rate (1 missed cross-language merge accepted in exchange for zero false-merge safety).
 
-**Additional risk — embedding model mismatch:** R3 used `BAAI/bge-m3` (its default). R2 chose `mE5-large`. Entity linking threshold 0.85 was validated on bge-m3 vectors, NOT the chosen mE5-large. Phase 8 must re-validate entity linking on mE5-large vectors before production.
+**T* for Phase 8:** **0.92** (was: 0.85 validated on bge-m3-misparse; 0.84 for item-level dedup is unrelated).
 
-**Carry-forward from spike:**
+**Method (2026-07-12, see `999.3-VERDICT.md`):** ModuleSpec-mocked torchvision bypass + `transformers.XLMRobertaModel` direct load (mirrors R3 workaround), manual mean-pool with attention mask + L2 normalize, 1024-dim `query:`-prefixed embeddings loaded from local safetensors cache. Default 12-entity cross-language pair set + curated distinct control set. Threshold sweep mirrors R2 format.
 
-- Schema validated: `entities (id, name, name_norm, lang, type, embedding vector(1024))` + `entity_links (entity_id FK, item_id, mention, lang)`
-- HNSW with `vector_cosine_ops`, LINK_THRESHOLD=0.85
-- Phase 8 must add multi-day rolling window with multiple feeds per language to create cross-language merge opportunities
-- Phase 8 must re-validate entity linking on mE5-large vectors (not bge-m3)
+**Phase 8 implications:**
+- Adopt T*=0.92 in `apps/triage/entities.py::LINK_THRESHOLD` and `libs/store/_postgres.py::find_similar_entity` default (replace current 0.85).
+- Item-level dedup threshold (R2 mE5-large @ 0.84) for `find_near_duplicate` stays unchanged — separate problem.
+- A follow-up spike could re-run `--corpus-from-postgres` with a Cyrillic↔Latin transliteration table to fully validate the cross-language bar against production data; the current heuristic in `_corpus_from_postgres` only matches same-script titles.
 
-**Source:** SPIKE-FINDINGS.md §R3, R3-VERDICT.md, ADR-006, Phase 00 VERIFICATION.md
-
-**Requirements:** TBD
-**Plans:** 0 plans
-
-Plans:
-
-- [ ] TBD (promote with /gsd-review-backlog when ready)
+**Source:** SPIKE-FINDINGS.md §R3, R3-VERDICT.md, ADR-006, Phase 00 VERIFICATION.md, `999.3-VERDICT.md` (2026-07-12).
+**Requirements:** TBD — superseded by adoption into Phase 8 plans.
+**Plans:** 4 plans executed (999.3-SPEC.md, 999.3-PLAN.md, scripts/validate_entity_threshold.py rewrite, 999.3-VERDICT.md realtime overwrite).
 
 ### Phase 999.4: Cross-language synthesis verification for Wiki-LLM (BACKLOG)
 

@@ -13,11 +13,16 @@ CORPUS = ROOT / "tests" / "fixtures" / "entity_validation_sample.json"
 
 
 def test_validation_script_requires_allow_synthetic_without_llm(tmp_path):
-    """Without --allow-synthetic and no LLM, the script should fail."""
+    """Without --allow-synthetic and no LLM, the http mode should fail.
+
+    Uses --mode http explicitly since offline mode (the new default) loads
+    mE5-large from on-disk safetensors and would succeed independently of
+    LLM_BASE_URL. The http-mode test is the canonical "no LLM access" case.
+    """
     env = {"LLM_BASE_URL": "http://127.0.0.1:1/v1"}
     report_path = tmp_path / "should_not_exist.md"
     result = subprocess.run(
-        [sys.executable, str(SCRIPT), "--report", str(report_path)],
+        [sys.executable, str(SCRIPT), "--mode", "http", "--report", str(report_path)],
         capture_output=True,
         text=True,
         env={**os.environ, **env},
@@ -35,6 +40,8 @@ def test_validation_script_produces_report_with_synthetic_fallback(tmp_path):
         [
             sys.executable,
             str(SCRIPT),
+            "--mode",
+            "synthetic",
             "--corpus",
             str(CORPUS),
             "--report",
@@ -63,6 +70,8 @@ def test_validation_script_uses_real_corpus_values(tmp_path):
         [
             sys.executable,
             str(SCRIPT),
+            "--mode",
+            "synthetic",
             "--corpus",
             str(CORPUS),
             "--report",
