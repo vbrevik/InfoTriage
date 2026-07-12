@@ -25,3 +25,17 @@ jobs:
 
       - name: Run mypy
         run: mypy
+
+      - name: Smoke test — mypy fails on deliberate type error
+        run: |
+          echo 'x: int = "deliberate type error"' > tests/_mypy_smoke.py
+          trap 'rm -f tests/_mypy_smoke.py' EXIT
+          if mypy --no-error-summary > /tmp/mypy_smoke.out; then
+            echo "mypy did not fail on deliberate type error"
+            exit 1
+          fi
+          if ! grep -q "Incompatible types in assignment" /tmp/mypy_smoke.out; then
+            echo "mypy failed but not with the expected deliberate type error"
+            cat /tmp/mypy_smoke.out
+            exit 1
+          fi
