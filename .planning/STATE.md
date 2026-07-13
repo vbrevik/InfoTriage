@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 9 (RAG recall) discuss-phase complete; ready for planning
-stopped_at: 09-CONTEXT.md and 09-DISCUSSION-LOG.md written, decisions locked
+status: M1 Foundation re-audited and passed; Phase 9 (RAG recall) discuss-phase complete; ready for planning or milestone completion
+stopped_at: v1.0-MILESTONE-AUDIT.md refreshed after re-audit; 09-CONTEXT.md and 09-DISCUSSION-LOG.md written, decisions locked
 last_updated: "2026-07-13T00:00:00.000Z"
 progress:
   total_phases: 13
