@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 8 (Entity Resolution) validated and complete; ready for Phase 9 or M1 push
-stopped_at: 08-VALIDATION.md created, ROADMAP.md/STATE.md updated, full pytest suite green (349/48/0)
+status: Phase 9 (RAG recall) discuss-phase complete; ready for planning
+stopped_at: 09-CONTEXT.md and 09-DISCUSSION-LOG.md written, decisions locked
 last_updated: "2026-07-13T00:00:00.000Z"
 progress:
   total_phases: 13
