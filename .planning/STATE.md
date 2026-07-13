@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 8 (Entity Resolution) executed; awaiting final review/commit
-stopped_at: Store entity methods, triage entity extraction, worker integration, vault projection, and mE5 threshold validation script/report complete
-last_updated: "2026-07-12T00:00:00.000Z"
+status: Phase 8 (Entity Resolution) validated and complete; ready for Phase 9 or M1 push
+stopped_at: 08-VALIDATION.md created, ROADMAP.md/STATE.md updated, full pytest suite green (349/48/0)
+last_updated: "2026-07-13T00:00:00.000Z"
 progress:
   total_phases: 13
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 34
   completed_plans: 34
-  percent: 62
+  percent: 69
 ---
 
 # STATE — InfoTriage
