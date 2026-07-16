@@ -28,6 +28,15 @@ VEC_A = [1.0, 0.0]  # orthogonal to VEC_B (cosine 0.0) — never a false dedup m
 VEC_B = [0.0, 1.0]
 
 
+def _fake_ner_chat(messages, max_tokens=800):
+    """Fake qwen36 NER: return known entities present in the prompt as JSON."""
+    import json as _json
+
+    content = messages[0]["content"]
+    known = [("NATO", "ORG"), ("Oslo", "GPE")]
+    return _json.dumps([{"name": n, "type": t} for n, t in known if n in content])
+
+
 class FakeBus:
     """Minimal async bus fake — records every publish() call for assertions."""
 
@@ -342,7 +351,11 @@ def test_entity_resolution_links_entities(store, bus):
             return VEC_B
         return [0.5, 0.5]
 
-    asyncio.run(process_item(item.id, store, bus, embed=fake_embed, score=score))
+    asyncio.run(
+        process_item(
+            item.id, store, bus, embed=fake_embed, score=score, ner_chat=_fake_ner_chat
+        )
+    )
 
     links = store.get_entity_links(item.id)
     names = {l["name"] for l in links}

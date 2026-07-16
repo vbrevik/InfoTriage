@@ -22,7 +22,7 @@ from pathlib import Path
 
 from contracts import RabbitMQBus, VerdictReady, setup_logging
 from store import PostgresStore
-from triage_score import score_item
+from triage_score import llm, score_item
 from entities import resolve_entities_async
 
 setup_logging("triage")
@@ -95,7 +95,7 @@ def clamp_score(value) -> int:
 
 
 async def process_item(
-    item_id, store, bus, *, embed=get_embedding, score=score_item
+    item_id, store, bus, *, embed=get_embedding, score=score_item, ner_chat=llm
 ) -> None:
     """Fetch, dedup, score, persist, and publish a single item.ingested item.
 
@@ -155,7 +155,7 @@ async def process_item(
     try:
         entity_text = item.title + " " + (item.summary or "")
         await resolve_entities_async(
-            item_id, entity_text, item.lang or "en", store, embed
+            item_id, entity_text, item.lang or "en", store, embed, ner_chat
         )
     except Exception as exc:
         log.warning("entity resolution failed for item_id=%s: %s", item_id, exc)
