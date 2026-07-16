@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
-"""entities.py — lightweight entity extraction, embedding, and linking (Phase 8).
+"""entities.py — LLM-based entity extraction, embedding, and linking (Phase 8).
 
-Uses a fast regex/heuristic NER (no new dependencies) and the existing
-mE5-large embedding endpoint to canonicalise and link entities to items.
+Wave 2: named entities are extracted by the local qwen36 chat model (typed
+PER/ORG/LOC/GPE/MISC), replacing the earlier regex/known-topics heuristic. The
+extracted names are canonicalised and linked to items via the mE5-large
+embedding endpoint (same threshold logic as before).
 
 Public API:
-    extract_mentions(text: str) -> list[str]
+    extract_entities(text: str, lang: str, chat_fn) -> list[dict]
     normalize_name(name: str) -> str
     embed_entity_name(name: str, lang: str, embed_fn) -> list[float] | None
-    resolve_entities(item_id, text, lang, store, embed_fn) -> None
+    resolve_entities(item_id, text, lang, store, embed_fn, chat_fn) -> None
+    resolve_entities_async(item_id, text, lang, store, embed_fn, chat_fn) -> None
 """
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 from typing import cast
@@ -25,291 +29,101 @@ log = logging.getLogger(__name__)
 # .planning/phases/999.3-entity-resolution-cross-language-coverage-and-mE5-large-re-validation/999.3-VERDICT.md
 LINK_THRESHOLD = 0.85
 
-# Known topics / system entities that the heuristic should always surface even if
-# the regex misses them.  Kept small and domain-agnostic; most entities come from
-# the text itself.  Use canonical casing (acronyms stay uppercase).
-_KNOWN_TOPICS = {
-    "NATO",
-    "Norge",
-    "Norway",
-    "Oslo",
-    "Bergen",
-    "Tromsø",
-    "Stavanger",
-    "Trondheim",
-    "NATO HQ",
-    "Norwegian Defense",
-    "Norwegian Armed Forces",
-    "Forsvaret",
-    "Ukraine",
-    "Russia",
-    "Putin",
-    "Zelensky",
-    "Warsaw",
-    "Poland",
-    "Belarus",
-    "China",
-    "Beijing",
-    "Taiwan",
-    "Hong Kong",
-    "Diplomatic",
-    "America",
-    "USA",
-    "United States",
-    "Washington",
-    "Climate",
-    "Environment",
-    "Green",
-    "Sustainable",
-    "Renewable",
-    "Technology",
-    "AI",
-    "Artificial Intelligence",
-    "Cybersecurity",
-    "Security",
-    "Ukrainian",
-    "Russian",
-    "Chinese",
-    "American",
-    "European",
-    "EU",
-}
+# Entity types the model may assign; anything else is coerced to MISC.
+_ALLOWED_TYPES = {"PER", "ORG", "LOC", "GPE", "MISC"}
 
-# Words that look like proper nouns but are not entities.
-_STOP_WORDS = {
-    "the",
-    "this",
-    "that",
-    "these",
-    "those",
-    "there",
-    "where",
-    "when",
-    "why",
-    "how",
-    "what",
-    "which",
-    "who",
-    "whose",
-    "it",
-    "its",
-    "they",
-    "them",
-    "their",
-    "i",
-    "you",
-    "he",
-    "she",
-    "we",
-    "us",
-    "our",
-    "my",
-    "your",
-    "his",
-    "her",
-    "a",
-    "an",
-    "and",
-    "or",
-    "but",
-    "if",
-    "then",
-    "than",
-    "as",
-    "at",
-    "by",
-    "from",
-    "in",
-    "on",
-    "to",
-    "of",
-    "with",
-    "without",
-    "over",
-    "under",
-    "between",
-    "about",
-    "after",
-    "before",
-    "during",
-    "within",
-    "through",
-    "above",
-    "below",
-    "new",
-    "old",
-    "good",
-    "bad",
-    "big",
-    "small",
-    "long",
-    "short",
-    "high",
-    "low",
-    "many",
-    "much",
-    "more",
-    "most",
-    "some",
-    "any",
-    "all",
-    "each",
-    "every",
-    "both",
-    "said",
-    "says",
-    "say",
-    "told",
-    "made",
-    "make",
-    "used",
-    "use",
-    "using",
-    "according",
-    "monday",
-    "tuesday",
-    "wednesday",
-    "thursday",
-    "friday",
-    "saturday",
-    "sunday",
-    "january",
-    "february",
-    "march",
-    "april",
-    "may",
-    "june",
-    "july",
-    "august",
-    "september",
-    "october",
-    "november",
-    "december",
-    # Norwegian common words (capitalised forms may be mistaken for entities)
-    "det",
-    "en",
-    "et",
-    "og",
-    "eller",
-    "men",
-    "som",
-    "at",
-    "til",
-    "fra",
-    "på",
-    "av",
-    "med",
-    "for",
-    "i",
-    "om",
-    "den",
-    "de",
-    "dette",
-    "disse",
-    "hans",
-    "hennes",
-    "deres",
-    "vår",
-    "min",
-    "din",
-    "nå",
-    "her",
-    "da",
-    "så",
-    "hvis",
-    "når",
-    "hvor",
-    "hva",
-    "hvem",
-    "hvorfor",
-    "hvordan",
-    # Russian common words (capitalised forms may be mistaken for entities)
-    "в",
-    "и",
-    "на",
-    "по",
-    "с",
-    "к",
-    "о",
-    "у",
-    "от",
-    "для",
-    "из",
-    "за",
-    "под",
-    "над",
-    "при",
-    "через",
-    "а",
-    "но",
-    "или",
-    "если",
-    "когда",
-    "где",
-    "кто",
-    "что",
-    "как",
-    "почему",
-    "зачем",
-    "этот",
-    "эта",
-    "это",
-    "эти",
-    "тот",
-    "та",
-    "то",
-    "те",
-    "саммит",
-    "встреча",
-    "конференция",
-}
+# Upper bound on prompt text. Titles + summaries are short; this is a safety cap
+# so a pathological body can't blow up the NER call.
+_MAX_NER_CHARS = 6000
 
-# Character class for entity word bodies: Latin, Norwegian, and Cyrillic.
-_WORD_CHARS = r"a-zæøåA-ZÆØÅа-яёА-ЯЁ"
-
-# Capitalised phrase: one or more capitalised words optionally joined by
-# lowercase connecting words (e.g. "European Union", "Ministry of Defence").
-_ENTITY_RE = re.compile(
-    rf"\b[A-ZÆØÅА-ЯЁ][{_WORD_CHARS}]*"
-    rf"(?:\s+[A-ZÆØÅА-ЯЁ][{_WORD_CHARS}]+){{0,3}}"
-    rf"(?:\s+(?:of|the|&|for|in|on|de|del|di|von|van|da|dos|e)\s+[A-ZÆØÅА-ЯЁ][{_WORD_CHARS}]+)*"
-    r"\b",
-    re.UNICODE,
+# NER instruction. Kept model-agnostic and deterministic (temperature 0 upstream);
+# the model must reply with ONLY a JSON array so parsing stays robust.
+_NER_INSTRUCTION = (
+    "You are a named-entity recognition engine for an intelligence-triage "
+    "pipeline. Extract the distinct named entities from the text below. For each, "
+    "give its canonical surface form and one type from: PER (person), ORG "
+    "(organization), LOC (physical location), GPE (country/city/geopolitical "
+    "entity), MISC (any other named entity). Ignore common nouns, dates, numbers, "
+    "and pronouns. Preserve each entity's original language and script. "
+    'Respond with ONLY a JSON array of objects {{"name": "...", "type": '
+    '"PER|ORG|LOC|GPE|MISC"}} and no other text. The text language is {lang}."'
 )
 
 
-def extract_mentions(text: str) -> list[str]:
-    """Return unique entity-like mentions from text using regex + known topics.
+def extract_entities(text: str, lang: str, chat_fn) -> list[dict]:
+    """Extract typed named entities from text using the local chat LLM (qwen36).
 
-    The heuristic is intentionally lightweight: it finds capitalised phrases and
-    supplements them with a small domain topic list.  It avoids adding heavy
-    NLP dependencies to the triage container.
+    Args:
+        text: the source text (title + summary in production).
+        lang: ISO language hint passed to the model ("en", "no", "ru", ...).
+        chat_fn: callable ``(messages, max_tokens=...) -> str`` returning the raw
+            assistant content (see triage_score.llm). Injected for testability.
+
+    Returns:
+        A list of ``{"name": str, "type": str}`` dicts (types in _ALLOWED_TYPES),
+        de-duplicated by lowercased name. ANY failure — LLM error or unparseable
+        output — returns ``[]`` and logs a WARNING. Entity resolution is
+        best-effort and must never raise into the worker.
     """
-    text = text or ""
-    text_lower = text.lower()
-    mentions: set[str] = set()
+    text = (text or "").strip()
+    if not text:
+        return []
+    prompt = (
+        _NER_INSTRUCTION.format(lang=lang or "unknown")
+        + "\n\nText:\n"
+        + text[:_MAX_NER_CHARS]
+    )
+    try:
+        raw = chat_fn([{"role": "user", "content": prompt}], max_tokens=800)
+    except Exception as exc:  # pragma: no cover - network/model failure path
+        log.warning("entity NER LLM call failed: %s", exc)
+        return []
+    return _parse_entities(raw)
 
-    # Known topics first (preserve canonical casing).
-    for topic in _KNOWN_TOPICS:
-        if topic.lower() in text_lower:
-            mentions.add(topic)
 
-    # Regex proper nouns.
-    for match in _ENTITY_RE.finditer(text):
-        mention = match.group(0).strip()
-        # Drop leading articles and trailing punctuation / possessives.
-        mention = re.sub(r"^(?:the|a|an)\s+", "", mention, flags=re.IGNORECASE)
-        mention = mention.rstrip("'s")
-        if not mention:
+def _parse_entities(raw: str) -> list[dict]:
+    """Parse an LLM NER response into validated ``{name, type}`` dicts.
+
+    Tolerant of markdown code fences and surrounding prose: it isolates the
+    outermost JSON array. Returns ``[]`` (with a WARNING) on anything it cannot
+    parse into a list of name-bearing objects.
+    """
+    if not raw:
+        return []
+    s = raw.strip()
+    # Strip ```json ... ``` fences if the model wrapped its answer.
+    if s.startswith("```"):
+        s = re.sub(r"^```[a-zA-Z]*\n?", "", s)
+        s = re.sub(r"\n?```$", "", s).strip()
+    # Isolate the outermost JSON array.
+    start, end = s.find("["), s.rfind("]")
+    if start == -1 or end == -1 or end < start:
+        log.warning("entity NER returned no JSON array: %r", raw[:120])
+        return []
+    try:
+        data = json.loads(s[start : end + 1])
+    except Exception as exc:
+        log.warning("entity NER JSON parse failed: %s", exc)
+        return []
+    if not isinstance(data, list):
+        return []
+    out: list[dict] = []
+    seen: set[str] = set()
+    for entry in data:
+        if not isinstance(entry, dict):
             continue
-        # Filter out stop words and single letters.
-        key = mention.lower()
-        if key in _STOP_WORDS or len(key) <= 1:
+        name = entry.get("name")
+        if not isinstance(name, str) or not name.strip():
             continue
-        mentions.add(mention)
-
-    # Stable order for deterministic tests.
-    return sorted(mentions, key=lambda s: s.lower())
+        name = name.strip()
+        key = name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        etype = entry.get("type")
+        etype = etype if etype in _ALLOWED_TYPES else "MISC"
+        out.append({"name": name, "type": etype})
+    return out
 
 
 def normalize_name(name: str) -> str:
@@ -353,18 +167,19 @@ def _find_or_create_entity(
     lang: str,
     store,
     embed_fn,
+    entity_type: str | None = None,
 ) -> str | None:
     """Return an entity id for mention, creating a new entity if necessary.
 
     Resolution order:
       1. Exact (name_norm, lang) match.
       2. Similar existing entity by mE5-large cosine similarity >= LINK_THRESHOLD.
-      3. Create a new entity.
+      3. Create a new entity (with its NER type, when known).
 
-    Returns None for mentions that normalise to a stop word or empty string.
+    Returns None for mentions that normalise to an empty string.
     """
     name_norm = normalize_name(mention)
-    if not name_norm or name_norm in _STOP_WORDS:
+    if not name_norm:
         return None
 
     existing = store.get_entity_by_name_norm(name_norm, lang)
@@ -384,7 +199,7 @@ def _find_or_create_entity(
             name=mention,
             name_norm=name_norm,
             lang=lang,
-            type=None,
+            type=entity_type,
             embedding=embedding,
         ),
     )
@@ -396,16 +211,21 @@ def resolve_entities(
     lang: str,
     store,
     embed_fn,
+    chat_fn,
 ) -> None:
-    """Extract entities from text, persist them, and link them to item_id.
+    """Extract entities from text (LLM NER), persist them, and link to item_id.
 
     This is the synchronous core; worker.py calls it via asyncio.to_thread.
     """
-    mentions = extract_mentions(text)
-    for mention in mentions:
-        entity_id = _find_or_create_entity(mention, lang, store, embed_fn)
+    for entity in extract_entities(text, lang, chat_fn):
+        name = entity.get("name")
+        if not name:
+            continue
+        entity_id = _find_or_create_entity(
+            name, lang, store, embed_fn, entity.get("type")
+        )
         if entity_id is not None:
-            store.link_entity(entity_id, item_id, mention, lang)
+            store.link_entity(entity_id, item_id, name, lang)
 
 
 async def resolve_entities_async(
@@ -414,6 +234,9 @@ async def resolve_entities_async(
     lang: str,
     store,
     embed_fn,
+    chat_fn,
 ) -> None:
     """Async wrapper around resolve_entities for the async worker loop."""
-    await asyncio.to_thread(resolve_entities, item_id, text, lang, store, embed_fn)
+    await asyncio.to_thread(
+        resolve_entities, item_id, text, lang, store, embed_fn, chat_fn
+    )
