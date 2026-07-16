@@ -469,7 +469,7 @@ class PostgresStore:
         ).fetchone()
         self._conn.commit()
         assert row is not None, "put_entity RETURNING id produced no row"
-        return cast(str, row["id"])
+        return str(row["id"])
 
     def get_entity(self, entity_id: str) -> "dict | None":
         """Return entity dict for entity_id, or None if absent."""
