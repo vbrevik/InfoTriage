@@ -29,7 +29,7 @@ urgent insertions. The all-local-LLM rule (ADR-004) is never revisited by a phas
 - [x] 06-01-PLAN.md — Renderer library + FastAPI serving layer (Wave 1+2) — 38 tests pass
 - [x] 06-02-PLAN.md — pgvector semantic clustering (replaced keyword-overlap) — 38/38 tests pass
 - [x] **Phase 7: Ops + cutover** (M1) - health, DLQ, replay, retire host path (completed 2026-07-12; **M1 ship-gate met**)
-- [x] **Phase 8: Entity resolution** (M2) - Postgres + pgvector → Obsidian projection (completed 2026-07-13; validated, T*=0.92 adopted in 999.3)
+- [ ] **Phase 8: Entity resolution** (M2) - Postgres + pgvector → Obsidian projection (Wave 1 done: store methods, heuristic NER, SQL tables; Waves 2–6 pending: LLM NER, worker integration, vault projection, entity graph, contract tests)
 - [ ] **Phase 9: RAG recall** (M2) - CCIR pre-filter + thematic recall over corpus
 - [ ] **Phase 10: Wiki-LLM** (M2) - standing auto-wiki + on-demand synthesis → Obsidian
 - [ ] **Phase 11: SOCMINT + Arctic collection** (M2) - Telegram/AIS adapters via MCP pattern
