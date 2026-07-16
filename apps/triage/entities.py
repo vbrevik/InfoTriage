@@ -24,10 +24,11 @@ from typing import cast
 
 log = logging.getLogger(__name__)
 
-# Default entity-link cosine threshold. Re-validated by
+# Default entity-link cosine threshold. Re-validated for mE5-large by
 # scripts/validate_entity_threshold.py and documented in
 # .planning/phases/999.3-entity-resolution-cross-language-coverage-and-mE5-large-re-validation/999.3-VERDICT.md
-LINK_THRESHOLD = 0.85
+# (T*=0.92 adopted: zero false-merges; the earlier 0.85 was validated on bge-m3).
+LINK_THRESHOLD = 0.92
 
 # Entity types the model may assign; anything else is coerced to MISC.
 _ALLOWED_TYPES = {"PER", "ORG", "LOC", "GPE", "MISC"}

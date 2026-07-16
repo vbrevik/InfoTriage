@@ -8,7 +8,9 @@ from pathlib import Path
 import pytest
 from contracts import from_frontmatter
 from apps.brief.vault_writer import (
+    render_entity_graph,
     render_wikilinked,
+    write_entity_graph,
     write_item_obsidian,
     write_sab_obsidian,
     write_vault_digest,
@@ -204,10 +206,11 @@ def test_write_vault_digest_includes_email_by_default(temp_vault, monkeypatch):
 
     paths = write_vault_digest(rows, temp_vault)
 
-    # Returns the item file plus the SAB projection
-    assert len(paths) == 2
+    # Returns the item file, the SAB projection, and the entity graph
+    assert len(paths) == 3
     assert (temp_vault / "email-1.md").exists()
     assert (temp_vault / "obsidian-sab.md").exists()
+    assert (temp_vault / "Entity Graph.md").exists()
 
 
 def test_gmail_row_excluded_when_email_disabled(temp_vault, monkeypatch):
@@ -349,3 +352,82 @@ def test_write_vault_digest_view_projection(temp_vault):
     assert (temp_vault / "obsidian-sab-cop.md").exists()
     # Should still return the SAB path even when not writing items
     assert any(p.name == "obsidian-sab-cop.md" for p in paths)
+
+
+# --- Phase 8 Wave 4: Entity Graph ---------------------------------------------
+
+
+def test_render_entity_graph_aggregates_aliases_and_counts():
+    """render_entity_graph groups by canonical name, tags aliases by language,
+    and counts distinct linked items."""
+    items = [
+        {
+            "item_id": "1",
+            "entities": [
+                {"name": "NATO", "mention": "NATO", "lang": "en"},
+                {"name": "Oslo", "mention": "Oslo", "lang": "en"},
+            ],
+        },
+        {
+            "item_id": "2",
+            "entities": [
+                {"name": "NATO", "mention": "NATO", "lang": "no"},
+                {"name": "NATO", "mention": "NATO", "lang": "en"},  # dup alias
+            ],
+        },
+    ]
+    md = render_entity_graph(items)
+    assert md.startswith("# Entity Graph")
+    # NATO seen in 2 distinct items
+    assert "## NATO" in md
+    assert "Linked items: 2" in md
+    # language-tagged, de-duplicated aliases
+    assert "NATO (en)" in md and "NATO (no)" in md
+    # Oslo seen in 1 item
+    assert "## Oslo" in md
+    # sections sorted: NATO before Oslo
+    assert md.index("## NATO") < md.index("## Oslo")
+
+
+def test_render_entity_graph_empty():
+    """No entities -> a valid, non-crashing note with a placeholder."""
+    md = render_entity_graph([{"item_id": "1", "entities": []}])
+    assert "# Entity Graph" in md
+    assert "No entities linked yet" in md
+
+
+def test_render_entity_graph_skips_nameless_links():
+    """Entity links without a name are ignored (no crash, no empty section)."""
+    md = render_entity_graph([{"item_id": "1", "entities": [{"mention": "x", "lang": "en"}]}])
+    assert "No entities linked yet" in md
+
+
+def test_write_entity_graph_writes_file(temp_vault):
+    """write_entity_graph produces Entity Graph.md in the vault."""
+    items = [{"item_id": "1", "entities": [{"name": "NATO", "mention": "NATO", "lang": "en"}]}]
+    path = write_entity_graph(items, temp_vault)
+    assert path == temp_vault / "Entity Graph.md"
+    assert path.exists()
+    assert "## NATO" in path.read_text(encoding="utf-8")
+
+
+def test_write_vault_digest_includes_entity_graph(temp_vault):
+    """The digest generates Entity Graph.md alongside items and the SAB."""
+    rows = [
+        {
+            "item_id": "1",
+            "title": "Item",
+            "summary": "Summary",
+            "source": "",
+            "url": "",
+            "ccir": "PIR-1",
+            "score": 9,
+            "cnr": "I",
+            "entities": [{"name": "NATO", "mention": "NATO", "lang": "en"}],
+        },
+    ]
+    paths = write_vault_digest(rows, temp_vault)
+    graph_path = temp_vault / "Entity Graph.md"
+    assert graph_path in paths
+    assert graph_path.exists()
+    assert "## NATO" in graph_path.read_text(encoding="utf-8")

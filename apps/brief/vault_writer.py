@@ -204,6 +204,62 @@ def write_sab_obsidian(
     return filepath
 
 
+def render_entity_graph(items: list[dict]) -> str:
+    """Render the Entity Graph note from the digested items' entity links.
+
+    Aggregates each item's ``entities`` links (``{name, mention, lang}``, as
+    projected onto rows by ``consumer._attach_entities``) into one section per
+    canonical entity, listing its language-tagged aliases and the number of
+    linked items. Uses only data already on the rows, so it needs no extra
+    store queries.
+    """
+    graph: dict[str, dict] = {}
+    for item in items:
+        item_id = item.get("item_id")
+        for e in item.get("entities", []):
+            name = e.get("name")
+            if not name:
+                continue
+            node = graph.setdefault(name, {"aliases": set(), "items": set()})
+            mention = e.get("mention")
+            lang = e.get("lang") or "?"
+            if mention:
+                node["aliases"].add((mention, lang))
+            if item_id is not None:
+                node["items"].add(item_id)
+
+    lines = ["# Entity Graph", ""]
+    if not graph:
+        lines.append("_No entities linked yet._")
+        lines.append("")
+    for name in sorted(graph):
+        node = graph[name]
+        aliases = sorted(f"{mention} ({lang})" for mention, lang in node["aliases"])
+        lines.append(f"## {name}")
+        lines.append(f"- Aliases: {', '.join(aliases) if aliases else '—'}")
+        lines.append(f"- Linked items: {len(node['items'])}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def write_entity_graph(
+    items: list[dict],
+    vault_path: Path,
+    *,
+    filename: str = "Entity Graph.md",
+) -> Path:
+    """Write the aggregated Entity Graph note to the vault (atomic replace)."""
+    vault_path.mkdir(parents=True, exist_ok=True)
+    filepath = vault_path / filename
+
+    content = render_entity_graph(items)
+    tmp_path = filepath.with_suffix(".tmp")
+    tmp_path.write_text(content, encoding="utf-8")
+    os.replace(tmp_path, filepath)
+
+    return filepath
+
+
 def write_vault_digest(
     enrichment_rows: list[dict],
     vault_path: Optional[Path] = None,
@@ -262,5 +318,8 @@ def write_vault_digest(
     # Write SAB projection
     write_sab_obsidian(kept, vault_path, filename=sab_filename)
     paths.append(vault_path / sab_filename)
+
+    # Write the aggregated entity graph note
+    paths.append(write_entity_graph(kept, vault_path))
 
     return paths

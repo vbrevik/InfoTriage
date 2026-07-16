@@ -520,7 +520,7 @@ class PostgresStore:
     def find_similar_entity(
         self,
         vector: list[float],
-        threshold: float = 0.85,
+        threshold: float = 0.92,  # mE5-large validated T*; see 999.3-VERDICT.md
     ) -> "dict | None":
         """Return the nearest entity with cosine similarity >= threshold, or None.
 
