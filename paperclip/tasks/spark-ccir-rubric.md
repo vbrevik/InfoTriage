@@ -1,0 +1,1 @@
+Write a concise one-page rubric in markdown applying military CCIR/CNR doctrine to triage incoming information (newspapers, websites, RSS, email) into Priority Intelligence Requirements (PIR), Friendly Force Information Requirements (FFIR), and discard. Align it with an OSINT Situational Awareness Brief (SAB) workflow. Include a short numeric scoring guide.

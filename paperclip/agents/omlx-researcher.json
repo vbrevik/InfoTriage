@@ -1,0 +1,16 @@
+{
+  "name": "oMLX Researcher",
+  "role": "researcher",
+  "title": "Local MLX researcher (oMLX, Mac fallback)",
+  "worker": {
+    "base": "http://127.0.0.1:8000/v1",
+    "model": "qwen36-ud-4bit",
+    "key": "omlx",
+    "out_file": "sources.md",
+    "workspace": "workspaces/omlx",
+    "task_file": "tasks/omlx-osint-sources.md",
+    "no_think": "1",
+    "max_tokens": "4000",
+    "timeout_sec": 600
+  }
+}
