@@ -1,1 +1,0 @@
-List 8 to 12 candidate open information sources (RSS feeds, news sites, mailing lists) useful for an OSINT/CCIR intelligence pipeline. Output a markdown table with columns: Source, Type, Why it matters, Reliability. One row per source.
