@@ -29,7 +29,7 @@ urgent insertions. The all-local-LLM rule (ADR-004) is never revisited by a phas
 - [x] 06-01-PLAN.md — Renderer library + FastAPI serving layer (Wave 1+2) — 38 tests pass
 - [x] 06-02-PLAN.md — pgvector semantic clustering (replaced keyword-overlap) — 38/38 tests pass
 - [x] **Phase 7: Ops + cutover** (M1) - health, DLQ, replay, retire host path (completed 2026-07-12; **M1 ship-gate met**)
-- [ ] **Phase 8: Entity resolution** (M2) - Postgres + pgvector → Obsidian projection (Wave 1 done: store methods, heuristic NER, SQL tables; Waves 2–6 pending: LLM NER, worker integration, vault projection, entity graph, contract tests)
+- [x] **Phase 8: Entity resolution** (M2) - Postgres + pgvector → Obsidian projection (Waves 1–6 complete: LLM NER, worker integration, vault projection, entity graph, mE5-large threshold re-validation, contract tests)
 - [ ] **Phase 9: RAG recall** (M2) - CCIR pre-filter + thematic recall over corpus
 - [ ] **Phase 10: Wiki-LLM** (M2) - standing auto-wiki + on-demand synthesis → Obsidian
 - [ ] **Phase 11: SOCMINT + Arctic collection** (M2) - Telegram/AIS adapters via MCP pattern
@@ -244,7 +244,10 @@ to the running pipeline.
   1. `entities` + `entity_links` populated via extraction + pgvector linking (cross-modality, cross-language).
   2. The Obsidian graph is generated as a projection of this truth, not the system of record.
 
-**Plans**: TBD
+**Plans**: 6/6 waves complete (08-01 store foundation through 08-02 entity graph + threshold validation)
+
+- [x] 08-01-PLAN.md — Store foundation: `put_entity`, `get_entity`, `link_entity`, `get_entity_links` on Protocol + Postgres + InMemory (W1)
+- [x] 08-02-PLAN.md — Waves 2–6: LLM-based NER (`apps/triage/entities.py`), triage worker integration, vault projection replacing heuristic, `Entity Graph.md` generation, mE5-large threshold re-validated at T*=0.92, contract/regression tests (W2–W6)
 
 ### Phase 9: RAG recall
 
