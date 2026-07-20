@@ -171,7 +171,7 @@ services:
       # NOT ${LLM_BASE_URL:-...}: .env's LLM_BASE_URL=127.0.0.1 is for host-side scripts
       # (e.g. triage_score.py run on the Mac); 127.0.0.1 inside this container is the
       # container itself, not the host, so that value must never leak in here.
-      LLM_BASE_URL: http://host.docker.internal:8000/v1   # host oMLX — ADR-004, local only
+      LLM_BASE_URL: http://host.docker.internal:8600/v1   # host LLM router: Spark primary / oMLX fallback (embeddings->oMLX) — ADR-004, local only
       LLM_API_KEY: ${LLM_API_KEY:-omlx}
       LLM_MODEL: ${LLM_MODEL:-qwen36-ud-4bit}
     extra_hosts:
@@ -219,7 +219,7 @@ services:
       VAULT_INCLUDE_EMAIL: ${VAULT_INCLUDE_EMAIL:-1}
       # NOT ${LLM_BASE_URL:-...}: .env's LLM_BASE_URL=127.0.0.1 is for host-side scripts;
       # inside the container that resolves to the container itself (see triage note).
-      LLM_BASE_URL: http://host.docker.internal:8000/v1   # host oMLX — ADR-004, local only
+      LLM_BASE_URL: http://host.docker.internal:8600/v1   # host LLM router: Spark primary / oMLX fallback (embeddings->oMLX) — ADR-004, local only
       LLM_API_KEY: ${LLM_API_KEY:-omlx}
       LLM_MODEL: ${LLM_MODEL:-qwen36-ud-4bit}
     extra_hosts:

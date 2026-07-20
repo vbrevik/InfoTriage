@@ -150,12 +150,26 @@ async def process_item(
     await asyncio.to_thread(store.put_embedding, item_id, vec)
 
     # Phase 8: extract, embed, and link entities to this item.
-    # This is best-effort: entity-linking failures are logged but must not
-    # prevent the verdict.ready event from being published.
+    # This is best-effort: entity-linking failures (including timeouts) are
+    # logged but must not prevent the verdict.ready event from being published.
+    # A timeout guard ensures a hung LLM NER call cannot block the scoring
+    # pipeline indefinitely (ADR-004, R5 prohibition).
+    _ENTITY_NER_TIMEOUT = float(
+        os.environ.get("INFOTRIAGE_ENTITY_NER_TIMEOUT", "15")
+    )
     try:
         entity_text = item.title + " " + (item.summary or "")
-        await resolve_entities_async(
-            item_id, entity_text, item.lang or "en", store, embed, ner_chat
+        await asyncio.wait_for(
+            resolve_entities_async(
+                item_id, entity_text, item.lang or "en", store, embed, ner_chat
+            ),
+            timeout=_ENTITY_NER_TIMEOUT,
+        )
+    except asyncio.TimeoutError:
+        log.warning(
+            "entity resolution timed out after %.0fs for item_id=%s — verdict not blocked",
+            _ENTITY_NER_TIMEOUT,
+            item_id,
         )
     except Exception as exc:
         log.warning("entity resolution failed for item_id=%s: %s", item_id, exc)

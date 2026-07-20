@@ -395,6 +395,98 @@ def test_verdict_ready_fields(store, bus):
     assert "ts" in payload
 
 
+def test_entity_resolution_failure_does_not_block_verdict(store, bus):
+    """Entity resolution raises → verdict.ready still published (R5 prohibition)."""
+    item = _item("Entity Error Item")
+    store.put_item(item)
+    score = _fake_score(
+        {
+            "ccir": "PIR-1",
+            "cnr": "II",
+            "score": 6,
+            "bucket": "maybe",
+            "why": "test",
+            "pmesii": "Political",
+            "tessoc": "Subversion",
+        }
+    )
+
+    def boom_ner(messages, max_tokens=800):
+        raise RuntimeError("NER model offline")
+
+    asyncio.run(
+        process_item(
+            item.id, store, bus, embed=lambda text: VEC_A, score=score, ner_chat=boom_ner
+        )
+    )
+
+    assert len(bus.published) == 1
+    assert bus.published[0]["routing_key"] == "verdict.ready"
+    assert bus.published[0]["payload"]["item_id"] == item.id
+
+
+def test_entity_resolution_timeout_does_not_block_verdict(store, bus):
+    """Entity resolution hangs → asyncio.wait_for timeouts → verdict.ready still published.
+
+    We replace resolve_entities_async with a coroutine that blocks on an
+    asyncio.Event() that never resolves. Because this blocks at the event-
+    loop level (not a thread pool), asyncio.wait_for can cancel it and
+    the timeout fires immediately.
+    """
+    import asyncio
+    import os
+    from unittest.mock import patch
+
+    item = _item("Timeout Item")
+    store.put_item(item)
+    score = _fake_score(
+        {
+            "ccir": "PIR-1",
+            "cnr": "II",
+            "score": 6,
+            "bucket": "maybe",
+            "why": "test",
+            "pmesii": "Political",
+            "tessoc": "Subversion",
+        }
+    )
+
+    _never = asyncio.Event()  # never set → blocks forever
+
+    env_orig = os.environ.get("INFOTRIAGE_ENTITY_NER_TIMEOUT")
+    try:
+        os.environ["INFOTRIAGE_ENTITY_NER_TIMEOUT"] = "0.01"
+        # The timeout must be short so the test finishes fast.
+        import time
+
+        async def _hang(*args, **kwargs):
+            await _never.wait()
+
+        t0 = time.monotonic()
+        with patch("worker.resolve_entities_async", _hang):
+            asyncio.run(
+                process_item(
+                    item.id,
+                    store,
+                    bus,
+                    embed=lambda text: VEC_A,
+                    score=score,
+                )
+            )
+        elapsed = time.monotonic() - t0
+        # The timeout should fire quickly (~0.01s) not block for minutes
+        assert elapsed < 2, f"timeout did not fire; took {elapsed:.1f}s"
+    finally:
+        if env_orig is not None:
+            os.environ["INFOTRIAGE_ENTITY_NER_TIMEOUT"] = env_orig
+        else:
+            os.environ.pop("INFOTRIAGE_ENTITY_NER_TIMEOUT", None)
+
+    assert len(bus.published) == 1
+    assert bus.published[0]["routing_key"] == "verdict.ready"
+    assert bus.published[0]["payload"]["item_id"] == item.id
+
+
 def test_on_message_reads_item_id_from_headers_not_body(store, bus, monkeypatch):
     """on_message must extract item_id from message.headers — RabbitMQBus.publish()
     puts item_id only in AMQP headers, never in the JSON body. A regression here
