@@ -605,7 +605,6 @@ class PostgresStore:
                 e.lang,
                 e.type,
                 ARRAY_AGG(DISTINCT el.mention || ' (' || el.lang || ')') AS aliases,
-                COUNT(DISTINCT el.mention || ' (' || el.lang || ')') AS alias_count,
                 COUNT(DISTINCT el.item_id) AS link_count
             FROM infotriage.entities e
             LEFT JOIN infotriage.entity_links el ON el.entity_id = e.id
@@ -622,7 +621,6 @@ class PostgresStore:
                 "lang": r["lang"],
                 "type": r["type"],
                 "aliases": sorted(r["aliases"]) if r["aliases"] is not None else [],
-                "alias_count": r["alias_count"],
                 "link_count": r["link_count"],
             }
             for r in rows

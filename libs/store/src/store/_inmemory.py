@@ -313,7 +313,6 @@ class InMemoryStore:
                     "lang": entity["lang"],
                     "type": entity["type"],
                     "aliases": aliases,
-                    "alias_count": len(aliases),
                     "link_count": len(item_map.get(entity_id, set())),
                 }
             )

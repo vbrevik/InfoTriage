@@ -263,7 +263,7 @@ def write_entity_graph(
 def render_entity_graph_from_store(entities: list[dict]) -> str:
     """Render the Entity Graph note from Store.get_all_entities() rows.
 
-    Each row is expected to have: id, name, lang, type, aliases, alias_count,
+    Each row is expected to have: id, name, lang, type, aliases,
     link_count. aliases is a list of language-tagged strings such as
     'NATO (en)' or 'НАТО (ru)'. The note lists canonical entities grouped by
     link_count with their language/type tags and actual aliases.

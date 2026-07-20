@@ -208,7 +208,7 @@ def test_get_entity_by_name_norm(store):
 
 
 def test_get_all_entities_aggregates_aliases_and_links(store):
-    """get_all_entities returns all entities with alias_count and link_count."""
+    """get_all_entities returns all entities with aliases and link_count."""
     item1 = _seed_item(store)
     item2 = _make_item("item-002")
     store.put_item(item2)
@@ -227,12 +227,10 @@ def test_get_all_entities_aggregates_aliases_and_links(store):
     assert nato["name_norm"] == "nato"
     assert nato["type"] == "ORG"
     assert nato["aliases"] == ["NATO (en)", "НАТО (ru)"]
-    assert nato["alias_count"] == 2
     assert nato["link_count"] == 2
     oslo = all_entities[1]
     assert oslo["name"] == "Oslo"
     assert oslo["aliases"] == []
-    assert oslo["alias_count"] == 0
     assert oslo["link_count"] == 0
 
 

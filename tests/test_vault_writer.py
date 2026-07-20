@@ -446,7 +446,6 @@ def test_write_entity_graph_from_store_uses_store_data(temp_vault):
                     "lang": "en",
                     "type": "ORG",
                     "aliases": ["NATO (en)", "НАТО (ru)"],
-                    "alias_count": 2,
                     "link_count": 5,
                 }
             ]
@@ -471,7 +470,6 @@ def test_write_vault_digest_prefers_store_graph_when_store_provided(temp_vault):
                     "lang": "en",
                     "type": "ORG",
                     "aliases": ["StoreEntity (en)"],
-                    "alias_count": 1,
                     "link_count": 3,
                 }
             ]
