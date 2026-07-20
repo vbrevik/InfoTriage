@@ -17,18 +17,47 @@ Tests:
         a routing key with no declared queue
 """
 import asyncio
+import contextlib
 import json
+import logging
 import os
 import socket
 
 import aio_pika
 import pytest
+from unittest.mock import patch
 
 from contracts import RabbitMQBus
 
-AMQP_URL = os.environ.get(
-    "INFOTRIAGE_AMQP_DSN", "amqp://infotriage:infotriage_rmq@127.0.0.1:22001"
-)
+log = logging.getLogger(__name__)
+
+AMQP_URL = "amqp://infotriage:infotriage_rmq@127.0.0.1:22001"
+
+# Test-isolated topology prefix. Must match test_bus_rabbitmq.py so the same
+# cleanup fixture can remove queues/exchanges created here.
+TEST_PREFIX = "test."
+TEST_ROUTING_KEY_TO_QUEUE = {
+    "item.ingested": f"{TEST_PREFIX}q.triage",
+    "verdict.ready": f"{TEST_PREFIX}q.brief",
+    "sab.published": f"{TEST_PREFIX}q.notify",
+    "feed.unhealthy": f"{TEST_PREFIX}q.ops",
+}
+TEST_DLX_NAME = f"{TEST_PREFIX}infotriage.dlx"
+TEST_DLQ_NAME = f"{TEST_PREFIX}infotriage.dlq"
+TEST_DLQ_ROUTING_KEY = f"{TEST_PREFIX}dead"
+
+
+@contextlib.contextmanager
+def _patched_topology():
+    """Patch RabbitMQBus topology globals to test-isolated names."""
+    with patch.multiple(
+        "contracts._bus_rabbitmq",
+        ROUTING_KEY_TO_QUEUE=TEST_ROUTING_KEY_TO_QUEUE,
+        DLX_NAME=TEST_DLX_NAME,
+        DLQ_NAME=TEST_DLQ_NAME,
+        DLQ_ROUTING_KEY=TEST_DLQ_ROUTING_KEY,
+    ):
+        yield
 
 
 def _rabbitmq_reachable() -> bool:
@@ -49,6 +78,37 @@ def _skip_if_unavailable() -> None:
         pytest.skip(
             "RabbitMQ :22001 not available — run: docker compose up -d rabbitmq"
         )
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _cleanup_test_topology():
+    """Yield to tests, then delete test-isolated RabbitMQ topology after the module."""
+    yield
+    if not _rabbitmq_reachable():
+        return
+
+    async def _delete() -> None:
+        try:
+            connection = await aio_pika.connect_robust(AMQP_URL)
+            channel = await connection.channel()
+            assert channel is not None
+            for q_name in list(TEST_ROUTING_KEY_TO_QUEUE.values()) + [TEST_DLQ_NAME]:
+                try:
+                    queue = await channel.get_queue(q_name)
+                    await queue.delete()
+                except Exception as exc:  # pragma: no cover
+                    log.debug("Could not delete test queue %s: %s", q_name, exc)
+            try:
+                exchange = await channel.get_exchange(TEST_DLX_NAME)
+                await exchange.delete()
+            except Exception as exc:  # pragma: no cover
+                log.debug("Could not delete test DLX %s: %s", TEST_DLX_NAME, exc)
+            await channel.close()
+            await connection.close()
+        except Exception as exc:  # pragma: no cover
+            log.warning("RabbitMQ test topology cleanup failed: %s", exc)
+
+    asyncio.run(_delete())
 
 
 async def _fresh_bus() -> RabbitMQBus:
@@ -98,7 +158,8 @@ def test_consume_delivers_message() -> None:
                 await bus._queues[rk].cancel(consumer_tag)
             await bus.close()
 
-    asyncio.run(_run())
+    with _patched_topology():
+        asyncio.run(_run())
 
 
 # ---------------------------------------------------------------------------
@@ -123,4 +184,5 @@ def test_consume_unknown_routing_key_raises() -> None:
         finally:
             await bus.close()
 
-    asyncio.run(_run())
+    with _patched_topology():
+        asyncio.run(_run())

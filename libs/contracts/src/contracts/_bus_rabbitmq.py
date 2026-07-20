@@ -117,7 +117,7 @@ class RabbitMQBus:
         assert self._connection is not None
         # Open a fresh channel (prior one closed after 406)
         ch = await self._connection.channel()
-        for q_name in [DLQ_NAME, "q.triage", "q.brief", "q.notify", "q.ops"]:
+        for q_name in [DLQ_NAME] + list(ROUTING_KEY_TO_QUEUE.values()):
             try:
                 await ch.queue_delete(q_name)
                 log.info("Deleted queue %s for topology rebuild", q_name)
@@ -217,7 +217,7 @@ class RabbitMQBus:
 
         while True:
             try:
-                msg = await queue.get(no_ack=True)
+                msg = await queue.get(no_ack=True, fail=False, timeout=0.5)
                 if msg is None:
                     break
                 try:
