@@ -365,15 +365,15 @@ def test_render_entity_graph_aggregates_aliases_and_counts():
         {
             "item_id": "1",
             "entities": [
-                {"name": "NATO", "mention": "NATO", "lang": "en"},
-                {"name": "Oslo", "mention": "Oslo", "lang": "en"},
+                {"name": "NATO", "mention": "NATO", "lang": "en", "type": "ORG"},
+                {"name": "Oslo", "mention": "Oslo", "lang": "en", "type": "GPE"},
             ],
         },
         {
             "item_id": "2",
             "entities": [
-                {"name": "NATO", "mention": "NATO", "lang": "no"},
-                {"name": "NATO", "mention": "NATO", "lang": "en"},  # dup alias
+                {"name": "NATO", "mention": "NATO", "lang": "no", "type": "ORG"},
+                {"name": "NATO", "mention": "NATO", "lang": "en", "type": "ORG"},  # dup alias
             ],
         },
     ]
@@ -382,6 +382,9 @@ def test_render_entity_graph_aggregates_aliases_and_counts():
     # NATO seen in 2 distinct items
     assert "## NATO" in md
     assert "Linked items: 2" in md
+    # type and language rendered consistently with store-backed graph
+    assert "**Type:** ORG · **Lang:** en" in md
+    assert "**Type:** GPE · **Lang:** en" in md
     # language-tagged, de-duplicated aliases
     assert "NATO (en)" in md and "NATO (no)" in md
     # Oslo seen in 1 item

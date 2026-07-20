@@ -207,11 +207,11 @@ def write_sab_obsidian(
 def render_entity_graph(items: list[dict]) -> str:
     """Render the Entity Graph note from the digested items' entity links.
 
-    Aggregates each item's ``entities`` links (``{name, mention, lang}``, as
-    projected onto rows by ``consumer._attach_entities``) into one section per
-    canonical entity, listing its language-tagged aliases and the number of
-    linked items. Uses only data already on the rows, so it needs no extra
-    store queries.
+    Aggregates each item's ``entities`` links (``{name, mention, lang, type}``,
+    as projected onto rows by ``consumer._attach_entities``) into one section
+    per canonical entity, listing its type, language-tagged aliases, and the
+    number of linked items. Uses only data already on the rows, so it needs no
+    extra store queries.
     """
     graph: dict[str, dict] = {}
     for item in items:
@@ -220,7 +220,9 @@ def render_entity_graph(items: list[dict]) -> str:
             name = e.get("name")
             if not name:
                 continue
-            node = graph.setdefault(name, {"aliases": set(), "items": set()})
+            node = graph.setdefault(
+                name, {"aliases": set(), "items": set(), "lang": e.get("lang") or "?", "type": e.get("type") or "MISC"}
+            )
             mention = e.get("mention")
             lang = e.get("lang") or "?"
             if mention:
@@ -236,6 +238,7 @@ def render_entity_graph(items: list[dict]) -> str:
         node = graph[name]
         aliases = sorted(f"{mention} ({lang})" for mention, lang in node["aliases"])
         lines.append(f"## {name}")
+        lines.append(f"- **Type:** {node['type']} · **Lang:** {node['lang']}")
         lines.append(f"- Aliases: {', '.join(aliases) if aliases else '—'}")
         lines.append(f"- Linked items: {len(node['items'])}")
         lines.append("")

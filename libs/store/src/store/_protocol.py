@@ -208,7 +208,7 @@ class Store(Protocol):
     def get_entity_links(self, item_id: str) -> list[dict]:
         """Return entity-link rows for item_id joined to canonical entity names.
 
-        Each row contains: entity_id, name, mention, lang.
+        Each row contains: entity_id, name, mention, lang, type.
         """
         ...
 

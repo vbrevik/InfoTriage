@@ -284,6 +284,7 @@ class InMemoryStore:
                         {
                             "entity_id": link["entity_id"],
                             "name": entity["name"],
+                            "type": entity["type"],
                             "mention": link["mention"],
                             "lang": link["lang"],
                         }

@@ -570,7 +570,7 @@ class PostgresStore:
         assert self._conn is not None, "PostgresStore must be used as a context manager"
         rows = self._conn.execute(
             """
-            SELECT el.entity_id, e.name, el.mention, el.lang
+            SELECT el.entity_id, e.name, e.type, el.mention, el.lang
             FROM infotriage.entity_links el
             JOIN infotriage.entities e ON e.id = el.entity_id
             WHERE el.item_id = %s
@@ -587,6 +587,7 @@ class PostgresStore:
                 {
                     "entity_id": str(r["entity_id"]),
                     "name": r["name"],
+                    "type": r["type"],
                     "mention": r["mention"],
                     "lang": r["lang"],
                 }

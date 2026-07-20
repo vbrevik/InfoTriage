@@ -189,6 +189,7 @@ def test_get_entity_links(store):
     assert len(links) == 1
     assert links[0]["entity_id"] == entity_id
     assert links[0]["name"] == "NATO"
+    assert links[0]["type"] == "ORG"
     assert links[0]["mention"] == "NATO"
     assert links[0]["lang"] == "en"
 
