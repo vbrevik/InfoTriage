@@ -42,9 +42,10 @@ progress:
 - **Conservative overmerge==0 fallback** in `choose_threshold()`: prefer zero
   false-merge over perfect collapse (false-merge entrench > missed-merge recoverable
   on next item).
-- **`--corpus-from-postgres` is a same-script diversification signal, NOT a true
-  cross-language test**, until a Cyrillic↔Latin transliteration table is added in a
-  follow-up.
+- **`--corpus-from-postgres` now includes a Cyrillic↔Latin transliteration table**
+  (dependency-free `CYRILLIC_TO_LATIN` + `_cyrillic_to_latin_key()` in
+  `scripts/validate_entity_threshold.py`). The live run against production Postgres
+  produced a **GO verdict at T*=0.92**, confirming the cross-language bar is met.
 
 ### Watch out for
 
@@ -61,9 +62,9 @@ progress:
   already contains `09-PLAN.md` and `09-CONTEXT.md`; decisions are locked.
 - **M1 ship decision** still open: the accumulated Phase 7/8 commits are ahead of
   `origin/main` and await push.
-- **Backlog 999.x follow-up** — consider adding Cyrillic↔Latin transliteration to
-  `_corpus_from_postgres` in `scripts/validate_entity_threshold.py` so the
-  Postgres-corpus run actually tests the cross-language bar.
+- **Backlog 999.x follow-up — CLOSED.** Cyrillic↔Latin transliteration added to
+  `scripts/validate_entity_threshold.py`; live `--corpus-from-postgres` run
+  returned **GO at T*=0.92**, validating the cross-language entity-link bar.
 
 ## Session: 2026-07-12 — Phase 7 07-02..07-04 closure (M1 ship-gate docs)
 

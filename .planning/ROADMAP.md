@@ -358,7 +358,7 @@ Plans:
 **Phase 8 implications:**
 - Adopt T*=0.92 in `apps/triage/entities.py::LINK_THRESHOLD` and `libs/store/_postgres.py::find_similar_entity` default (replace current 0.85).
 - Item-level dedup threshold (R2 mE5-large @ 0.84) for `find_near_duplicate` stays unchanged — separate problem.
-- A follow-up spike could re-run `--corpus-from-postgres` with a Cyrillic↔Latin transliteration table to fully validate the cross-language bar against production data; the current heuristic in `_corpus_from_postgres` only matches same-script titles.
+- ~~A follow-up spike could re-run `--corpus-from-postgres` with a Cyrillic↔Latin transliteration table to fully validate the cross-language bar against production data; the current heuristic in `_corpus_from_postgres` only matches same-script titles.~~ **DONE 2026-07-13**: dependency-free `CYRILLIC_TO_LATIN` table + `_cyrillic_to_latin_key()` added; live `--corpus-from-postgres` run produced **GO at T*=0.92**, confirming the cross-language bar is met.
 
 **Source:** SPIKE-FINDINGS.md §R3, R3-VERDICT.md, ADR-006, Phase 00 VERIFICATION.md, `999.3-VERDICT.md` (2026-07-12).
 **Requirements:** TBD — superseded by adoption into Phase 8 plans.

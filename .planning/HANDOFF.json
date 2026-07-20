@@ -22,17 +22,19 @@
   "blockers": [],
   "async_jobs": [],
   "human_actions_pending": [
-    "Operator decision: push the accumulated Phase 7/8 commits to origin/main, OR continue straight into Phase 9 (RAG recall).",
-    "Backlog follow-up suggestion: add Cyrillic↔Latin transliteration to scripts/validate_entity_threshold.py so --corpus-from-postgres tests the true cross-language bar."
+    "Operator decision: continue straight into Phase 9 (RAG recall)."
   ],
   "decisions": [
     {"decision": "LINK_THRESHOLD = 0.92 for entity-level mE5-large linking", "rationale": "Real mE5-large vector re-validation (backlog 999.3) recommended 0.92 via conservative overmerge==0 fallback; 0.85 was the old R3 bge-m3-misparse value and is no longer used.", "phase": "08"},
     {"decision": "Store.get_all_entities() returns language-tagged aliases", "rationale": "Entity Graph.md projection should show actual aliases (mention + lang) rather than a bare count; alias_count removed as redundant with len(aliases).", "phase": "08"},
     {"decision": "Row-based and store-backed Entity Graph both render type and language", "rationale": "Consistency between the two graph formats; type/lang are canonical entity attributes.", "phase": "08"},
-    {"decision": "Entity NER in triage worker guarded by asyncio.wait_for timeout", "rationale": "Prevents a hung LLM NER call from blocking verdict.ready publication per ADR-004 R5 prohibition.", "phase": "08"}
+    {"decision": "Entity NER in triage worker guarded by asyncio.wait_for timeout", "rationale": "Prevents a hung LLM NER call from blocking verdict.ready publication per ADR-004 R5 prohibition.", "phase": "08"},
+    {"decision": "Cyrillic↔Latin transliteration added to scripts/validate_entity_threshold.py for cross-language corpus validation", "rationale": "Enables --corpus-from-postgres to pair Cyrillic and Latin mentions of the same entity (e.g. NATO / НАТО); live run validated the cross-language bar at T*=0.92 (GO).", "phase": "08"}
   ],
   "uncommitted_files": [],
   "prerequisite_commits": [
+    {"commit": "b109518", "purpose": "test(entities): add mocked _corpus_from_postgres integration test for cross-script pairing"},
+    {"commit": "4fa4ddc", "purpose": "feat(entities): add Cyrillic↔Latin transliteration to entity threshold validator"},
     {"commit": "9a1b8c3", "purpose": "Phase 8 Waves 5-6 — store-backed entity graph and threshold validation"},
     {"commit": "0cb0aa8", "purpose": "fix(bus): repair RabbitMQ test hang and topology cleanup"},
     {"commit": "e4b0b21", "purpose": "feat(entities): display language-tagged aliases in store-backed Entity Graph.md"},
@@ -40,5 +42,5 @@
     {"commit": "2f80c7e", "purpose": "feat(vault): render type and language in row-based Entity Graph"}
   ],
   "next_action": "Phase 8 is complete. Phase 9 (RAG recall) is ready to execute; 09-PLAN.md and 09-CONTEXT.md exist in .planning/phases/09-rag-recall/. Begin via /gsd-execute-phase 9. Alternatively, push the pending Phase 7/8 commits to origin/main first.",
-  "context_notes": "Phase 8 Waves 1-6 closed. LINK_THRESHOLD=0.92 shipped in apps/triage/entities.py and libs/store/src/store/_postgres.py. Store.get_all_entities() returns sorted language-tagged aliases; alias_count removed from API. vault_writer renders type and language in both row-based and store-backed Entity Graph.md. Triage worker NER call protected by INFOTRIAGE_ENTITY_NER_TIMEOUT (default 15s). Full pytest suite green: 405 passed, 43 skipped."
+  "context_notes": "Phase 8 Waves 1-6 closed. LINK_THRESHOLD=0.92 shipped in apps/triage/entities.py and libs/store/src/store/_postgres.py. Store.get_all_entities() returns sorted language-tagged aliases; alias_count removed from API. vault_writer renders type and language in both row-based and store-backed Entity Graph.md. Triage worker NER call protected by INFOTRIAGE_ENTITY_NER_TIMEOUT (default 15s). Cyrillic↔Latin transliteration added to scripts/validate_entity_threshold.py; live --corpus-from-postgres run GO at T*=0.92. Full pytest suite green: 405 passed, 43 skipped."
 }
