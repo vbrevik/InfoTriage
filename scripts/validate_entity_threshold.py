@@ -63,13 +63,24 @@ import math  # noqa: E402
 import os  # noqa: E402
 import urllib.request  # noqa: E402
 from pathlib import Path  # noqa: E402
-from typing import Optional  # noqa: E402
+from typing import Optional, cast  # noqa: E402
+
+
+# Cyrillic → Latin transliteration table for cross-script entity pairing in
+# _corpus_from_postgres. Lowercase only; used after .lower() on the mention.
+CYRILLIC_TO_LATIN = {
+    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "yo",
+    "ж": "zh", "з": "z", "и": "i", "й": "y", "к": "k", "л": "l", "м": "m",
+    "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u",
+    "ф": "f", "х": "h", "ц": "ts", "ч": "ch", "ш": "sh", "щ": "sch", "ъ": "",
+    "ы": "y", "ь": "", "э": "e", "ю": "yu", "я": "ya",
+}
 
 
 # 12-entity default corpus: 7 cross-language same-entity pairs + 5 distinct-entity pairs.
 # Mirrors the corpus baked into the prior 999.3-VERDICT placeholder so we can verify
 # the post-patch run produces a substantively different (real) result.
-DEFAULT_CORPUS: dict = {
+DEFAULT_CORPUS: dict[str, list[list[str]]] = {
     "same_pairs": [
         ["NATO", "НАТО"],
         ["Norway", "Norge"],
@@ -92,6 +103,16 @@ DEFAULT_CORPUS: dict = {
 # Lazy / optional import: transformers is only loaded in offline mode.
 # Lazy loading prevents the broken-torchvision path from being hit when mode=http.
 _offline_model = None  # tuple[tokenizer, model]
+
+
+def _cyrillic_to_latin_key(text: str) -> str:
+    """Return a lowercase Latin key for a mention, transliterating Cyrillic.
+
+    Used in _corpus_from_postgres so that same-entity mentions written in
+    different scripts (e.g. NATO / НАТО / Nató) collapse to one bucket and can
+    be emitted as a cross-language same-entity pair.
+    """
+    return "".join(CYRILLIC_TO_LATIN.get(c, c) for c in text.lower())
 
 
 def _resolve_model_dir() -> Path:
@@ -247,7 +268,7 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
     return dot / (norm_a * norm_b)
 
 
-def load_corpus(path: str) -> dict:
+def load_corpus(path: str) -> dict[str, list[list[str]]]:
     """Load validation corpus from JSON or return the default corpus."""
     if not path:
         return DEFAULT_CORPUS
@@ -256,10 +277,10 @@ def load_corpus(path: str) -> dict:
         print(f"WARN: corpus {path} not found; using default corpus")
         return DEFAULT_CORPUS
     with p.open("r", encoding="utf-8") as f:
-        return json.load(f)
+        return cast(dict[str, list[list[str]]], json.load(f))
 
 
-def _corpus_from_postgres() -> dict:
+def _corpus_from_postgres() -> dict[str, list[list[str]]]:
     """Export a date-stamped cross-language pair set from production Postgres.
 
     Heuristic: for each article in the last 14d with lang ∈ {en, no, ru},
@@ -307,7 +328,7 @@ def _corpus_from_postgres() -> dict:
     by_norm: dict[str, dict[str, str]] = {}
     for lang, title, _summary in rows:
         for m in pattern.findall(title or ""):
-            norm = m.lower()
+            norm = _cyrillic_to_latin_key(m)
             by_norm.setdefault(norm, {})[lang] = m
     for norm, langs in by_norm.items():
         if len(langs) >= 2:
@@ -325,8 +346,12 @@ def _corpus_from_postgres() -> dict:
             "('en','no','ru') ORDER BY ts DESC LIMIT 50;\")."
         )
 
-    distinct_pairs = DEFAULT_CORPUS["distinct_pairs"]
-    return {"same_pairs": same_pairs, "distinct_pairs": distinct_pairs}
+    distinct_pairs: list[list[str]] = DEFAULT_CORPUS["distinct_pairs"]
+    result: dict[str, list[list[str]]] = {
+        "same_pairs": same_pairs,
+        "distinct_pairs": distinct_pairs,
+    }
+    return result
 
 
 def threshold_sweep(
@@ -539,13 +564,13 @@ criteria are from `999.3-SPEC.md` §Acceptance Criteria.
 
 - Minimum similarity for same entities: **{min_same:.4f}**
 - Maximum similarity for distinct entities: **{max_distinct:.4f}**
-- **Chosen T\* = {chosen_T:.4f}** — {choice_reason}
+- **Chosen T* = {chosen_T:.4f}** — {choice_reason}
 
 ## Acceptance Criteria (SPEC §Acceptance Criteria)
 
 - (a) Mechanism (cosine orders mE5-large vectors): {'PASS' if mechanism_pass else 'FAIL'} (min(same)=**{min_same:.4f}**, max(distinct)=**{max_distinct:.4f}**, sanity: min(same) > max(distinct))
-- (b) Cross-language same-entity merge @ T\*: {'PASS' if bar_b else 'FAIL'} (min_same={min_same:.4f}, T\*={chosen_T:.4f})
-- (c) Distinct-entity separation @ T\*: {'PASS' if bar_c else 'FAIL'} (max_distinct={max_distinct:.4f}, T\*={chosen_T:.4f})
+- (b) Cross-language same-entity merge @ T*: {'PASS' if bar_b else 'FAIL'} (min_same={min_same:.4f}, T*={chosen_T:.4f})
+- (c) Distinct-entity separation @ T*: {'PASS' if bar_c else 'FAIL'} (max_distinct={max_distinct:.4f}, T*={chosen_T:.4f})
 
 ## Phase 8 Handoff
 

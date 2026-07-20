@@ -62,6 +62,31 @@ def test_validation_script_produces_report_with_synthetic_fallback(tmp_path):
     assert "synthetic" in text.lower()
 
 
+def test_cyrillic_to_latin_key_normalizes_cross_script_mentions():
+    """_cyrillic_to_latin_key maps Cyrillic and Latin forms to the same bucket."""
+    script = ROOT / "scripts" / "validate_entity_threshold.py"
+    scripts_path = str(ROOT / "scripts")
+    code = (
+        f"import sys; "
+        f"sys.path.insert(0, {scripts_path!r}); "
+        f"from validate_entity_threshold import _cyrillic_to_latin_key; "
+        f"print(_cyrillic_to_latin_key('НАТО')); "
+        f"print(_cyrillic_to_latin_key('NATO')); "
+        f"print(_cyrillic_to_latin_key('Зеленский')); "
+        f"print(_cyrillic_to_latin_key('Украина')); "
+        f"print(_cyrillic_to_latin_key('Norway'))"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    lines = result.stdout.strip().splitlines()
+    assert lines == ["nato", "nato", "zelenskiy", "ukraina", "norway"]
+
+
 def test_validation_script_uses_real_corpus_values(tmp_path):
     """The report should contain values from the fixture corpus."""
     report_path = tmp_path / "999.3-VERDICT.md"
