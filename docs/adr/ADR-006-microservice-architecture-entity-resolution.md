@@ -27,7 +27,7 @@ real corpus data.
    - `entities (id, name, name_norm, lang, type, embedding vector(1024))`
    - `entity_links (entity_id FK, item_id, mention, lang)`
    - **Linking:** pgvector **HNSW** index with `vector_cosine_ops`, the `<=>` cosine operator, and
-     **`LINK_THRESHOLD = 0.85`**. Entity mentions are NER-extracted by the **local** qwen36 (oMLX,
+     **`LINK_THRESHOLD = 0.92`** (validated on mE5-large; see Consequences). Entity mentions are NER-extracted by the **local** qwen36 (oMLX,
      ADR-004) — no cloud.
 
 R3 proved the mechanism on real data: 285 entities from 144 items, 599 entity_links; **NATO merged

@@ -1,71 +1,44 @@
 {
   "version": "1.0",
-  "timestamp": "2026-07-12T00:00:00Z",
-  "phase": "999.3-closeout",
-  "phase_name": "mE5-large entity-link threshold re-validation (backlog promotion)",
-  "phase_dir": ".planning/phases/999.3-entity-resolution-cross-language-coverage-and-mE5-large-re-validation",
+  "timestamp": "2026-07-13T00:00:00Z",
+  "phase": "08-entity-resolution",
+  "phase_name": "Entity resolution",
+  "phase_dir": ".planning/phases/08-entity-resolution",
   "previous_phase": "07-ops-cutover",
   "previous_phase_dir": ".planning/phases/07-ops-cutover",
-  "plan": 1,
+  "plan": 2,
   "task": 1,
-  "total_tasks": 4,
+  "total_tasks": 1,
   "status": "completed",
-  "phase_999_3_closeout": {
+  "phase_8_closeout": {
     "status": "completed",
-    "verdict": "PARTIAL",
-    "production_recommended_threshold": 0.92,
-    "summary": "Backlog 999.3 (entity-link threshold re-validation on mE5-large) closed 2026-07-12. Realtime mE5-large cosine vectors produced via ModuleSpec-mocked torchvision bypass + transformers.XLMRobertaModel direct load. Default 12-entity cross-language corpus + curated distinct controls. Sweep T=0.75..0.98 documented in 999.3-VERDICT.md. Chosen T*=0.92 (conservative overmerge==0 fallback: 1 missed cross-lang merge accepted in exchange for zero false-merge safety). Mechanism bar PASSED; cross-lang merge bar FAILED for United States/США at 0.9169 (within trade); control separation bar PASSED (max_distinct=0.9151). ADR-006 §Consequences amended with 'Resolution (2026-07-12)' paragraph. ROADMAP.md backlog §999.3 flipped to closed.",
+    "verdict": "PASS",
+    "summary": "Phase 8 (Entity resolution) closed 2026-07-13. Waves 1-6 complete: Store foundation (put_entity/get_entity/link_entity/get_entity_links/get_all_entities), LLM-based NER in apps/triage/entities.py, triage worker integration with timeout guard, vault projection (row-based and store-backed Entity Graph.md), mE5-large threshold re-validation at T*=0.92, and contract/regression tests. Production code now ships LINK_THRESHOLD=0.92 in apps/triage/entities.py and libs/store/src/store/_postgres.py::find_similar_entity. The store-backed Entity Graph.md displays language-tagged aliases (e.g. 'NATO (en), НАТО (ru)') and renders entity type/language consistently with the row-based graph.",
     "completed_tasks": [
-      {"id": 1, "name": "999.3-SPEC.md", "status": "done", "commit": "(in 999.3 commit)"},
-      {"id": 2, "name": "999.3-PLAN.md", "status": "done", "commit": "(in 999.3 commit)"},
-      {"id": 3, "name": "scripts/validate_entity_threshold.py rewrite (offline/http/synthetic + sweep + verdict branching + corpus-export)", "status": "done", "commit": "(in 999.3 commit)"},
-      {"id": 4, "name": "999.3-VERDICT.md realtime overwrite (NO WARNING block; T*=0.92 explicit; clean sweep table)", "status": "done", "commit": "(in 999.3 commit)"}
+      {"id": 1, "name": "08-01 store foundation", "status": "done", "commit": "9a1b8c3"},
+      {"id": 2, "name": "08-02 Waves 2-6 — LLM NER, worker integration, vault projection, entity graph, threshold validation, tests", "status": "done", "commit": "2f80c7e"}
     ]
   },
   "blockers": [],
   "async_jobs": [],
   "human_actions_pending": [
-    "Decimal phase dir created at .planning/phases/999.3-.../ but ROADMAP.md does not yet mark it [x] — already fixed in the 999.3 commit alongside the SPEC/PLAN/VERDICT.",
-    "Operator decision: push M1 (07-02..07-04 + this 999.3 commit) OR continue straight into Phase 8. Both are defensible.",
-    "Backlog follow-up suggestion: add Cyrillic↔Latin transliteration to _corpus_from_postgres so the Postgres-corpus run actually tests the cross-language bar."
+    "Operator decision: push the accumulated Phase 7/8 commits to origin/main, OR continue straight into Phase 9 (RAG recall).",
+    "Backlog follow-up suggestion: add Cyrillic↔Latin transliteration to scripts/validate_entity_threshold.py so --corpus-from-postgres tests the true cross-language bar."
   ],
   "decisions": [
-    {"decision": "pgvector HNSW greedy centroid clustering per CCIR section", "rationale": "Replaces keyword-overlap fallback; semantic similarity via mE5-large embeddings", "phase": "06"},
-    {"decision": "Vault-writer uses interim heuristic wikilinks", "rationale": "Full entity resolution deferred to Phase 8; interim heuristic sufficient for UAT", "phase": "06"},
-    {"decision": "Test-DSN pattern: INFOTRIAGE_TEST_DSN only, no fallback", "rationale": "Prevents prod DB wipe; guard test enforces", "phase": "06"},
-    {"decision": "Idle-in-transaction backstop: 5-min server-side timeout", "rationale": "Self-heals future leaks; 300s >> legitimate operations (~120s)", "phase": "06"},
-    {"decision": "threshold config: CLUSTER_THRESHOLD env var (0.0-1.0), default 0.75", "rationale": "Configurable threshold for clustering; validated in main.py", "phase": "06"},
-    {"decision": "View filters: COP/CIP/CRP (ADR-012); COP=operational/friendly, CIP=adversary/threat, CRP=user-configurable", "rationale": "Output lenses — don't change the LLM scorer, just render subsets", "phase": "06"},
-    {"decision": "TESSOC taxonomy: UK/NATO JDP 2-00 threat-actor frame (Terror/Espionage/Subversion/Sabotage/Organized Crime)", "rationale": "ADR-010; replaces operational-variable list (Time/Equipment/.../Communications)", "phase": "06"},
-    {"decision": "render_brief inline format (drop digest.line() which short-circuited title/score when why was truthy)", "rationale": "CAT_II/ROUTINE items were rendering `- <why>  [les](url)` with no title or score", "phase": "06"},
-    {"decision": "views.py:_normalize actually title-cases (was docstring-only); _matches_cip adds .upper() on ccir", "rationale": "Lowercase pmesii from seed_sample_data.py was failing case-sensitive _CIP_PMESII set membership; .title() corrupted 'PIR-1' → 'Pir-1' so ccir needed .upper() to undo it", "phase": "06"},
-    {"decision": "M1 ship-gate single 07-01 plan covers structured logging + DLQ consumer + ops Makefile + retire host scripts", "rationale": "Consolidates original 07-02/07-03/07-04 into one executable plan; the original 07-01 (FreshRSS ops) is already done", "phase": "07"},
-    {"decision": "Realtime mE5-large entity-link threshold: T*=0.92", "rationale": "Replaces R3-bge-m3-misparse 0.85 with the value calibrated on real mE5-large vectors. Conservative overmerge==0 fallback in choose_threshold preferred over perfect collapse (false-merge entrench vs missed-merge recoverable on next item). PARTIAL verdict — no T clears both bars; 1 missed cross-lang merge (United States/США at 0.9169) accepted as part of the trade.", "phase": "999.3"},
-    {"decision": "scripts/validate_entity_threshold.py: three modes (offline / http / synthetic) with synthetic gated by --allow-synthetic", "rationale": "Default offline loads mE5-large from on-disk safetensors via ModuleSpec-mocked torchvision bypass + transformers.XLMRobertaModel direct load (mirrors R3 workaround). Synthetic SHA256-derived fallback is the path that produced the invalid placeholder VERDICT — must be opted-in explicitly and is NEVER the default.", "phase": "999.3"}
+    {"decision": "LINK_THRESHOLD = 0.92 for entity-level mE5-large linking", "rationale": "Real mE5-large vector re-validation (backlog 999.3) recommended 0.92 via conservative overmerge==0 fallback; 0.85 was the old R3 bge-m3-misparse value and is no longer used.", "phase": "08"},
+    {"decision": "Store.get_all_entities() returns language-tagged aliases", "rationale": "Entity Graph.md projection should show actual aliases (mention + lang) rather than a bare count; alias_count removed as redundant with len(aliases).", "phase": "08"},
+    {"decision": "Row-based and store-backed Entity Graph both render type and language", "rationale": "Consistency between the two graph formats; type/lang are canonical entity attributes.", "phase": "08"},
+    {"decision": "Entity NER in triage worker guarded by asyncio.wait_for timeout", "rationale": "Prevents a hung LLM NER call from blocking verdict.ready publication per ADR-004 R5 prohibition.", "phase": "08"}
   ],
   "uncommitted_files": [],
   "prerequisite_commits": [
-    {"commit": "07df0d9", "purpose": "render_brief regression fix — prevent digest.line() short-circuit from dropping title/score"},
-    {"commit": "ddf2a04", "purpose": "View-filter pipeline + TESSOC taxonomy (ADR-010) + 5 ADRs + UAT script seeds"},
-    {"commit": "8cf93e7", "purpose": "Phase 6 UAT closure — 4 live UAT scripts + 06-UAT.md updated to 9/9"},
-    {"commit": "591034d", "purpose": "07-02 — uvicorn JSON access logs + live RMQ-mgmt DLQ depth probe + DSN smoke gate"},
-    {"commit": "3da4932", "purpose": "07-03 — fix 3 services crash-looping on missing transitive contracts deps (per-requirements.txt hand-listing + aio-pika addition + TOML fix + vhost URL-encoding)"},
-    {"commit": "428f8a9", "purpose": "07-03 docs"},
-    {"commit": "b4ee46a", "purpose": "ops/Makefile -f forwarding fix"},
-    {"commit": "f17e644", "purpose": "07-04 — tests/test_dep_list_superset.py cross-check"}
+    {"commit": "9a1b8c3", "purpose": "Phase 8 Waves 5-6 — store-backed entity graph and threshold validation"},
+    {"commit": "0cb0aa8", "purpose": "fix(bus): repair RabbitMQ test hang and topology cleanup"},
+    {"commit": "e4b0b21", "purpose": "feat(entities): display language-tagged aliases in store-backed Entity Graph.md"},
+    {"commit": "2550de8", "purpose": "refactor(store): remove redundant alias_count from get_all_entities API"},
+    {"commit": "2f80c7e", "purpose": "feat(vault): render type and language in row-based Entity Graph"}
   ],
-  "next_action": "Backlog 999.3 closed (PARTIAL, T*=0.92). Phase 8 (Entity resolution) is now UNBLOCKED. Begin Phase 8 via /gsd-discuss-phase 8 with new T*=0.92 as input. NOTE: PRODUCTION code at apps/triage/entities.py::LINK_THRESHOLD = 0.85 and libs/store/_postgres.py::find_similar_entity(threshold=0.85) is INTENTIONALLY UNCHANGED by 999.3 — it is the Phase 8 plan's job to ship the in-repo threshold update after its SPEC + plan phases. M1 ship-gate still open: 5 unpushed Phase 7 commits (591034d, 3da4932, 428f8a9, b4ee46a, f17e644) + the new 999.3 commit; operator decision: push together, OR push 999.3 alone and continue to Phase 8.",
-  "context_notes": "999.3 spike closed 2026-07-12. Production-recommended LINK_THRESHOLD=0.92 (entity-level, on mE5-large) replaces the 0.85 R3-bge-m3-misparse. Spike method: ModuleSpec-mocked torchvision + transformers.XLMRobertaModel direct load; default 12-entity cross-language corpus + curated distinct control. Sweep table embedded in 999.3-VERDICT.md + phase 8 handoff. Mechanism bar PASS; merge bar FAIL on min_same=0.9169 (United States/США — 1 missed merge accepted); control separation bar PASS (max_distinct=0.9151). M1 Foundation still pending push: 07-02/07-03/07-03-docs/Makefile-recursion-fix/07-04 (already on local main) + this 999.3 commit (UNPUSHED). Phase 8 is now unblocked; backlog 999.3 was the precondition per USER continuation choice.",
-  "critical_anti_patterns": [
-    {"pattern": "Writing SUMMARY before verifying artifacts on disk", "description": "06-01 SUMMARY claimed deliverables not on disk", "severity": "blocking", "prevention": "git status + ls first; never trust agent output"},
-    {"pattern": "Running tests against prod DB", "description": "DEV_DSN = prod :22000 in test fixtures", "severity": "blocking", "prevention": "test_dsn_safety.py guard; INFOTRIAGE_TEST_DSN only"},
-    {"pattern": "Monkey-patch without verification", "description": "HTML renderer monkey-patch didn't apply", "severity": "blocking", "prevention": "Test monkey-patch in isolation before integrating"},
-    {"pattern": "Threshold too high", "description": "0.75 excluded 0.72-0.82 similarity pairs", "severity": "advisory", "prevention": "Calibrate on held-out corpus; log merge decisions"},
-    {"pattern": "Monkey-patch not applied", "description": "sab_html.cluster called directly, not via module", "severity": "blocking", "prevention": "Modify module function, not local reference"},
-    {"pattern": "Reintroducing _digest_line", "description": "drops title/score when why is truthy", "severity": "blocking", "prevention": "TestRenderBriefIncludesAllItemFields regression test"},
-    {"pattern": "Lowercase pmesii/tessoc in DB rows", "description": "view filters fail (case-sensitive set membership)", "severity": "blocking", "prevention": "TestCaseInsensitiveNormalization regression test; views.py:_normalize title-cases"},
-    {"pattern": "Forgetting .upper() on ccir after .title()", "description": "str.title() corrupts 'PIR-1' → 'Pir-1' (capitalizes first letter, lowercases rest); _matches_cip needs .upper() on ccir like _matches_cop does", "severity": "blocking", "prevention": "Always use the pattern ccir = _normalize(row.get('ccir')).upper() when checking against uppercase sets or doing startswith on uppercase prefixes"},
-    {"pattern": "torchvision mock via plain MagicMock() fails because transformers uses importlib.util.find_spec which raises ValueError on __spec__=None", "description": "ModuleSpec-with-origin=None needed; also stub torchvision.transforms + torchvision.io", "severity": "blocking", "prevention": "Use the ModuleSpec-based mock pattern in scripts/validate_entity_threshold.py as the template for any future offline embedding spikes"},
-    {"pattern": "Synthetic vectors silently elevate to real verdict", "description": "The original 999.3-VERDICT.md placeholder was produced by the SHA256 synthetic fallback; real-data spike now exposes the actual mE5-large geometry and is the only authoritative input for Phase 8 T*", "severity": "blocking", "prevention": "scripts/validate_entity_threshold.py gates synthetic mode behind --allow-synthetic; mechanism bar (a) auto-verifies that vectors are not degenerate"}
-  ]
+  "next_action": "Phase 8 is complete. Phase 9 (RAG recall) is ready to execute; 09-PLAN.md and 09-CONTEXT.md exist in .planning/phases/09-rag-recall/. Begin via /gsd-execute-phase 9. Alternatively, push the pending Phase 7/8 commits to origin/main first.",
+  "context_notes": "Phase 8 Waves 1-6 closed. LINK_THRESHOLD=0.92 shipped in apps/triage/entities.py and libs/store/src/store/_postgres.py. Store.get_all_entities() returns sorted language-tagged aliases; alias_count removed from API. vault_writer renders type and language in both row-based and store-backed Entity Graph.md. Triage worker NER call protected by INFOTRIAGE_ENTITY_NER_TIMEOUT (default 15s). Full pytest suite green: 405 passed, 43 skipped."
 }

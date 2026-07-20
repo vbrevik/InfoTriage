@@ -44,9 +44,11 @@ requirements: [R5, R6, ADR-004, ADR-006]
 - `render_wikilinked()` uses canonical entity names
 
 **Wave 5 (Entity Graph.md):** ✅ DONE
-- `write_entity_graph(items, vault_path)` exists in `vault_writer.py` and generates `Entity Graph.md`
-- `write_vault_digest()` calls `write_entity_graph()` after writing item notes and SAB
-- `render_entity_graph()` aggregates aliases by language and counts linked items per canonical entity
+- `write_entity_graph(items, vault_path)` and `write_entity_graph_from_store(store, vault_path)` exist in `vault_writer.py`
+- `write_vault_digest()` calls `write_entity_graph_from_store()` after writing item notes and SAB
+- `render_entity_graph()` (row-based) and `render_entity_graph_from_store()` (store-backed) both render type/lang and language-tagged aliases
+- `Store.get_all_entities()` returns canonical entities with a sorted `aliases` list (`"NATO (en)"`, `"НАТО (ru)"`) and `link_count`
+- `alias_count` was removed from the API (redundant with `len(aliases)`)
 
 **Wave 5 (mE5-large threshold validation):** ✅ DONE
 - `scripts/validate_entity_threshold.py` produced `999.3-VERDICT.md` in `offline` mode
@@ -101,15 +103,15 @@ def write_entity_graph(store, vault_path: Path) -> Path:
 Add to `_protocol.py`:
 ```python
 def get_all_entities(self) -> list[dict]:
-    """Return all canonical entities with alias counts and link counts."""
+    """Return all canonical entities with language-tagged aliases and link count."""
     raise NotImplementedError
 ```
 
 Postgres implementation:
 ```sql
 SELECT e.id, e.name, e.name_norm, e.lang, e.type,
-       COUNT(DISTINCT el.entity_id) as alias_count,
-       COUNT(el.id) as link_count
+       ARRAY_AGG(DISTINCT el.mention || ' (' || el.lang || ')') AS aliases,
+       COUNT(DISTINCT el.item_id) AS link_count
 FROM infotriage.entities e
 LEFT JOIN infotriage.entity_links el ON e.id = el.entity_id
 GROUP BY e.id
@@ -208,12 +210,14 @@ is functionally complete; next is Phase 9 (RAG recall) execution.
 - [x] `write_entity_graph_from_store(store, vault_path)` queries the store and writes `Entity Graph.md`
 - [x] `consumer.py` passes the Store into `write_vault_digest()` so production uses the store-backed graph
 - [x] `write_vault_digest()` keeps a backward-compatible row-based `write_entity_graph()` path for callers without a Store
-- [x] Entity Graph.md lists entities with type/lang tags, alias counts, and linked item counts
+- [x] Entity Graph.md lists entities with type/lang tags, language-tagged aliases, and linked item counts
+- [x] `alias_count` removed from the `get_all_entities()` API (redundant with `len(aliases)`)
+- [x] Row-based `render_entity_graph()` also renders entity type and language
 - [x] 999.3-VERDICT.md generated from real mE5-large offline vectors (T*=0.92)
 - [x] LINK_THRESHOLD in entities.py updated to 0.92 (validated value)
 - [x] tests/test_vault_writer.py includes tests for `write_entity_graph` and `write_entity_graph_from_store`
 - [x] tests/test_store_entities.py includes tests for `get_all_entities`
-- [x] Full pytest suite (excluding live db/rabbitmq markers): 394 passed, 48 deselected
+- [x] Full pytest suite (excluding live db/rabbitmq markers): 405 passed, 43 skipped
 
 ## Risk Assessment
 

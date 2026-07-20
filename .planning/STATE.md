@@ -48,24 +48,22 @@ progress:
 
 ### Watch out for
 
-- The torch 2.11.0 / torchvision 0.24.0.dev collision used by the spike
-  (ModuleSpec-mock pattern) is **throwaway-only**. Phase 8 production code must ship
-  a clean `requirements.txt` with pinned torchvision that matches production torch.
-- **PRODUCTION code at `apps/triage/entities.py::LINK_THRESHOLD = 0.85` and
-  `libs/store/_postgres.py::find_similar_entity(threshold=0.85)` is NOT yet** updated
-  to T\*=0.92. This is intentional per SPEC §Out-of-Scope — Phase 8 picks it up.
+- The torch 2.11.0 / torchvision 0.24.0.dev collision used by the 999.3 spike
+  (ModuleSpec-mock pattern) is **throwaway-only**. The Phase 8 production code does
+  not depend on that mock; only the validation script uses the offline embedding path
+  when local safetensors weights are present.
+- The `alias_count` field was removed from `Store.get_all_entities()` in commit
+  `2550de8`; any future consumers should use `len(aliases)` if they need a count.
 
 ### Next
 
-- **Phase 8 discuss-phase** (now unblocked on 999.3). Plan: replace the in-repo
-  `0.85` with `0.92`, add cross-language pair coverage for `_resolve_entities()` via
-  either transliteration table or CFG/CFG-aware `_KNOWN_TOPICS` expansion
-  (Norway→Норвегия, etc.).
-- **M1 ship decision** still open: 5 unpushed Phase 7 commits + the new 999.3 commit
-  — push together, OR push 999.3 alone and continue to Phase 8.
+- **Phase 9 (RAG recall)** is ready to execute. `.planning/phases/09-rag-recall/`
+  already contains `09-PLAN.md` and `09-CONTEXT.md`; decisions are locked.
+- **M1 ship decision** still open: the accumulated Phase 7/8 commits are ahead of
+  `origin/main` and await push.
 - **Backlog 999.x follow-up** — consider adding Cyrillic↔Latin transliteration to
-  `_corpus_from_postgres` so the Postgres-corpus run actually tests the
-  cross-language bar.
+  `_corpus_from_postgres` in `scripts/validate_entity_threshold.py` so the
+  Postgres-corpus run actually tests the cross-language bar.
 
 ## Session: 2026-07-12 — Phase 7 07-02..07-04 closure (M1 ship-gate docs)
 
