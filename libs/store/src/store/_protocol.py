@@ -213,10 +213,11 @@ class Store(Protocol):
         ...
 
     def get_all_entities(self) -> list[dict]:
-        """Return all canonical entities with alias counts and linked item counts.
+        """Return all canonical entities with language-tagged aliases and counts.
 
-        Each dict contains: id, name, name_norm, lang, type, alias_count, link_count.
-        Ordered by link_count DESC, then name_norm. alias_count counts distinct
-        mentions (aliases) for the entity.
+        Each dict contains: id, name, name_norm, lang, type, aliases,
+        alias_count, link_count. aliases is a list of language-tagged strings in
+        the form 'mention (lang)' (e.g. 'NATO (en)', 'НАТО (ru)'). Ordered by
+        link_count DESC, then name_norm.
         """
         ...

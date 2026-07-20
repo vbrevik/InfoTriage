@@ -445,6 +445,7 @@ def test_write_entity_graph_from_store_uses_store_data(temp_vault):
                     "name_norm": "nato",
                     "lang": "en",
                     "type": "ORG",
+                    "aliases": ["NATO (en)", "НАТО (ru)"],
                     "alias_count": 2,
                     "link_count": 5,
                 }
@@ -454,7 +455,7 @@ def test_write_entity_graph_from_store_uses_store_data(temp_vault):
     assert path.exists()
     text = path.read_text(encoding="utf-8")
     assert "## NATO" in text
-    assert "**Aliases:** 2" in text
+    assert "**Aliases:** NATO (en), НАТО (ru)" in text
     assert "**Linked items:** 5" in text
 
 
@@ -469,6 +470,7 @@ def test_write_vault_digest_prefers_store_graph_when_store_provided(temp_vault):
                     "name_norm": "storeentity",
                     "lang": "en",
                     "type": "ORG",
+                    "aliases": ["StoreEntity (en)"],
                     "alias_count": 1,
                     "link_count": 3,
                 }
@@ -490,5 +492,6 @@ def test_write_vault_digest_prefers_store_graph_when_store_provided(temp_vault):
     paths = write_vault_digest(rows, temp_vault, store=FakeStore())
     graph_path = temp_vault / "Entity Graph.md"
     assert graph_path in paths
-    assert "## StoreEntity" in graph_path.read_text(encoding="utf-8")
-    assert "**Aliases:** 1" in graph_path.read_text(encoding="utf-8")
+    text = graph_path.read_text(encoding="utf-8")
+    assert "## StoreEntity" in text
+    assert "**Aliases:** StoreEntity (en)" in text

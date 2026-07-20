@@ -263,9 +263,10 @@ def write_entity_graph(
 def render_entity_graph_from_store(entities: list[dict]) -> str:
     """Render the Entity Graph note from Store.get_all_entities() rows.
 
-    Each row is expected to have: id, name, lang, type, alias_count, link_count.
-    Aliases are not stored per entity in the current aggregation; the note lists
-    canonical entities grouped by link_count with available language/type tags.
+    Each row is expected to have: id, name, lang, type, aliases, alias_count,
+    link_count. aliases is a list of language-tagged strings such as
+    'NATO (en)' or 'НАТО (ru)'. The note lists canonical entities grouped by
+    link_count with their language/type tags and actual aliases.
     """
     lines = ["# Entity Graph", ""]
     if not entities:
@@ -277,11 +278,12 @@ def render_entity_graph_from_store(entities: list[dict]) -> str:
         name = entity["name"]
         lang = entity.get("lang") or "?"
         etype = entity.get("type") or "MISC"
-        alias_count = entity.get("alias_count", 0)
+        aliases = entity.get("aliases", [])
+        alias_line = ", ".join(sorted(aliases)) if aliases else "—"
         link_count = entity.get("link_count", 0)
         lines.append(f"## {name}")
         lines.append(f"- **Type:** {etype} · **Lang:** {lang}")
-        lines.append(f"- **Aliases:** {alias_count}")
+        lines.append(f"- **Aliases:** {alias_line}")
         lines.append(f"- **Linked items:** {link_count}")
         lines.append("")
     return "\n".join(lines)

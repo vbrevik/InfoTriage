@@ -292,18 +292,19 @@ class InMemoryStore:
         return results
 
     def get_all_entities(self) -> list[dict]:
-        """Return all canonical entities with alias counts and linked item counts."""
+        """Return all canonical entities with language-tagged aliases and counts."""
         # Build per-entity aggregate stats from stored links.
         alias_map: dict[str, set[str]] = defaultdict(set)
         item_map: dict[str, set[str]] = defaultdict(set)
         for link in self._entity_links.values():
             entity_id = link["entity_id"]
-            alias_map[entity_id].add(link["mention"])
+            alias_map[entity_id].add(f"{link['mention']} ({link['lang']})")
             item_map[entity_id].add(link["item_id"])
 
         results = []
         for entity in self._entities.values():
             entity_id = entity["id"]
+            aliases = sorted(alias_map.get(entity_id, set()))
             results.append(
                 {
                     "id": entity_id,
@@ -311,7 +312,8 @@ class InMemoryStore:
                     "name_norm": entity["name_norm"],
                     "lang": entity["lang"],
                     "type": entity["type"],
-                    "alias_count": len(alias_map.get(entity_id, set())),
+                    "aliases": aliases,
+                    "alias_count": len(aliases),
                     "link_count": len(item_map.get(entity_id, set())),
                 }
             )

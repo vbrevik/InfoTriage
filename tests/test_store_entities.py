@@ -226,10 +226,12 @@ def test_get_all_entities_aggregates_aliases_and_links(store):
     assert nato["name"] == "NATO"
     assert nato["name_norm"] == "nato"
     assert nato["type"] == "ORG"
+    assert nato["aliases"] == ["NATO (en)", "НАТО (ru)"]
     assert nato["alias_count"] == 2
     assert nato["link_count"] == 2
     oslo = all_entities[1]
     assert oslo["name"] == "Oslo"
+    assert oslo["aliases"] == []
     assert oslo["alias_count"] == 0
     assert oslo["link_count"] == 0
 
