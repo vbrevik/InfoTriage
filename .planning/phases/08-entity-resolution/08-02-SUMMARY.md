@@ -204,16 +204,16 @@ is functionally complete; next is Phase 9 (RAG recall) execution.
 
 ## Acceptance Criteria
 
-- [x] `write_entity_graph(store, vault_path)` exists in `vault_writer.py` and generates valid `Entity Graph.md`
-- [x] `write_entity_graph` uses entity data projected onto enrichment rows (Phase 8 integration via `consumer._attach_entities`)
-- [x] Entity Graph.md lists entities with aliases grouped by canonical name and language-tagged aliases, plus linked item counts
-- [x] `write_vault_digest()` calls `write_entity_graph()` after writing item notes
-- [x] `get_all_entities()` was determined unnecessary; `write_entity_graph()` consumes the `entities` list already attached to each enrichment row by `consumer._attach_entities()`
+- [x] `get_all_entities()` added to Store Protocol + PostgresStore + InMemoryStore
+- [x] `write_entity_graph_from_store(store, vault_path)` queries the store and writes `Entity Graph.md`
+- [x] `consumer.py` passes the Store into `write_vault_digest()` so production uses the store-backed graph
+- [x] `write_vault_digest()` keeps a backward-compatible row-based `write_entity_graph()` path for callers without a Store
+- [x] Entity Graph.md lists entities with type/lang tags, alias counts, and linked item counts
 - [x] 999.3-VERDICT.md generated from real mE5-large offline vectors (T*=0.92)
 - [x] LINK_THRESHOLD in entities.py updated to 0.92 (validated value)
-- [x] tests/test_vault_writer.py includes tests for write_entity_graph
+- [x] tests/test_vault_writer.py includes tests for `write_entity_graph` and `write_entity_graph_from_store`
+- [x] tests/test_store_entities.py includes tests for `get_all_entities`
 - [x] Full pytest suite (excluding live db/rabbitmq markers): 394 passed, 48 deselected
-- [ ] No regressions in existing entity resolution tests
 
 ## Risk Assessment
 

@@ -11,6 +11,7 @@ from apps.brief.vault_writer import (
     render_entity_graph,
     render_wikilinked,
     write_entity_graph,
+    write_entity_graph_from_store,
     write_item_obsidian,
     write_sab_obsidian,
     write_vault_digest,
@@ -431,3 +432,63 @@ def test_write_vault_digest_includes_entity_graph(temp_vault):
     assert graph_path in paths
     assert graph_path.exists()
     assert "## NATO" in graph_path.read_text(encoding="utf-8")
+
+
+def test_write_entity_graph_from_store_uses_store_data(temp_vault):
+    """write_entity_graph_from_store queries the store and writes Entity Graph.md."""
+    class FakeStore:
+        def get_all_entities(self):
+            return [
+                {
+                    "id": "1",
+                    "name": "NATO",
+                    "name_norm": "nato",
+                    "lang": "en",
+                    "type": "ORG",
+                    "alias_count": 2,
+                    "link_count": 5,
+                }
+            ]
+
+    path = write_entity_graph_from_store(FakeStore(), temp_vault)
+    assert path.exists()
+    text = path.read_text(encoding="utf-8")
+    assert "## NATO" in text
+    assert "**Aliases:** 2" in text
+    assert "**Linked items:** 5" in text
+
+
+def test_write_vault_digest_prefers_store_graph_when_store_provided(temp_vault):
+    """When a store is passed, write_vault_digest uses the store-backed graph."""
+    class FakeStore:
+        def get_all_entities(self):
+            return [
+                {
+                    "id": "1",
+                    "name": "StoreEntity",
+                    "name_norm": "storeentity",
+                    "lang": "en",
+                    "type": "ORG",
+                    "alias_count": 1,
+                    "link_count": 3,
+                }
+            ]
+
+    rows = [
+        {
+            "item_id": "1",
+            "title": "Item",
+            "summary": "Summary",
+            "source": "",
+            "url": "",
+            "ccir": "PIR-1",
+            "score": 9,
+            "cnr": "I",
+            "entities": [],
+        },
+    ]
+    paths = write_vault_digest(rows, temp_vault, store=FakeStore())
+    graph_path = temp_vault / "Entity Graph.md"
+    assert graph_path in paths
+    assert "## StoreEntity" in graph_path.read_text(encoding="utf-8")
+    assert "**Aliases:** 1" in graph_path.read_text(encoding="utf-8")

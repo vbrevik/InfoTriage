@@ -207,6 +207,39 @@ def test_get_entity_by_name_norm(store):
     assert store.get_entity_by_name_norm("oslo", "en") is None
 
 
+def test_get_all_entities_aggregates_aliases_and_links(store):
+    """get_all_entities returns all entities with alias_count and link_count."""
+    item1 = _seed_item(store)
+    item2 = _make_item("item-002")
+    store.put_item(item2)
+    entity_id = store.put_entity(
+        name="NATO", name_norm="nato", lang="en", type="ORG", embedding=None
+    )
+    store.put_entity(name="Oslo", name_norm="oslo", lang="en", type="GPE", embedding=None)
+    store.link_entity(entity_id, item1.id, "NATO", "en")
+    store.link_entity(entity_id, item2.id, "NATO", "en")
+    store.link_entity(entity_id, item2.id, "НАТО", "ru")
+    all_entities = store.get_all_entities()
+    assert len(all_entities) == 2
+    # Sorted by link_count desc, so NATO first
+    nato = all_entities[0]
+    assert nato["name"] == "NATO"
+    assert nato["name_norm"] == "nato"
+    assert nato["type"] == "ORG"
+    assert nato["alias_count"] == 2
+    assert nato["link_count"] == 2
+    oslo = all_entities[1]
+    assert oslo["name"] == "Oslo"
+    assert oslo["alias_count"] == 0
+    assert oslo["link_count"] == 0
+
+
+def test_get_all_entities_empty(store):
+    """get_all_entities returns an empty list when no entities exist."""
+    _seed_item(store)
+    assert store.get_all_entities() == []
+
+
 def test_find_similar_entity_returns_match_above_threshold(store):
     """find_similar_entity returns the nearest entity with cosine >= threshold."""
     _seed_item(store)

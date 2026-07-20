@@ -211,3 +211,12 @@ class Store(Protocol):
         Each row contains: entity_id, name, mention, lang.
         """
         ...
+
+    def get_all_entities(self) -> list[dict]:
+        """Return all canonical entities with alias counts and linked item counts.
+
+        Each dict contains: id, name, name_norm, lang, type, alias_count, link_count.
+        Ordered by link_count DESC, then name_norm. alias_count counts distinct
+        mentions (aliases) for the entity.
+        """
+        ...

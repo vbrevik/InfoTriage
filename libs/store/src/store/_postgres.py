@@ -592,3 +592,36 @@ class PostgresStore:
                 }
             )
         return result
+
+    def get_all_entities(self) -> list[dict]:
+        """Return all canonical entities with alias counts and linked item counts."""
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
+        rows = self._conn.execute(
+            """
+            SELECT
+                e.id,
+                e.name,
+                e.name_norm,
+                e.lang,
+                e.type,
+                COUNT(DISTINCT el.mention) AS alias_count,
+                COUNT(DISTINCT el.item_id) AS link_count
+            FROM infotriage.entities e
+            LEFT JOIN infotriage.entity_links el ON el.entity_id = e.id
+            GROUP BY e.id, e.name, e.name_norm, e.lang, e.type
+            ORDER BY link_count DESC, e.name_norm
+            """
+        ).fetchall()
+        self._conn.rollback()
+        return [
+            {
+                "id": str(r["id"]),
+                "name": r["name"],
+                "name_norm": r["name_norm"],
+                "lang": r["lang"],
+                "type": r["type"],
+                "alias_count": r["alias_count"],
+                "link_count": r["link_count"],
+            }
+            for r in rows
+        ]

@@ -154,6 +154,7 @@ async def process_verdict(
         vault_dir,
         write_items=True,
         sab_filename="obsidian-sab.md",
+        store=store,
     )
     await asyncio.to_thread(
         write_vault_digest,
@@ -161,6 +162,7 @@ async def process_verdict(
         vault_dir,
         write_items=False,
         sab_filename="obsidian-sab-cop.md",
+        store=store,
     )
     await asyncio.to_thread(
         write_vault_digest,
@@ -168,6 +170,7 @@ async def process_verdict(
         vault_dir,
         write_items=False,
         sab_filename="obsidian-sab-cip.md",
+        store=store,
     )
     log.info("wrote Obsidian vault projections (default, cop, cip)")
 

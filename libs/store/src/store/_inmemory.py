@@ -17,6 +17,7 @@ Phase 5 additions (D-05, D-06, D-07):
     - _cosine_sim: stdlib cosine similarity helper for find_near_duplicate
 """
 import math
+from collections import defaultdict
 from pathlib import Path
 from typing import Optional, cast
 
@@ -288,4 +289,32 @@ class InMemoryStore:
                         }
                     )
         results.sort(key=lambda r: (r["name"], r["mention"]))
+        return results
+
+    def get_all_entities(self) -> list[dict]:
+        """Return all canonical entities with alias counts and linked item counts."""
+        # Build per-entity aggregate stats from stored links.
+        alias_map: dict[str, set[str]] = defaultdict(set)
+        item_map: dict[str, set[str]] = defaultdict(set)
+        for link in self._entity_links.values():
+            entity_id = link["entity_id"]
+            alias_map[entity_id].add(link["mention"])
+            item_map[entity_id].add(link["item_id"])
+
+        results = []
+        for entity in self._entities.values():
+            entity_id = entity["id"]
+            results.append(
+                {
+                    "id": entity_id,
+                    "name": entity["name"],
+                    "name_norm": entity["name_norm"],
+                    "lang": entity["lang"],
+                    "type": entity["type"],
+                    "alias_count": len(alias_map.get(entity_id, set())),
+                    "link_count": len(item_map.get(entity_id, set())),
+                }
+            )
+
+        results.sort(key=lambda r: (-r["link_count"], r["name_norm"]))
         return results
