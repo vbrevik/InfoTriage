@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """tests/test_validate_entity_threshold.py — tests for the threshold validation script."""
+import ast
 import os
 import subprocess
 import sys
@@ -85,6 +86,39 @@ def test_cyrillic_to_latin_key_normalizes_cross_script_mentions():
     assert result.returncode == 0, result.stderr
     lines = result.stdout.strip().splitlines()
     assert lines == ["nato", "nato", "zelenskiy", "ukraina", "norway"]
+
+
+def test_corpus_from_postgres_pairs_cross_script_mentions_via_mock():
+    """_corpus_from_postgres pairs Cyrillic and Latin forms of the same entity."""
+    scripts_path = str(ROOT / "scripts")
+    # Mock stdout from `docker exec ... psql` with two English and one Russian
+    # row so that NATO / НАТО collapse to the same transliterated bucket.
+    mock_tsv = "en\tNATO leaders meet in Washington\t\nru\tЛидеры НАТО встретились в Вашингтоне\t\nno\tNorge deltar\t"
+    code = (
+        f"import sys; sys.path.insert(0, {scripts_path!r}); "
+        f"import subprocess; "
+        f"from unittest.mock import MagicMock; "
+        f"from validate_entity_threshold import _corpus_from_postgres; "
+        f"fake = MagicMock(); "
+        f"fake.returncode = 0; "
+        f"fake.stdout = {mock_tsv!r}; "
+        f"fake.stderr = ''; "
+        f"subprocess.run = lambda *args, **kwargs: fake; "
+        f"result = _corpus_from_postgres(); "
+        f"print(result)"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    output = ast.literal_eval(result.stdout.strip())
+    same_pairs = output["same_pairs"]
+    distinct_pairs = output["distinct_pairs"]
+    assert any(pair == ["NATO", "НАТО"] for pair in same_pairs), same_pairs
+    assert distinct_pairs  # default control pairs preserved
 
 
 def test_validation_script_uses_real_corpus_values(tmp_path):

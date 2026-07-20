@@ -326,7 +326,10 @@ def _corpus_from_postgres() -> dict[str, list[list[str]]]:
     )
     same_pairs: list[list[str]] = []
     by_norm: dict[str, dict[str, str]] = {}
-    for lang, title, _summary in rows:
+    for row in rows:
+        if len(row) < 2:
+            continue
+        lang, title = row[0], row[1]
         for m in pattern.findall(title or ""):
             norm = _cyrillic_to_latin_key(m)
             by_norm.setdefault(norm, {})[lang] = m
