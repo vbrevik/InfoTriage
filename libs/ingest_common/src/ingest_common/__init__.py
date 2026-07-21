@@ -16,11 +16,13 @@ Public API:
 """
 
 from .persist import persist_and_publish
+from .timeutil import parse_since
 from .trigger import make_trigger_app
 from .runtime import build_store, build_bus
 
 __all__ = [
     "persist_and_publish",
+    "parse_since",
     "make_trigger_app",
     "build_store",
     "build_bus",

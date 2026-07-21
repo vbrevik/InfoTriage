@@ -17,11 +17,10 @@ import argparse
 import datetime
 import logging
 import os
-import re
 from typing import Optional
 
-from contracts import BusClient, Item, require_discipline
-from ingest_common import build_bus, build_store, persist_and_publish
+from contracts import BusClient, Item
+from ingest_common import build_bus, build_store, parse_since, persist_and_publish
 from store._protocol import Store
 
 log = logging.getLogger(__name__)
@@ -43,26 +42,6 @@ def load_channels(cli_channels: Optional[list[str]] = None) -> list[str]:
     if not raw:
         return []
     return [c.strip() for c in raw.split(",") if c.strip()]
-
-
-def parse_since(since: Optional[str]) -> Optional[datetime.datetime]:
-    """Parse a relative window like '24h' or '7d' into a UTC datetime.
-
-    Returns None if since is None or empty.
-    """
-    if not since:
-        return None
-    since = since.strip()
-    match = re.fullmatch(r"(\d+)([hd])", since, re.IGNORECASE)
-    if not match:
-        raise ValueError(f"Invalid --since value: {since!r}; expected e.g. 24h or 7d")
-    value, unit = int(match.group(1)), match.group(2).lower()
-    delta = (
-        datetime.timedelta(hours=value)
-        if unit == "h"
-        else datetime.timedelta(days=value)
-    )
-    return datetime.datetime.now(tz=datetime.timezone.utc) - delta
 
 
 # ---------------------------------------------------------------------------
@@ -129,7 +108,6 @@ def _message_to_item(channel: str, message) -> Item:
         discipline="SOCMINT",
         admiralty_reliability=DEFAULT_ADMIRALTY_RELIABILITY,
     )
-    require_discipline(item)
     return item
 
 

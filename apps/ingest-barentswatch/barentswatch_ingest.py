@@ -17,12 +17,11 @@ import argparse
 import datetime
 import logging
 import os
-import re
 from typing import Optional
 
 import httpx
 from contracts import BusClient, Item
-from ingest_common import build_bus, build_store, persist_and_publish
+from ingest_common import build_bus, build_store, parse_since, persist_and_publish
 from store._protocol import Store
 
 log = logging.getLogger(__name__)
@@ -60,31 +59,20 @@ def _load_credentials() -> tuple[str, str]:
 
 def _load_area(cli_area: Optional[str] = None) -> str:
     """Return the configured area string, defaulting to env var then DEFAULT_AREA."""
-    return (
+    area = (
         cli_area
         or os.environ.get("BARENTSWATCH_AREA", DEFAULT_AREA).strip()
         or DEFAULT_AREA
     )
+    # Validate early so bad configuration fails before any API call.
+    _bbox_to_polygon(area)
+    return area
 
 
-def parse_since(since: Optional[str]) -> Optional[datetime.datetime]:
-    """Parse a relative window like '24h' or '7d' into a UTC datetime.
-
-    Returns None if since is None or empty.
-    """
-    if not since:
-        return None
-    since = since.strip()
-    match = re.fullmatch(r"(\d+)([hd])", since, re.IGNORECASE)
-    if not match:
-        raise ValueError(f"Invalid --since value: {since!r}; expected e.g. 24h or 7d")
-    value, unit = int(match.group(1)), match.group(2).lower()
-    delta = (
-        datetime.timedelta(hours=value)
-        if unit == "h"
-        else datetime.timedelta(days=value)
-    )
-    return datetime.datetime.now(tz=datetime.timezone.utc) - delta
+def _clear_token_cache() -> None:
+    """Clear the module-level OAuth2 token cache."""
+    global _TOKEN_CACHE
+    _TOKEN_CACHE = None
 
 
 def _bbox_to_polygon(area: str) -> list[list[list[float]]]:
@@ -252,13 +240,14 @@ async def ingest(
     """
     client_id, client_secret = _load_credentials()
     area_str = _load_area(area)
-    since_dt = parse_since(since)
+    since_str = since or os.environ.get("BARENTSWATCH_SINCE", "24h")
+    since_dt = parse_since(since_str)
 
     produced: list[Item] = []
     log.info(
         "barentswatch ingest start: area=%s since=%s dry_run=%s",
         area_str,
-        since or "latest",
+        since_str,
         dry_run,
     )
 
@@ -271,7 +260,18 @@ async def ingest(
     client_ctx = _client or httpx.AsyncClient()
     async with client_ctx as client:
         token = await _get_token(client, client_id, client_secret)
-        positions = await fetch_positions(client, token, area_str, since_dt)
+        try:
+            positions = await fetch_positions(client, token, area_str, since_dt)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 401:
+                log.warning(
+                    "BarentsWatch token rejected; retrying once with fresh token"
+                )
+                _clear_token_cache()
+                token = await _get_token(client, client_id, client_secret)
+                positions = await fetch_positions(client, token, area_str, since_dt)
+            else:
+                raise
         log.info("barentswatch fetched %d positions", len(positions))
         for pos in positions:
             item = _position_to_item(pos)
