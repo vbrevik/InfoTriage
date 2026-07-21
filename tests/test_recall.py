@@ -146,6 +146,67 @@ def test_recall_synthesis_uses_dgx_backend(capsys, fake_store):
     assert "DGX synthesis" in out
 
 
+def test_recall_dgx_cross_language_appends_verification_flag(capsys, fake_store):
+    """DGX synthesis omitting a citation triggers the language coverage flag."""
+    fake_store.recall_items.return_value = [
+        {
+            "item_id": "id1",
+            "title": "Arctic article",
+            "source": "NRK",
+            "url": "https://example.com/1",
+            "ccir": "PIR-1",
+            "score": 8,
+            "similarity": 0.89,
+            "lang": "en",
+        },
+        {
+            "item_id": "id2",
+            "title": "Russian article",
+            "source": "TASS",
+            "url": "https://example.com/2",
+            "ccir": "PIR-1",
+            "score": 7,
+            "similarity": 0.85,
+            "lang": "ru",
+        },
+    ]
+
+    class FakeResponse:
+        def __init__(self, body: bytes):
+            self.body = body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def read(self):
+            return self.body
+
+    def fake_urlopen(req, *args, **kwargs):
+        return FakeResponse(
+            json.dumps(
+                {"choices": [{"message": {"content": "Synthesis [id1]."}}]}
+            ).encode()
+        )
+
+    with patch("urllib.request.urlopen", fake_urlopen):
+        _run_recall(
+            "--topic",
+            "Arctic security",
+            "--synthesize",
+            "--backend",
+            "dgx",
+            fake_store=fake_store,
+        )
+
+    out = capsys.readouterr().out
+    assert "## Synthesis" in out
+    assert "Synthesis [id1]." in out
+    assert "ru language sources were present but not cited" in out
+
+
 def test_recall_since_relative(fake_store):
     _run_recall("--topic", "Arctic security", "--since", "7d", fake_store=fake_store)
     call = fake_store.recall_items.call_args
