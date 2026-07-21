@@ -277,6 +277,8 @@ Plans consume:
 - `translate_to` works without network calls to cloud APIs.
 - Caching is tested.
 
+**Status:** ✅ COMPLETE
+
 ### Task 9: Surface translation in the Obsidian vault / SAB brief
 
 **Files:** `apps/brief/vault_writer.py`, `apps/brief/renderer.py`, `apps/brief/html_renderer.py`
