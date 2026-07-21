@@ -20,6 +20,12 @@ from typing import cast
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "libs" / "store" / "src"))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "apps" / "wiki"))
 
+from contracts import (  # noqa: E402
+    CITATION_INSTRUCTION,
+    CONTRADICTION_INSTRUCTION,
+    CROSS_LANGUAGE_INSTRUCTION,
+    verify_language_coverage,
+)
 from store import PostgresStore  # noqa: E402
 from dgx_client import DGXSynthesisBackend, RecallBackend  # noqa: E402
 
@@ -101,15 +107,19 @@ def _parse_since(since: str | None) -> datetime.datetime | None:
 
 def _synthesis_prompt(topic: str, results: list[dict], include_body: bool) -> str:
     lines = [
-        "Answer the query using ONLY the provided articles. Cite every claim with [item_id].",
+        f"Answer the query using ONLY the provided articles. {CITATION_INSTRUCTION}",
+        CROSS_LANGUAGE_INSTRUCTION,
+        CONTRADICTION_INSTRUCTION,
         "If the articles do not answer the query, say so.\n",
         f"Query: {topic}\n",
         "Articles:",
     ]
     for r in results:
         lines.append(
-            f"[item_id: {r['item_id']}] Title: \"{r['title']}\" "
-            f"Source: {r['source']} CCIR: {r['ccir']} Score: {r['score']}"
+            f"[item_id: {r.get('item_id', 'unknown')}] Title: \"{r.get('title', 'Untitled')}\" "
+            f"Source: {r.get('source', 'unknown')} "
+            f"CCIR: {r.get('ccir', 'none')} "
+            f"Score: {r.get('score', 0)}"
         )
         if r.get("summary"):
             lines.append(f"Summary: {r['summary']}")
@@ -227,6 +237,13 @@ def main() -> None:
                 }
             ]
         )
+        missing_langs = verify_language_coverage(results, synthesis)
+        if missing_langs:
+            lang_list = ", ".join(missing_langs)
+            synthesis += (
+                "\n\n> ⚠️ **Verification Flag**: "
+                f"{lang_list} language sources were present but not cited."
+            )
 
     markdown = _markdown_output(args.topic, args.since, results)
     print(markdown)

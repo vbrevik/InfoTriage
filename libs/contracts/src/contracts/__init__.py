@@ -17,6 +17,12 @@ from ._bus import BusClient, InMemoryBus
 from ._bus_rabbitmq import RabbitMQBus
 from ._logging import setup_logging
 from .uvicorn_log_config import LOGGING_CONFIG
+from ._verify import (
+    CITATION_INSTRUCTION,
+    CONTRADICTION_INSTRUCTION,
+    CROSS_LANGUAGE_INSTRUCTION,
+    verify_language_coverage,
+)
 
 __all__ = [
     "Item",
@@ -31,4 +37,8 @@ __all__ = [
     "RabbitMQBus",
     "setup_logging",
     "LOGGING_CONFIG",
+    "verify_language_coverage",
+    "CITATION_INSTRUCTION",
+    "CROSS_LANGUAGE_INSTRUCTION",
+    "CONTRADICTION_INSTRUCTION",
 ]

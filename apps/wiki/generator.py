@@ -17,7 +17,14 @@ from typing import Callable, Iterable, cast
 
 import yaml
 
-from contracts import from_frontmatter, to_frontmatter
+from contracts import (
+    CITATION_INSTRUCTION,
+    CONTRADICTION_INSTRUCTION,
+    CROSS_LANGUAGE_INSTRUCTION,
+    from_frontmatter,
+    to_frontmatter,
+    verify_language_coverage,
+)
 from store import Store
 
 
@@ -74,11 +81,8 @@ def _slugify(text: str) -> str:
 # Synthesis prompt templates
 # ---------------------------------------------------------------------------
 
-CITATION_INSTRUCTION = "Cite every claim with [item_id]."
-CROSS_LANGUAGE_INSTRUCTION = "Synthesize insights from ALL provided languages."
-CONTRADICTION_INSTRUCTION = (
-    "If sources disagree, highlight the contradiction explicitly."
-)
+# Prompt-instruction constants are imported from the contracts package so
+# that standing wiki generation and on-demand recall synthesis stay in sync.
 
 
 def _synthesis_prompt(subject: str, items: list[dict]) -> str:
@@ -94,43 +98,17 @@ def _synthesis_prompt(subject: str, items: list[dict]) -> str:
     for r in items:
         lines.append(
             f"[item_id: {r['item_id']}] Title: \"{r['title']}\" "
-            f"Source: {r['source']} CCIR: {r.get('ccir', 'none')} Score: {r.get('score', 0)}"
+            f"Source: {r.get('source', 'unknown')} "
+            f"CCIR: {r.get('ccir', 'none')} "
+            f"Score: {r.get('score', 0)}"
         )
         if r.get("summary"):
             lines.append(f"Summary: {r['summary']}")
     return "\n".join(lines)
 
 
-# ---------------------------------------------------------------------------
-# Cross-language coverage verification (Phase 999.4)
-# ---------------------------------------------------------------------------
-
-
-def verify_language_coverage(items: Iterable[dict], text: str) -> list[str]:
-    """Return languages present in items but missing from citations in text.
-
-    Each item must have a 'lang' key or 'item_id'. Citation format is [item_id].
-    """
-    lang_by_item: dict[str, str] = {}
-    for item in items:
-        item_id = str(item.get("item_id") or item.get("id"))
-        if not item_id:
-            continue
-        lang_by_item[item_id] = item.get("lang") or "unknown"
-
-    required_langs: set[str] = set()
-    for item_id, lang in lang_by_item.items():
-        if lang == "unknown":
-            continue
-        required_langs.add(lang)
-
-    found_langs: set[str] = set()
-    for match in re.finditer(r"\[([^\]]+)\]", text):
-        cited = match.group(1).strip()
-        if cited in lang_by_item:
-            found_langs.add(lang_by_item[cited])
-
-    return sorted(required_langs - found_langs)
+# verify_language_coverage is now shared from contracts._verify (Phase 10 Wave 4)
+# so it can be reused by apps/triage/recall.py.
 
 
 # ---------------------------------------------------------------------------
@@ -251,9 +229,10 @@ class WikiGenerator:
 
         missing_langs = verify_language_coverage(items, synthesis)
         if missing_langs:
+            lang_list = ", ".join(missing_langs)
             synthesis += (
-                "\n\n> ⚠️ **Verification Flag**: sources in "
-                f"{', '.join(missing_langs)} were present but not cited."
+                "\n\n> ⚠️ **Verification Flag**: "
+                f"{lang_list} language sources were present but not cited."
             )
 
         return self._write_page(subject, synthesis, items)
