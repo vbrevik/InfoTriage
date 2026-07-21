@@ -98,7 +98,7 @@ Plans consume:
 
 | Artifact | Purpose |
 |----------|---------|
-| `libs/contracts/src/contracts/_item.py` | `Item` schema with `discipline` and `admiralty_rating` fields |
+| `libs/contracts/src/contracts/_item.py` | `Item` schema with `discipline` and `admiralty_reliability` fields |
 | `libs/store/src/store/_protocol.py` (+ backends) | Storage support for new provenance metadata |
 | `apps/ingest-telegram/` | Telethon-based Telegram MCP adapter |
 | `apps/ingest-barentswatch/` | BarentsWatch AIS MCP adapter |
@@ -147,15 +147,17 @@ Plans consume:
 **Action:**
 1. Add to `Item`:
    - `discipline: str | None` (OSINT, SOCMINT, MASINT/AIS, GEOINT, etc.)
-   - `admiralty_rating: str | None` (A-F + 1-6, e.g. "A1")
+   - `admiralty_reliability: str | None` (A-F + 1-6, e.g. "A1")
    - `source_reliability: str | None` (optional human-readable justification)
 2. Update Postgres schema (migration) to store the new columns with sensible defaults.
 3. Update InMemory store.
 4. Add tests in `tests/test_store_contract.py` or new `tests/test_store_item_metadata.py`.
 
 **Acceptance Criteria:**
-- `Item` round-trips with discipline and Admiralty rating.
+- `Item` round-trips with discipline and Admiralty reliability.
 - Migration is backward-compatible (existing rows default to `NULL`).
+
+**Status:** ✅ COMPLETE
 
 ## Wave 2: Translation on Demand (Phase 999.1 backlog)
 
