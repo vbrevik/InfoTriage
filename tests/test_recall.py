@@ -1,4 +1,5 @@
 """tests/test_recall.py — Phase 9 recall CLI tests."""
+
 from __future__ import annotations
 
 import datetime
@@ -42,8 +43,13 @@ def fake_store():
 
 def _run_recall(*args, fake_store, fake_embedding=None, fake_llm=None):
     with patch("recall.PostgresStore", return_value=fake_store):
-        with patch("recall._get_embedding", return_value=fake_embedding or [0.1] * 1024):
-            with patch("recall.LocalSynthesisBackend.synthesize", return_value=fake_llm or "synthesized answer"):
+        with patch(
+            "recall._get_embedding", return_value=fake_embedding or [0.1] * 1024
+        ):
+            with patch(
+                "recall.LocalSynthesisBackend.synthesize",
+                return_value=fake_llm or "synthesized answer",
+            ):
                 with patch.object(sys, "argv", ["recall.py", *args]):
                     recall.main()
 
@@ -51,7 +57,7 @@ def _run_recall(*args, fake_store, fake_embedding=None, fake_llm=None):
 def test_recall_default_markdown_output(capsys, fake_store):
     _run_recall("--topic", "Arctic security", fake_store=fake_store)
     out = capsys.readouterr().out
-    assert "Recall: \"Arctic security\"" in out
+    assert 'Recall: "Arctic security"' in out
     assert "Arctic security article" in out
     assert "NATO summit" in out
     assert "0.890" in out
@@ -72,7 +78,9 @@ def test_recall_json_include_body_strips_body(capsys, fake_store):
     item.body_ref = "deadbeef" * 8
     fake_store.get_item.return_value = item
     fake_store.get_blob.return_value = b"full article body text"
-    _run_recall("--topic", "Arctic security", "--json", "--include-body", fake_store=fake_store)
+    _run_recall(
+        "--topic", "Arctic security", "--json", "--include-body", fake_store=fake_store
+    )
     out = capsys.readouterr().out
     data = json.loads(out)
     assert "body" not in data[0]
@@ -109,7 +117,13 @@ def test_recall_no_results(capsys, fake_store):
 
 
 def test_recall_synthesis_calls_llm(capsys, fake_store):
-    _run_recall("--topic", "Arctic security", "--synthesize", fake_store=fake_store, fake_llm="synthesis text")
+    _run_recall(
+        "--topic",
+        "Arctic security",
+        "--synthesize",
+        fake_store=fake_store,
+        fake_llm="synthesis text",
+    )
     out = capsys.readouterr().out
     assert "## Synthesis" in out
     assert "synthesis text" in out
@@ -141,7 +155,9 @@ def test_recall_since_relative(fake_store):
 
 def test_recall_obsidian_output(tmp_path, capsys, fake_store):
     vault = tmp_path / "vault"
-    _run_recall("--topic", "Arctic security", "--obsidian", str(vault), fake_store=fake_store)
+    _run_recall(
+        "--topic", "Arctic security", "--obsidian", str(vault), fake_store=fake_store
+    )
     out = capsys.readouterr().out
     assert "Obsidian note written to" in out
     notes = list(vault.glob("recall-Arctic-security-*.md"))

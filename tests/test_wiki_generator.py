@@ -264,13 +264,17 @@ def test_dgx_backend_synthesize_uses_spark_endpoint_and_large_max_tokens(monkeyp
     monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
 
     backend = DGXSynthesisBackend(base_url="http://192.168.10.2:8000/v1")
-    result = backend.synthesize([{"role": "user", "content": "Summarize"}], max_tokens=800)
+    result = backend.synthesize(
+        [{"role": "user", "content": "Summarize"}], max_tokens=800
+    )
 
     assert result == "DGX synthesis output"
     assert captured["body"]["model"] == "model"
     assert captured["body"]["max_tokens"] == 4096
     assert captured["body"]["messages"] == [{"role": "user", "content": "Summarize"}]
-    assert captured["request"].full_url == "http://192.168.10.2:8000/v1/chat/completions"
+    assert (
+        captured["request"].full_url == "http://192.168.10.2:8000/v1/chat/completions"
+    )
 
 
 def test_dgx_backend_strips_thinking_tokens(monkeypatch):
@@ -292,13 +296,13 @@ def test_dgx_backend_strips_thinking_tokens(monkeypatch):
             return self.content
 
     response_body = json.dumps(
-        {
-            "choices": [
-                {"message": {"content": " thinking some reasoning]Final answer"}}
-            ]
-        }
+        {"choices": [{"message": {"content": " thinking some reasoning]Final answer"}}]}
     ).encode()
-    monkeypatch.setattr(urllib.request, "urlopen", lambda req, *args, **kwargs: FakeResponse(response_body))
+    monkeypatch.setattr(
+        urllib.request,
+        "urlopen",
+        lambda req, *args, **kwargs: FakeResponse(response_body),
+    )
 
     backend = DGXSynthesisBackend(base_url="http://dgx.test/v1")
     result = backend.synthesize([{"role": "user", "content": "x"}])

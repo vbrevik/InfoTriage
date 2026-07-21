@@ -88,7 +88,9 @@ def _parse_since(since: str | None) -> datetime.datetime | None:
             days = int(since[:-1])
             if days < 0:
                 raise SystemExit(f"Invalid --since value: {since!r} (negative days)")
-            return datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=days)
+            return datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(
+                days=days
+            )
         dt = datetime.datetime.fromisoformat(since)
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=datetime.timezone.utc)
@@ -120,7 +122,11 @@ def _markdown_output(topic: str, since: str | None, results: list[dict]) -> str:
     if not results:
         return f"No results found for '{topic}'."
     since_str = since or "all time"
-    lines = [f"## Recall: \"{topic}\" ({since_str})\n", "| # | Title | Source | CCIR | Score | Similarity |", "|---|-------|--------|------|-------|------------|"]
+    lines = [
+        f'## Recall: "{topic}" ({since_str})\n',
+        "| # | Title | Source | CCIR | Score | Similarity |",
+        "|---|-------|--------|------|-------|------------|",
+    ]
     for i, r in enumerate(results, 1):
         title = f"[{r['title']}]({r['url']})" if r.get("url") else r["title"]
         lines.append(
@@ -129,7 +135,9 @@ def _markdown_output(topic: str, since: str | None, results: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def _obsidian_output(topic: str, since: str | None, results: list[dict], synthesis: str | None) -> str:
+def _obsidian_output(
+    topic: str, since: str | None, results: list[dict], synthesis: str | None
+) -> str:
     front_matter = {
         "topic": topic,
         "since": since,
@@ -144,23 +152,33 @@ def _obsidian_output(topic: str, since: str | None, results: list[dict], synthes
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Thematic recall over the InfoTriage corpus")
+    parser = argparse.ArgumentParser(
+        description="Thematic recall over the InfoTriage corpus"
+    )
     parser.add_argument("--topic", required=True, help="Search query topic")
     parser.add_argument("--since", help="Date filter: 7d or ISO date")
     parser.add_argument("--ccir", help="Filter by CCIR ID")
-    parser.add_argument("--bucket", choices=["keep", "maybe", "skip"], help="Filter by bucket")
+    parser.add_argument(
+        "--bucket", choices=["keep", "maybe", "skip"], help="Filter by bucket"
+    )
     parser.add_argument("--limit", type=int, default=50, help="Max results")
     parser.add_argument("--json", action="store_true", help="Output JSON")
     parser.add_argument("--obsidian", help="Write Obsidian note to this path")
-    parser.add_argument("--synthesize", action="store_true", help="Synthesize with the selected backend")
+    parser.add_argument(
+        "--synthesize", action="store_true", help="Synthesize with the selected backend"
+    )
     parser.add_argument(
         "--backend",
         choices=["local", "dgx"],
         default="local",
         help="Synthesis backend: local (default) or DGX-heavy",
     )
-    parser.add_argument("--include-body", action="store_true", help="Include article body in synthesis")
-    parser.add_argument("--dsn", default=os.environ.get("INFOTRIAGE_PG_DSN"), help="Postgres DSN")
+    parser.add_argument(
+        "--include-body", action="store_true", help="Include article body in synthesis"
+    )
+    parser.add_argument(
+        "--dsn", default=os.environ.get("INFOTRIAGE_PG_DSN"), help="Postgres DSN"
+    )
     args = parser.parse_args()
 
     if not args.dsn:
@@ -192,9 +210,7 @@ def main() -> None:
 
     if args.json:
         # JSON output should not silently leak full article bodies.
-        safe_results = [
-            {k: v for k, v in r.items() if k != "body"} for r in results
-        ]
+        safe_results = [{k: v for k, v in r.items() if k != "body"} for r in results]
         print(json.dumps(safe_results, indent=2, ensure_ascii=False))
         return
 
@@ -202,7 +218,14 @@ def main() -> None:
     if args.synthesize:
         backend = _select_backend(args.backend)
         synthesis = backend.synthesize(
-            [{"role": "user", "content": _synthesis_prompt(args.topic, results, args.include_body)}]
+            [
+                {
+                    "role": "user",
+                    "content": _synthesis_prompt(
+                        args.topic, results, args.include_body
+                    ),
+                }
+            ]
         )
 
     markdown = _markdown_output(args.topic, args.since, results)
@@ -215,8 +238,14 @@ def main() -> None:
         vault = Path(args.obsidian)
         vault.mkdir(parents=True, exist_ok=True)
         slug = args.topic.replace(" ", "-").replace("/", "-")[:50]
-        note_path = vault / f"recall-{slug}-{datetime.datetime.now(tz=datetime.timezone.utc).strftime('%Y-%m-%d')}.md"
-        note_path.write_text(_obsidian_output(args.topic, args.since, results, synthesis), encoding="utf-8")
+        note_path = (
+            vault
+            / f"recall-{slug}-{datetime.datetime.now(tz=datetime.timezone.utc).strftime('%Y-%m-%d')}.md"
+        )
+        note_path.write_text(
+            _obsidian_output(args.topic, args.since, results, synthesis),
+            encoding="utf-8",
+        )
         print(f"\nObsidian note written to {note_path}")
 
 

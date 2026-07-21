@@ -207,7 +207,7 @@ class WikiGenerator:
 
     def _recall_for_subject(self, subject: str) -> list[dict]:
         vec = self.embed(f"query: {subject}")
-        return self.store.recall_items(vec, limit=self.max_items)
+        return cast(list[dict], self.store.recall_items(vec, limit=self.max_items))
 
     def build_prompt(self, subject: str, items: list[dict]) -> str:
         """Return the synthesis prompt for ``subject`` and its source ``items``.
