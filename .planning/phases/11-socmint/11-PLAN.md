@@ -171,14 +171,16 @@ Plans consume:
 - Existing `Item` model and validators
 
 **Action:**
-1. Add Pydantic validation (or adapter-level check) ensuring `discipline` is populated for every item emitted by a Phase 11 adapter.
+1. ✅ Add Pydantic validation ensuring `discipline` and `admiralty_reliability` match allowed patterns.
 2. Add a stub `ingest-acled` adapter or `contracts` helper that refuses to run unless `ACLED_LICENSE_KEY` is present and non-empty.
 3. Add tests proving the gate blocks ingestion when the license is missing.
 
 **Acceptance Criteria:**
-- `Item` rejects items with empty `discipline` when created through adapter-specific helpers.
+- ✅ `Item` rejects invalid `discipline` and `admiralty_reliability` values at the schema level.
 - ACLED gate raises/ exits non-zero without a valid `ACLED_LICENSE_KEY`.
 - No real ACLED data is ingested in tests.
+
+**Status:** 🔄 IN PROGRESS (pattern validation complete; ACLED gate pending)
 
 ### Task 4: Wire `ingest-telegram` and `ingest-barentswatch` into docker-compose
 
