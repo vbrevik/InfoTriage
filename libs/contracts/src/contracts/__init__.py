@@ -24,6 +24,12 @@ from ._verify import (
     verify_language_coverage,
 )
 from ._translation import translate_to, TranslationCache
+from ._phase11_gates import (
+    require_discipline,
+    require_acled_license,
+    DisciplineRequired,
+    AcledLicenseMissing,
+)
 
 __all__ = [
     "Item",
@@ -44,4 +50,8 @@ __all__ = [
     "CONTRADICTION_INSTRUCTION",
     "translate_to",
     "TranslationCache",
+    "require_discipline",
+    "require_acled_license",
+    "DisciplineRequired",
+    "AcledLicenseMissing",
 ]
