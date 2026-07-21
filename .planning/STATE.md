@@ -2,21 +2,35 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: M1 Foundation re-audited and passed; Phase 8 (entity resolution) complete; Phase 9 (RAG recall) ready to execute
-stopped_at: v1.0-MILESTONE-AUDIT.md refreshed after re-audit; 09-CONTEXT.md and 09-DISCUSSION-LOG.md written, decisions locked
-last_updated: "2026-07-13T00:00:00.000Z"
+status: M1 Foundation re-audited and passed; Phase 8 (entity resolution) complete; Phase 9 (RAG recall) complete; Phase 10 ready to execute
+stopped_at: Phase 9 closed out; amended plan, implementation, tests, and live verification done
+last_updated: "2026-07-21T00:00:00.000Z"
 progress:
   total_phases: 13
-  completed_phases: 10
+  completed_phases: 11
   total_plans: 34
   completed_plans: 34
-  percent: 77
+  percent: 85
 ---
 
 # STATE — InfoTriage
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-07-21 — Phase 9 (RAG recall) COMPLETE
+
+### Just-completed
+
+- **09-PLAN.md amended and executed.** Implemented the CCIR pre-filter in `apps/triage/worker.py` (`find_similar_ccir` / `recall_items` store methods), added `psycopg.sql`-based recall queries in `libs/store/src/store/_postgres.py`, built the thematic recall CLI in `apps/triage/recall.py`, and added the `scripts/build_ccir_vectors.py` build script.
+- **Runtime fixes.** `get_all_entities` now uses `ARRAY_AGG ... FILTER` to avoid `[None]` aliases for unlinked entities; expected table list in `tests/test_store_integration.py` updated to include `ccir_vectors`.
+- **Verification.** Full pytest suite against the live test DB: **479 passed, 0 failed, 0 skipped**; mypy clean on modified Phase 9 files. Smoke tests: `build_ccir_vectors.py` built 12 CCIR vectors; `recall.py --topic "Arctic security" --since 7d --json` returned exit 0.
+- **Docs.** `ROADMAP.md` Phase 9 checkbox marked complete and detailed status updated.
+
+### Next
+
+- **Phase 10** is ready to execute when scheduled.
+- **M1 ship decision** remains open; accumulated Phase 7/8/9 commits are still ahead of `origin/main` and await explicit push.
 
 ## Session: 2026-07-12 — Backlog 999.3 closeout: mE5-large entity-link threshold re-validated (T*=0.92, PARTIAL)
 

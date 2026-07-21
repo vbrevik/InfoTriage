@@ -30,7 +30,7 @@ urgent insertions. The all-local-LLM rule (ADR-004) is never revisited by a phas
 - [x] 06-02-PLAN.md — pgvector semantic clustering (replaced keyword-overlap) — 38/38 tests pass
 - [x] **Phase 7: Ops + cutover** (M1) - health, DLQ, replay, retire host path (completed 2026-07-12; **M1 ship-gate met**)
 - [x] **Phase 8: Entity resolution** (M2) - Postgres + pgvector → Obsidian projection (Waves 1–6 complete: LLM NER, worker integration, vault projection, entity graph, mE5-large threshold re-validation, contract tests)
-- [ ] **Phase 9: RAG recall** (M2) - CCIR pre-filter + thematic recall over corpus
+- [x] **Phase 9: RAG recall** (M2) - CCIR pre-filter + thematic recall over corpus ✅
 - [ ] **Phase 10: Wiki-LLM** (M2) - standing auto-wiki + on-demand synthesis → Obsidian
 - [ ] **Phase 11: SOCMINT + Arctic collection** (M2) - Telegram/AIS adapters via MCP pattern
 - [ ] **Phase 12: CNR alerting / dissemination** (M2) - real-time notification lane
@@ -249,17 +249,17 @@ to the running pipeline.
 - [x] 08-01-PLAN.md — Store foundation: `put_entity`, `get_entity`, `link_entity`, `get_entity_links` on Protocol + Postgres + InMemory (W1)
 - [x] 08-02-PLAN.md — Waves 2–6: LLM-based NER (`apps/triage/entities.py`), triage worker integration, vault projection replacing heuristic, `Entity Graph.md` generation, mE5-large threshold re-validated at T*=0.92, contract/regression tests (W2–W6)
 
-### Phase 9: RAG recall
+### Phase 9: RAG recall ✅ COMPLETE
 
 **Goal**: Cut LLM caller volume via a CCIR pre-filter and enable thematic recall over the durable corpus.
 **Depends on**: Phase 8
 **Requirements**: ADR-001
 **Success Criteria** (what must be TRUE):
 
-  1. Clearly off-topic items skip the LLM (`cosine(article, ccir.vector) < τ`), logged in `audit`.
-  2. A thematic recall (`recall.py --topic … --since …`) cites `articles.id`/`url` per claim; heavy synthesis may run on DGX.
+  1. ✅ Clearly off-topic items skip the LLM (`cosine(article, ccir.vector) < τ`), logged in `audit`.
+  2. ✅ A thematic recall (`recall.py --topic … --since …`) cites `articles.id`/`url` per claim; heavy synthesis may run on DGX.
 
-**Plans**: TBD
+**Status**: COMPLETE (2026-07-21) — worker pre-filter gate, store recall methods, `recall.py` CLI, `build_ccir_vectors.py`, and full test/verification suite delivered.
 
 ### Phase 10: Wiki-LLM
 

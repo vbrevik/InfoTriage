@@ -23,11 +23,11 @@ requirements: [R1, ADR-001, ADR-004, ADR-006]
 must_haves:
   truths:
     - "One vector per CCIR in infotriage.ccir_vectors table (D-01, D-02)"
-    - "Pre-filter cosine gate uses τ=0.50, configurable via INFOTRIAGE_PREFILTER_THRESHOLD (D-04, D-05)"
+    - "Pre-filter cosine gate uses τ=0.50, configurable via INFOTRIAGE_PREFILTER_THRESHOLD; find_similar_ccir returns the raw nearest match, worker applies τ (D-04, D-05)"
     - "Pre-filter runs after embedding, before score_item() in worker.py (D-07)"
     - "Pre-filter skip writes enrichment with ccir=none, bucket=skip (D-08)"
     - "Audit pre-filter skips with details JSONB (D-11, D-12)"
-    - "Recall CLI searches title+summary+enrichment.why via item vectors (D-14, D-15)"
+    - "Recall CLI searches item embeddings via vector similarity to the topic; synthesis prompt may include summary/body (D-14, D-15)"
     - "Recall outputs Markdown by default; --json, --obsidian, --synthesize flags (D-18, D-19, D-20)"
     - "Local qwen36 only for synthesis; DGX deferred (D-22, D-23)"
     - "Reuse infotriage.embeddings for items; infotriage.ccir_vectors for CCIRs (D-24, D-25)"
@@ -41,6 +41,7 @@ must_haves:
     - apps/triage/worker.py (pre-filter integration)
     - apps/triage/recall.py (thematic recall CLI)
     - tests/test_ccir_vectors.py (unit + db_live tests)
+    - tests/test_build_ccir_vectors.py (CCIR parser unit tests)
     - tests/test_prefilter.py (pre-filter integration tests)
     - tests/test_recall.py (recall CLI tests)
   key_links:
@@ -178,17 +179,16 @@ Add two methods to the `Store` Protocol:
 def find_similar_ccir(
     self,
     vector: list[float],
-    threshold: float = 0.50,  # D-04 default τ
 ) -> Optional[dict]:
-    """Return the nearest CCIR vector with cosine similarity >= threshold, or None.
+    """Return the nearest CCIR vector, or None if the table is empty.
 
     Args:
         vector: 1024-dim item embedding.
-        threshold: minimum cosine similarity to consider a CCIR match (default 0.50).
 
     Returns:
-        dict with keys: ccir_id, similarity (cosine similarity >= threshold).
-        Returns None when no CCIR vector meets the threshold.
+        dict with keys: ccir_id, similarity (raw cosine similarity to the
+        nearest stored CCIR vector). Returns None when no CCIR vectors have
+        been stored. The caller applies its own threshold.
     """
     ...
 
@@ -214,19 +214,19 @@ def recall_items(
 ```
 
 Postgres implementation:
-- `find_similar_ccir`: `SELECT ccir_id, (1 - (embedding <=> %s::vector)) AS sim FROM infotriage.ccir_vectors WHERE (embedding <=> %s::vector) <= %s ORDER BY embedding <=> %s::vector LIMIT 1;` (convert distance to similarity, filter by threshold)
-- `recall_items`: JOIN `infotriage.enrichment` → `infotriage.articles` → `infotriage.embeddings`, filter by bucket/since/ccir, ORDER BY embedding <=> query_vector, LIMIT
+- `find_similar_ccir`: `SELECT ccir_id, (embedding <=> %s::vector) AS dist FROM infotriage.ccir_vectors ORDER BY embedding <=> %s::vector LIMIT 1;` (returns the nearest CCIR regardless of any threshold; caller converts distance to similarity and decides).
+- `recall_items`: JOIN `infotriage.enrichment` → `infotriage.articles` → `infotriage.embeddings`, filter by bucket/since/ccir, ORDER BY embedding <=> query_vector, LIMIT. Uses `psycopg.sql` composition, not string concatenation, to keep the WHERE clause safe.
 
 InMemory implementation:
-- `find_similar_ccir`: iterate stored CCIR vectors, compute cosine, return best if >= threshold
+- `find_similar_ccir`: iterate stored CCIR vectors, compute cosine, return the nearest CCIR (or None if the table is empty)
 - `recall_items`: iterate stored embeddings, compute cosine, filter by criteria, sort DESC, return top N
 
 All SQL uses `%s` binds. No f-string SQL.
 
 **Verify:**
 ```bash
-pytest tests/test_store_ccir.py -x          # inmemory
-pytest tests/test_store_ccir.py -m db_live -x  # postgres
+pytest tests/test_ccir_vectors.py -x             # inmemory
+pytest tests/test_ccir_vectors.py -m db_live -x  # postgres
 ```
 
 **Done:** Store Protocol has `find_similar_ccir` and `recall_items`. Both Postgres and InMemory implementations pass contract tests.
@@ -248,19 +248,13 @@ pytest tests/test_store_ccir.py -m db_live -x  # postgres
 **Action:**
 Create `scripts/build_ccir_vectors.py` that:
 1. Reads `ccir.md` from the project root
-2. Parses each CCIR section (PIR-1..6, FFIR-1..3, SIR-1..3) — section heading + bullet text
-3. Truncates each section to the first ~512 tokens (per D-03, same as item dedup input)
-4. Embeds each section with the `query:` prefix using the same oMLX endpoint as `get_embedding()`
-5. Upserts each vector into `infotriage.ccir_vectors` via the Store protocol:
-   ```python
-   store.put(  # or direct SQL
-       "UPSERT infotriage.ccir_vectors SET ccir_id=%s, embedding=%s, model=%s, updated_at=NOW() ON CONFLICT (ccir_id) DO UPDATE SET embedding=EXCLUDED.embedding, updated_at=NOW()",
-       (ccir_id, embedding, "intfloat/multilingual-e5-large")
-   )
-   ```
-6. Prints a summary: how many vectors written, how many updated
+2. Parses each CCIR bullet item under the `## PIR`/`## FFIR`/`## SIR` headings — bullet line + indented continuation lines
+3. Truncates each section to the first 2048 characters
+4. Embeds each section with the `query:` prefix using the local oMLX endpoint
+5. Upserts each vector into `infotriage.ccir_vectors` via the Store protocol (`store.put_ccir_vector`)
+6. Prints a summary of how many CCIR vectors were written
 
-The script should be runnable standalone (not a Python package import) and accept an optional `--dsn` flag.
+The script is runnable standalone (not a Python package import) and requires `--dsn`.
 
 **Verify:**
 ```bash
@@ -322,42 +316,47 @@ except Exception as exc:
     log.warning("pre-filter CCIR search failed for item_id=%s: %s", item_id, exc)
     best_ccir = None  # fall through to LLM scoring
 
-if best_ccir is not None and best_ccir["similarity"] >= float(os.environ.get("INFOTRIAGE_PREFILTER_THRESHOLD", "0.50")):
+_prefilter_sim = best_ccir["similarity"] if best_ccir is not None else 0.0
+_prefilter_ccir_id = best_ccir["ccir_id"] if best_ccir is not None else "none"
+_prefilter_threshold = float(os.environ.get("INFOTRIAGE_PREFILTER_THRESHOLD", "0.50"))
+# If CCIR lookup fails or there are no CCIR vectors, fall through to the
+# LLM scorer rather than silently dropping the item (D-07).
+pre_filter_passes = (
+    best_ccir is None or _prefilter_sim >= _prefilter_threshold
+)
+
+if pre_filter_passes:
     # Item passes pre-filter — proceed to normal LLM scoring path (D-09)
     log.info("pre-filter PASS item_id=%s best_ccir=%s similarity=%.3f",
-             item_id, best_ccir["ccir_id"], best_ccir["similarity"])
+             item_id, _prefilter_ccir_id, _prefilter_sim)
 else:
     # Item fails pre-filter — skip LLM scoring (D-08)
     log.info("pre-filter SKIP item_id=%s best_ccir=%s similarity=%.3f",
-             item_id, best_ccir["ccir_id"] if best_ccir else "none",
-             best_ccir["similarity"] if best_ccir else 0.0)
-    
+             item_id, _prefilter_ccir_id, _prefilter_sim)
+
     fields = {
         "ccir": "none",
         "cnr": "none",
         "score": 0,
         "bucket": "skip",
-        "why": f"pre-filter: max_cosine={best_ccir['similarity'] if best_ccir else 0.0:.3f} < threshold",
+        "why": f"pre-filter: max_cosine={_prefilter_sim:.3f} < threshold",
         "pmesii": "none",
         "tessoc": "none",
     }
-    
+
     await asyncio.to_thread(store.put_enrichment, item_id, fields)
     await asyncio.to_thread(store.put_embedding, item_id, vec)
-    
+
     # Audit log (D-11, D-12)
-    await asyncio.to_thread(store._audit_write,
+    await asyncio.to_thread(
+        store.audit_write,
         op="pre_filter_skip",
         table_name="enrichment",
         item_id=item_id,
-        details={"max_similarity": best_ccir["similarity"] if best_ccir else 0.0,
-                 "threshold": float(os.environ.get("INFOTRIAGE_PREFILTER_THRESHOLD", "0.50")),
-                 "best_ccir": best_ccir["ccir_id"] if best_ccir else "none"}
+        details={"max_similarity": _prefilter_sim,
+                 "threshold": _prefilter_threshold,
+                 "best_ccir": _prefilter_ccir_id}
     )
-    
-    payload = VerdictReady(...)  # same as current
-    await bus.publish("verdict.ready", item_id, payload.model_dump(mode="json"))
-    return  # Short-circuit: no LLM call made
 ```
 
 If `best_ccir` is not None and similarity >= τ, proceed to the existing dedup + score path (D-09: no change to passed items).
@@ -536,6 +535,7 @@ Create `tests/test_recall.py` with:
 **Verify:**
 ```bash
 pytest tests/test_recall.py -x
+pytest tests/test_build_ccir_vectors.py -x
 ```
 
 **Done:** Recall CLI tested for all output modes, filters, synthesis, and edge cases.
@@ -597,10 +597,10 @@ Specifically verify:
 </threat_model>
 
 <verification>
+- Start the test DB: `docker-compose -f docker-compose.test.yml up -d` and set `INFOTRIAGE_TEST_DSN`
 - `pytest tests/test_ccir_vectors.py -x` (inmemory) and `-m db_live -x` (postgres) green
-- `pytest tests/test_store_ccir.py -x` (inmemory) and `-m db_live -x` (postgres) green
 - `pytest tests/test_prefilter.py -x` green
-- `pytest tests/test_recall.py -x` green
+- `pytest tests/test_recall.py -x` and `pytest tests/test_build_ccir_vectors.py -x` green
 - Full suite: `pytest tests/ -q` returns baseline + new tests all pass
 - `python scripts/build_ccir_vectors.py --dsn "$INFOTRIAGE_PG_DSN"` writes all CCIR vectors
 - `python apps/triage/recall.py --topic "test" --since 7d` runs end-to-end
