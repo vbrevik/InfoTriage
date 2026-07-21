@@ -18,8 +18,10 @@ from pathlib import Path
 from typing import cast
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "libs" / "store" / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "apps" / "wiki"))
 
 from store import PostgresStore  # noqa: E402
+from dgx_client import DGXSynthesisBackend, RecallBackend  # noqa: E402
 
 
 EMBED_MODEL = "intfloat/multilingual-e5-large"
@@ -41,28 +43,41 @@ def _get_embedding(text: str) -> list[float]:
         return cast(list[float], json.load(r)["data"][0]["embedding"])
 
 
-def _llm(messages: list[dict], max_tokens: int = 800) -> str:
-    base = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:8000/v1")
-    key = os.environ.get("LLM_API_KEY", "omlx")
-    model = os.environ.get("LLM_MODEL", "qwen36-ud-4bit")
-    body = json.dumps(
-        {
-            "model": model,
-            "messages": messages,
-            "temperature": 0,
-            "max_tokens": max_tokens,
-        }
-    ).encode()
-    req = urllib.request.Request(
-        base.rstrip("/") + "/chat/completions",
-        data=body,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {key}",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=120) as r:
-        return cast(str, json.load(r)["choices"][0]["message"]["content"])
+class LocalSynthesisBackend(RecallBackend):
+    """Local-only synthesis backend (oMLX/qwen36, ADR-004)."""
+
+    def __init__(self, *, timeout: int = 120) -> None:
+        self.base_url = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:8000/v1")
+        self.api_key = os.environ.get("LLM_API_KEY", "omlx")
+        self.model = os.environ.get("LLM_MODEL", "qwen36-ud-4bit")
+        self.timeout = timeout
+
+    def synthesize(self, messages: list[dict], max_tokens: int = 800) -> str:
+        body = json.dumps(
+            {
+                "model": self.model,
+                "messages": messages,
+                "temperature": 0,
+                "max_tokens": max_tokens,
+            }
+        ).encode()
+        req = urllib.request.Request(
+            self.base_url.rstrip("/") + "/chat/completions",
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.api_key}",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=self.timeout) as r:
+            return cast(str, json.load(r)["choices"][0]["message"]["content"])
+
+
+def _select_backend(name: str) -> RecallBackend:
+    """Return the synthesis backend named by ``name`` (``local`` or ``dgx``)."""
+    if name == "dgx":
+        return DGXSynthesisBackend()
+    return LocalSynthesisBackend()
 
 
 def _parse_since(since: str | None) -> datetime.datetime | None:
@@ -137,7 +152,13 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=50, help="Max results")
     parser.add_argument("--json", action="store_true", help="Output JSON")
     parser.add_argument("--obsidian", help="Write Obsidian note to this path")
-    parser.add_argument("--synthesize", action="store_true", help="Synthesize with local qwen36")
+    parser.add_argument("--synthesize", action="store_true", help="Synthesize with the selected backend")
+    parser.add_argument(
+        "--backend",
+        choices=["local", "dgx"],
+        default="local",
+        help="Synthesis backend: local (default) or DGX-heavy",
+    )
     parser.add_argument("--include-body", action="store_true", help="Include article body in synthesis")
     parser.add_argument("--dsn", default=os.environ.get("INFOTRIAGE_PG_DSN"), help="Postgres DSN")
     args = parser.parse_args()
@@ -179,7 +200,8 @@ def main() -> None:
 
     synthesis: str | None = None
     if args.synthesize:
-        synthesis = _llm(
+        backend = _select_backend(args.backend)
+        synthesis = backend.synthesize(
             [{"role": "user", "content": _synthesis_prompt(args.topic, results, args.include_body)}]
         )
 

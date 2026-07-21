@@ -43,7 +43,7 @@ def fake_store():
 def _run_recall(*args, fake_store, fake_embedding=None, fake_llm=None):
     with patch("recall.PostgresStore", return_value=fake_store):
         with patch("recall._get_embedding", return_value=fake_embedding or [0.1] * 1024):
-            with patch("recall._llm", return_value=fake_llm or "synthesized answer"):
+            with patch("recall.LocalSynthesisBackend.synthesize", return_value=fake_llm or "synthesized answer"):
                 with patch.object(sys, "argv", ["recall.py", *args]):
                     recall.main()
 
@@ -113,6 +113,23 @@ def test_recall_synthesis_calls_llm(capsys, fake_store):
     out = capsys.readouterr().out
     assert "## Synthesis" in out
     assert "synthesis text" in out
+
+
+def test_recall_synthesis_uses_dgx_backend(capsys, fake_store):
+    from dgx_client import DGXSynthesisBackend
+
+    with patch.object(DGXSynthesisBackend, "synthesize", return_value="DGX synthesis"):
+        _run_recall(
+            "--topic",
+            "Arctic security",
+            "--synthesize",
+            "--backend",
+            "dgx",
+            fake_store=fake_store,
+        )
+    out = capsys.readouterr().out
+    assert "## Synthesis" in out
+    assert "DGX synthesis" in out
 
 
 def test_recall_since_relative(fake_store):

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import json
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
@@ -229,6 +230,93 @@ def test_build_prompt_requires_contradiction_flagging():
     gen = WikiGenerator(MagicMock(), "/vault")
     prompt = gen.build_prompt("NATO", [])
     assert CONTRADICTION_INSTRUCTION in prompt
+
+
+def test_dgx_backend_synthesize_uses_spark_endpoint_and_large_max_tokens(monkeypatch):
+    import urllib.request
+
+    from dgx_client import DGXSynthesisBackend
+
+    captured: dict = {}
+
+    class FakeResponse:
+        def __init__(self, content: bytes):
+            self.content = content
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def read(self):
+            return self.content
+
+    def fake_urlopen(req, *args, **kwargs):
+        captured["request"] = req
+        captured["body"] = json.loads(req.data.decode())
+        return FakeResponse(
+            json.dumps(
+                {"choices": [{"message": {"content": "DGX synthesis output"}}]}
+            ).encode()
+        )
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    backend = DGXSynthesisBackend(base_url="http://192.168.10.2:8000/v1")
+    result = backend.synthesize([{"role": "user", "content": "Summarize"}], max_tokens=800)
+
+    assert result == "DGX synthesis output"
+    assert captured["body"]["model"] == "model"
+    assert captured["body"]["max_tokens"] == 4096
+    assert captured["body"]["messages"] == [{"role": "user", "content": "Summarize"}]
+    assert captured["request"].full_url == "http://192.168.10.2:8000/v1/chat/completions"
+
+
+def test_dgx_backend_strips_thinking_tokens(monkeypatch):
+    import urllib.request
+
+    from dgx_client import DGXSynthesisBackend
+
+    class FakeResponse:
+        def __init__(self, content: bytes):
+            self.content = content
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def read(self):
+            return self.content
+
+    response_body = json.dumps(
+        {
+            "choices": [
+                {"message": {"content": " thinking some reasoning]Final answer"}}
+            ]
+        }
+    ).encode()
+    monkeypatch.setattr(urllib.request, "urlopen", lambda req, *args, **kwargs: FakeResponse(response_body))
+
+    backend = DGXSynthesisBackend(base_url="http://dgx.test/v1")
+    result = backend.synthesize([{"role": "user", "content": "x"}])
+
+    assert " thinking" not in result
+    assert "Final answer" in result
+
+
+def test_select_backend_returns_local_or_dgx_backend():
+    from recall import _select_backend, LocalSynthesisBackend
+
+    local_backend = _select_backend("local")
+    assert isinstance(local_backend, LocalSynthesisBackend)
+
+    dgx_backend = _select_backend("dgx")
+    from dgx_client import DGXSynthesisBackend
+
+    assert isinstance(dgx_backend, DGXSynthesisBackend)
 
 
 def test_build_prompt_includes_subject_and_source_items():
