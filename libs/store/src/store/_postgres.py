@@ -65,7 +65,9 @@ class PostgresStore:
         """
         self._dsn = dsn
         self._blob_root = blob_root
-        self._conn: psycopg.Connection[dict[str, Any]] | None = None  # opened in __enter__
+        self._conn: psycopg.Connection[dict[str, Any]] | None = (
+            None  # opened in __enter__
+        )
 
     # -------------------------------------------------------------------------
     # Context manager — one connection per "with" block (D-03)
@@ -162,18 +164,20 @@ class PostgresStore:
         self._conn.execute(
             """
             INSERT INTO infotriage.articles
-                (id, source, source_type, url, title, ts, lang, summary, body_ref, payload)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                (id, source, source_type, url, title, ts, lang, summary, body_ref, payload, discipline, admiralty_reliability)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (id) DO UPDATE SET
-                source      = EXCLUDED.source,
-                source_type = EXCLUDED.source_type,
-                url         = EXCLUDED.url,
-                title       = EXCLUDED.title,
-                ts          = EXCLUDED.ts,
-                lang        = EXCLUDED.lang,
-                summary     = EXCLUDED.summary,
-                body_ref    = EXCLUDED.body_ref,
-                payload     = EXCLUDED.payload
+                source                  = EXCLUDED.source,
+                source_type             = EXCLUDED.source_type,
+                url                     = EXCLUDED.url,
+                title                   = EXCLUDED.title,
+                ts                      = EXCLUDED.ts,
+                lang                    = EXCLUDED.lang,
+                summary                 = EXCLUDED.summary,
+                body_ref                = EXCLUDED.body_ref,
+                payload                 = EXCLUDED.payload,
+                discipline              = EXCLUDED.discipline,
+                admiralty_reliability   = EXCLUDED.admiralty_reliability
             """,
             (
                 item.id,
@@ -186,6 +190,8 @@ class PostgresStore:
                 item.summary,
                 item.body_ref,
                 Jsonb(item.payload),  # REQUIRED — Pitfall 2: raw dict fails for JSONB
+                item.discipline,
+                item.admiralty_reliability,
             ),
         )
         # Audit row in the SAME transaction (DD-5) — commit both together.
@@ -203,7 +209,7 @@ class PostgresStore:
         assert self._conn is not None, "PostgresStore must be used as a context manager"
         row = self._conn.execute(
             """
-            SELECT source, source_type, url, title, ts, lang, summary, body_ref, payload
+            SELECT source, source_type, url, title, ts, lang, summary, body_ref, payload, discipline, admiralty_reliability
             FROM infotriage.articles
             WHERE id = %s
             """,
@@ -221,6 +227,8 @@ class PostgresStore:
             lang=row["lang"],
             summary=row["summary"],
             body_ref=row["body_ref"],
+            discipline=row["discipline"],
+            admiralty_reliability=row["admiralty_reliability"],
             payload=row["payload"] if row["payload"] is not None else {},
         )
 
@@ -240,7 +248,7 @@ class PostgresStore:
         if source_type_in is not None:
             rows = self._conn.execute(
                 """
-                SELECT source, source_type, url, title, ts, lang, summary, body_ref, payload
+                SELECT source, source_type, url, title, ts, lang, summary, body_ref, payload, discipline, admiralty_reliability
                 FROM infotriage.articles
                 WHERE source_type = ANY(%s)
                 ORDER BY ts DESC, id DESC
@@ -251,7 +259,7 @@ class PostgresStore:
         else:
             rows = self._conn.execute(
                 """
-                SELECT source, source_type, url, title, ts, lang, summary, body_ref, payload
+                SELECT source, source_type, url, title, ts, lang, summary, body_ref, payload, discipline, admiralty_reliability
                 FROM infotriage.articles
                 ORDER BY ts DESC, id DESC
                 LIMIT %s
@@ -269,6 +277,8 @@ class PostgresStore:
                 lang=r["lang"],
                 summary=r["summary"],
                 body_ref=r["body_ref"],
+                discipline=r["discipline"],
+                admiralty_reliability=r["admiralty_reliability"],
                 payload=r["payload"] if r["payload"] is not None else {},
             )
             for r in rows
@@ -743,15 +753,21 @@ class PostgresStore:
         cond_params: list[Any] = []
 
         if bucket is not None:
-            conditions.append(psycopg.sql.SQL("e.bucket = {}").format(psycopg.sql.Placeholder()))
+            conditions.append(
+                psycopg.sql.SQL("e.bucket = {}").format(psycopg.sql.Placeholder())
+            )
             cond_params.append(bucket)
         else:
             conditions.append(psycopg.sql.SQL("e.bucket != 'skip'"))
         if ccir is not None:
-            conditions.append(psycopg.sql.SQL("e.ccir = {}").format(psycopg.sql.Placeholder()))
+            conditions.append(
+                psycopg.sql.SQL("e.ccir = {}").format(psycopg.sql.Placeholder())
+            )
             cond_params.append(ccir)
         if since is not None:
-            conditions.append(psycopg.sql.SQL("a.ts >= {}").format(psycopg.sql.Placeholder()))
+            conditions.append(
+                psycopg.sql.SQL("a.ts >= {}").format(psycopg.sql.Placeholder())
+            )
             cond_params.append(since)
 
         where = psycopg.sql.SQL(" AND ").join(conditions)

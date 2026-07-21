@@ -305,3 +305,40 @@ def test_write_failure_raises(store, tmp_path, monkeypatch):
     with patch.object(Path, "write_bytes", patched_write_bytes):
         with pytest.raises(OSError, match="simulated write failure"):
             store.put_blob(data)
+
+
+# ---------------------------------------------------------------------------
+# Phase 11: discipline + Admiralty reliability rating round-trip
+# ---------------------------------------------------------------------------
+
+
+def test_put_get_roundtrip_with_discipline_and_reliability(store):
+    """discipline and admiralty_reliability must round-trip through put_item/get_item."""
+    item = _item(title="SOCMINT Item")
+    item = item.model_copy(
+        update={
+            "discipline": "SOCMINT",
+            "admiralty_reliability": "B2",
+        }
+    )
+    store.put_item(item)
+    got = store.get_item(item.id)
+    assert got is not None
+    assert got.discipline == "SOCMINT"
+    assert got.admiralty_reliability == "B2"
+
+
+def test_list_items_returns_discipline_and_reliability(store):
+    """list_items must preserve discipline and admiralty_reliability fields."""
+    item = _item(title="Arctic OSINT Item")
+    item = item.model_copy(
+        update={
+            "discipline": "OSINT",
+            "admiralty_reliability": "A1",
+        }
+    )
+    store.put_item(item)
+    result = store.list_items()
+    assert len(result) == 1
+    assert result[0].discipline == "OSINT"
+    assert result[0].admiralty_reliability == "A1"

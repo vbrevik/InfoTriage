@@ -33,6 +33,10 @@ class Item(BaseModel):
     summary: Optional[str] = None
     body_ref: Optional[str] = None
 
+    # Phase 11: collection discipline + Admiralty reliability rating
+    discipline: Optional[str] = None  # e.g. "OSINT", "SOCMINT", "MASINT"
+    admiralty_reliability: Optional[str] = None  # e.g. "A1", "B2"
+
     # Rich / open
     payload: dict = {}  # open dict — Phase 5 writes ccir, cnr, score, bucket, why
     attachments: list = []
