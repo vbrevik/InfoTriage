@@ -16,6 +16,7 @@ Phase 5 additions (D-05, D-06, D-07):
     - _embeddings dict: item_id → list[float] vector
     - _cosine_sim: stdlib cosine similarity helper for find_near_duplicate
 """
+import datetime
 import math
 from collections import defaultdict
 from pathlib import Path
@@ -66,6 +67,9 @@ class InMemoryStore:
         # Phase 8 state: entity resolution (ADR-006)
         self._entities: dict[tuple[str, str], dict] = {}
         self._entity_links: dict[tuple[str, str, str], dict] = {}
+        # Phase 9 state: CCIR vectors + audit
+        self._ccir_vectors: dict[str, list[float]] = {}
+        self._audit: list[dict] = []
 
     # Context manager — no-ops; implemented for Store Protocol compliance
 
@@ -320,3 +324,86 @@ class InMemoryStore:
 
         results.sort(key=lambda r: (-r["link_count"], r["name_norm"]))
         return results
+
+    # -------------------------------------------------------------------------
+    # CCIR pre-filter + recall — Phase 9 (RAG recall)
+    # -------------------------------------------------------------------------
+
+    def put_ccir_vector(self, ccir_id: str, vector: list[float]) -> None:
+        """Upsert a CCIR vector into the in-memory fake."""
+        self._ccir_vectors[ccir_id] = list(vector)
+
+    def find_similar_ccir(
+        self,
+        vector: list[float],
+    ) -> Optional[dict]:
+        """Return the nearest CCIR vector, or None if the table is empty."""
+        best_id: Optional[str] = None
+        best_sim: float = -1.0
+        for ccir_id, stored in self._ccir_vectors.items():
+            sim = _cosine_sim(vector, stored)
+            if sim > best_sim:
+                best_sim = sim
+                best_id = ccir_id
+        if best_id is not None:
+            return {"ccir_id": best_id, "similarity": best_sim}
+        return None
+
+    def recall_items(
+        self,
+        query_vector: list[float],
+        since: Optional[datetime.datetime] = None,
+        ccir: Optional[str] = None,
+        bucket: Optional[str] = None,
+        limit: int = 50,
+    ) -> list[dict]:
+        """Search in-memory items for embeddings similar to query_vector."""
+        # Enrichment is required for recall; items without it are skipped.
+        results = []
+        for item_id, stored_vec in self._embeddings.items():
+            enrichment = self._enrichments.get(item_id)
+            if enrichment is None:
+                continue
+            if enrichment.get("bucket") == "skip" and bucket != "skip":
+                continue
+            if ccir is not None and enrichment.get("ccir") != ccir:
+                continue
+            if bucket is not None and enrichment.get("bucket") != bucket:
+                continue
+            item = self._items.get(item_id)
+            if item is None:
+                continue
+            if since is not None and item.ts < since:
+                continue
+            sim = _cosine_sim(query_vector, stored_vec)
+            results.append(
+                {
+                    "item_id": item_id,
+                    "title": item.title,
+                    "source": item.source,
+                    "url": item.url,
+                    "ccir": enrichment.get("ccir"),
+                    "score": enrichment.get("score"),
+                    "similarity": sim,
+                }
+            )
+        results.sort(key=lambda r: cast(float, r["similarity"]), reverse=True)
+        return results[:limit]
+
+    def audit_write(
+        self,
+        *,
+        op: str,
+        table_name: str,
+        item_id: str,
+        details: Optional[dict] = None,
+    ) -> None:
+        """Write a structured audit row with optional details."""
+        self._audit.append(
+            {
+                "op": op,
+                "table_name": table_name,
+                "item_id": item_id,
+                "details": details,
+            }
+        )

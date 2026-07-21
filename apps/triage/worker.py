@@ -20,6 +20,8 @@ import os
 import urllib.request
 from pathlib import Path
 
+from typing import Literal, cast
+
 from contracts import RabbitMQBus, VerdictReady, setup_logging
 from store import PostgresStore
 from triage_score import llm, score_item
@@ -57,7 +59,7 @@ def get_embedding(text: str) -> list[float]:
         headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"},
     )
     with urllib.request.urlopen(req, timeout=120) as r:
-        return json.load(r)["data"][0]["embedding"]
+        return cast(list[float], json.load(r)["data"][0]["embedding"])
 
 
 # ---------------------------------------------------------------------------
@@ -117,37 +119,99 @@ async def process_item(
         return
 
     text = item.title + " " + (item.summary or "")[:512]
-    vec = await asyncio.to_thread(embed, text)
-    dup = await asyncio.to_thread(store.find_near_duplicate, vec)
+    vec = cast(list[float], await asyncio.to_thread(embed, text))
 
-    if dup:
+    # Phase 9: CCIR pre-filter — skip clearly off-topic items before dedup/score.
+    _prefilter_threshold = float(os.environ.get("INFOTRIAGE_PREFILTER_THRESHOLD", "0.50"))
+    ccir_lookup_failed = False
+    best_ccir: dict | None = None
+    try:
+        best_ccir = await asyncio.to_thread(store.find_similar_ccir, vec)
+    except Exception as exc:
+        log.warning("pre-filter CCIR search failed for item_id=%s: %s", item_id, exc)
+        ccir_lookup_failed = True
+
+    _prefilter_sim = best_ccir["similarity"] if best_ccir is not None else 0.0
+    _prefilter_ccir_id = best_ccir["ccir_id"] if best_ccir is not None else "none"
+    # If CCIR lookup fails or there are no CCIR vectors, fall through to the
+    # LLM scorer rather than silently dropping the item (D-07).
+    pre_filter_passes = (
+        ccir_lookup_failed
+        or best_ccir is None
+        or _prefilter_sim >= _prefilter_threshold
+    )
+    if pre_filter_passes:
+        log.info(
+            "pre-filter PASS item_id=%s best_ccir=%s similarity=%.3f",
+            item_id,
+            _prefilter_ccir_id,
+            _prefilter_sim,
+        )
+    else:
+        log.info(
+            "pre-filter SKIP item_id=%s best_ccir=%s similarity=%.3f",
+            item_id,
+            _prefilter_ccir_id,
+            _prefilter_sim,
+        )
+
+    # Dedup + score only for items that pass the pre-filter.
+    if pre_filter_passes:
+        dup = await asyncio.to_thread(store.find_near_duplicate, vec)
+        if dup:
+            fields = {
+                "ccir": "none",
+                "cnr": "none",
+                "score": 0,
+                "bucket": "skip",
+                "why": f"duplicate of {dup}",
+                "pmesii": "none",
+                "tessoc": "none",
+            }
+        else:
+            result = await asyncio.to_thread(
+                score, {"title": item.title, "source": item.source, "summary": item.summary}
+            )
+            fields = {
+                "ccir": result.get("ccir"),
+                "cnr": result.get("cnr"),
+                "score": clamp_score(result.get("score")),
+                "bucket": result.get("bucket"),
+                "why": result.get("why"),
+                "pmesii": result.get("pmesii"),
+                "tessoc": result.get("tessoc"),
+            }
+    else:
         fields = {
             "ccir": "none",
             "cnr": "none",
             "score": 0,
             "bucket": "skip",
-            "why": f"duplicate of {dup}",
+            "why": f"pre-filter: max_cosine={_prefilter_sim:.3f} < threshold",
             "pmesii": "none",
             "tessoc": "none",
         }
-    else:
-        result = await asyncio.to_thread(
-            score, {"title": item.title, "source": item.source, "summary": item.summary}
-        )
-        fields = {
-            "ccir": result.get("ccir"),
-            "cnr": result.get("cnr"),
-            "score": clamp_score(result.get("score")),
-            "bucket": result.get("bucket"),
-            "why": result.get("why"),
-            "pmesii": result.get("pmesii"),
-            "tessoc": result.get("tessoc"),
-        }
 
-    # Enrichment write MUST commit before verdict.ready is published (R2/R5 prohibition):
-    # a crash or exception here propagates without ever reaching bus.publish below.
+    # Persist enrichment and embedding before publishing verdict (R2/R5 prohibition).
     await asyncio.to_thread(store.put_enrichment, item_id, fields)
     await asyncio.to_thread(store.put_embedding, item_id, vec)
+
+    # Audit pre-filter skips for later analysis / threshold tuning.
+    if not pre_filter_passes:
+        try:
+            await asyncio.to_thread(
+                store.audit_write,
+                op="pre_filter_skip",
+                table_name="enrichment",
+                item_id=item_id,
+                details={
+                    "max_similarity": _prefilter_sim,
+                    "threshold": _prefilter_threshold,
+                    "best_ccir": _prefilter_ccir_id,
+                },
+            )
+        except Exception as exc:
+            log.warning("pre-filter audit write failed for item_id=%s: %s", item_id, exc)
 
     # Phase 8: extract, embed, and link entities to this item.
     # This is best-effort: entity-linking failures (including timeouts) are
@@ -177,11 +241,11 @@ async def process_item(
     payload = VerdictReady(
         event="verdict.ready",
         item_id=item_id,
-        ccir=fields.get("ccir"),
-        cnr=map_cnr(fields.get("cnr") or "none"),
-        score=fields.get("score", 0),
-        bucket=map_bucket(fields.get("bucket") or "skip"),
-        why=fields.get("why") or "",
+        ccir=cast("str | None", fields.get("ccir")),
+        cnr=cast(Literal["I", "II", "Routine"], map_cnr(cast(str, fields.get("cnr") or "none"))),
+        score=cast(int, fields.get("score", 0)),
+        bucket=cast(Literal["keep", "maybe", "skip"], map_bucket(cast(str, fields.get("bucket") or "skip"))),
+        why=cast(str, fields.get("why") or ""),
         ts=datetime.datetime.now(tz=datetime.timezone.utc),
     )
     await bus.publish("verdict.ready", item_id, payload.model_dump(mode="json"))

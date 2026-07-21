@@ -8,3 +8,6 @@ CREATE TABLE IF NOT EXISTS infotriage.audit (
     item_id     TEXT,                               -- Item.id or blob sha256 hash
     ts          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Phase 9: structured details for pre-filter skip events (D-11, D-12)
+ALTER TABLE infotriage.audit ADD COLUMN IF NOT EXISTS details JSONB;

@@ -46,3 +46,15 @@ CREATE INDEX IF NOT EXISTS idx_entities_embedding_hnsw
 CREATE INDEX IF NOT EXISTS idx_embeddings_embedding_hnsw
     ON infotriage.embeddings USING hnsw (embedding vector_cosine_ops)
     WITH (m = 16, ef_construction = 64);
+
+-- Phase 9: CCIR vectors for pre-filter cosine gate (D-01, D-02)
+CREATE TABLE IF NOT EXISTS infotriage.ccir_vectors (
+    ccir_id     TEXT        PRIMARY KEY,     -- e.g. "PIR-1", "FFIR-2", "SIR-3"
+    embedding   vector(1024) NOT NULL,       -- mE5-large 1024-dim, query: prefix embedding
+    model       TEXT        NOT NULL DEFAULT 'intfloat/multilingual-e5-large',
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ccir_vectors_embedding_hnsw
+    ON infotriage.ccir_vectors USING hnsw (embedding vector_cosine_ops)
+    WITH (m = 16, ef_construction = 64);

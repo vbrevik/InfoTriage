@@ -18,6 +18,7 @@ Phase 5 additions (D-05, D-06):
     - put_enrichment / get_enrichment — scoring results persistence (R1)
     - put_embedding / find_near_duplicate — pgvector semantic dedup (R4)
 """
+import datetime
 from typing import Optional, Protocol, runtime_checkable
 
 from contracts import Item
@@ -217,5 +218,70 @@ class Store(Protocol):
         link_count. aliases is a list of language-tagged strings in the form
         'mention (lang)' (e.g. 'NATO (en)', 'НАТО (ru)'). Ordered by
         link_count DESC, then name_norm.
+        """
+        ...
+
+    # -------------------------------------------------------------------------
+    # CCIR pre-filter + recall — Phase 9 (RAG recall)
+    # -------------------------------------------------------------------------
+
+    def put_ccir_vector(self, ccir_id: str, vector: list[float]) -> None:
+        """Upsert a CCIR vector into infotriage.ccir_vectors.
+
+        Idempotent: ON CONFLICT (ccir_id) updates embedding and updated_at.
+        """
+        ...
+
+    def find_similar_ccir(
+        self,
+        vector: list[float],
+    ) -> Optional[dict]:
+        """Return the nearest CCIR vector, or None if the table is empty.
+
+        Args:
+            vector: 1024-dim item embedding.
+
+        Returns:
+            dict with keys: ccir_id, similarity. Similarity is the raw cosine
+            similarity to the nearest stored CCIR vector. Returns None when no
+            CCIR vectors have been stored; callers apply their own threshold.
+        """
+        ...
+
+    def recall_items(
+        self,
+        query_vector: list[float],
+        since: datetime.datetime | None = None,
+        ccir: str | None = None,
+        bucket: str | None = None,
+        limit: int = 50,
+    ) -> list[dict]:
+        """Search infotriage.embeddings for items similar to query_vector.
+
+        Searches items with bucket != 'skip' by default. Optional filters:
+        - since: only items created_at >= this timestamp
+        - ccir: only items matching this CCIR ID (e.g. "PIR-1")
+        - bucket: filter by bucket value ("keep", "maybe", "skip")
+
+        Returns list of dicts with keys: item_id, title, source, url, ccir,
+        score, similarity. Ordered by similarity DESC. Limited to `limit` results.
+        """
+        ...
+
+    def audit_write(
+        self,
+        *,
+        op: str,
+        table_name: str,
+        item_id: str,
+        details: dict | None = None,
+    ) -> None:
+        """Write a structured audit row with optional JSONB details.
+
+        Args:
+            op: operation name, e.g. 'pre_filter_skip'.
+            table_name: target table, e.g. 'enrichment'.
+            item_id: affected item id.
+            details: optional JSON-serializable metadata.
         """
         ...

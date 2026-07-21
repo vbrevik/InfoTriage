@@ -27,6 +27,7 @@ Design decisions (from CONTEXT.md / RESEARCH.md):
 """
 from __future__ import annotations
 
+import datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -605,7 +606,8 @@ class PostgresStore:
                 e.name_norm,
                 e.lang,
                 e.type,
-                ARRAY_AGG(DISTINCT el.mention || ' (' || el.lang || ')') AS aliases,
+                ARRAY_AGG(DISTINCT el.mention || ' (' || el.lang || ')')
+                FILTER (WHERE el.mention IS NOT NULL AND el.lang IS NOT NULL) AS aliases,
                 COUNT(DISTINCT el.item_id) AS link_count
             FROM infotriage.entities e
             LEFT JOIN infotriage.entity_links el ON el.entity_id = e.id
@@ -626,3 +628,123 @@ class PostgresStore:
             }
             for r in rows
         ]
+
+    # -------------------------------------------------------------------------
+    # CCIR pre-filter + recall — Phase 9 (RAG recall)
+    # -------------------------------------------------------------------------
+
+    def put_ccir_vector(self, ccir_id: str, vector: list[float]) -> None:
+        """Upsert a CCIR vector into infotriage.ccir_vectors."""
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
+        model = "intfloat/multilingual-e5-large"
+        self._conn.execute(
+            """
+            INSERT INTO infotriage.ccir_vectors (ccir_id, embedding, model)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (ccir_id) DO UPDATE SET
+                embedding = EXCLUDED.embedding,
+                model     = EXCLUDED.model,
+                updated_at = NOW()
+            """,
+            (ccir_id, vector, model),
+        )
+        self._conn.commit()
+
+    def find_similar_ccir(
+        self,
+        vector: list[float],
+    ) -> "dict | None":
+        """Return the nearest CCIR vector, or None if the table is empty."""
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
+        row = self._conn.execute(
+            """
+            SELECT ccir_id, (embedding <=> %s::vector) AS dist
+            FROM infotriage.ccir_vectors
+            ORDER BY embedding <=> %s::vector
+            LIMIT 1
+            """,
+            (vector, vector),
+        ).fetchone()
+        self._conn.rollback()
+        if row is not None:
+            return {"ccir_id": row["ccir_id"], "similarity": 1.0 - row["dist"]}
+        return None
+
+    def recall_items(
+        self,
+        query_vector: list[float],
+        since: "datetime.datetime | None" = None,
+        ccir: "str | None" = None,
+        bucket: "str | None" = None,
+        limit: int = 50,
+    ) -> list[dict]:
+        """Search item embeddings for items similar to query_vector.
+
+        Joins enrichment and articles. Filters by bucket, ccir, and since.
+        Ordered by similarity DESC. Uses only %s binds — no f-string SQL.
+        """
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
+        conditions: list[psycopg.sql.Composable] = []
+        cond_params: list[Any] = []
+
+        if bucket is not None:
+            conditions.append(psycopg.sql.SQL("e.bucket = {}").format(psycopg.sql.Placeholder()))
+            cond_params.append(bucket)
+        else:
+            conditions.append(psycopg.sql.SQL("e.bucket != 'skip'"))
+        if ccir is not None:
+            conditions.append(psycopg.sql.SQL("e.ccir = {}").format(psycopg.sql.Placeholder()))
+            cond_params.append(ccir)
+        if since is not None:
+            conditions.append(psycopg.sql.SQL("a.ts >= {}").format(psycopg.sql.Placeholder()))
+            cond_params.append(since)
+
+        where = psycopg.sql.SQL(" AND ").join(conditions)
+        qvec_ph = psycopg.sql.Placeholder()
+        limit_ph = psycopg.sql.Placeholder()
+        query = psycopg.sql.SQL(
+            "SELECT a.id AS item_id, a.title, a.source, a.url, e.ccir, e.score, "
+            "(emb.embedding <=> {}::vector) AS dist "
+            "FROM infotriage.enrichment e "
+            "JOIN infotriage.articles a ON a.id = e.item_id "
+            "JOIN infotriage.embeddings emb ON emb.item_id = e.item_id "
+            "WHERE {} "
+            "ORDER BY emb.embedding <=> {}::vector LIMIT {}"
+        ).format(qvec_ph, where, qvec_ph, limit_ph)
+        # Placeholder order in the composed query: SELECT qvec, WHERE conditions,
+        # ORDER BY qvec, LIMIT. Match that order in params.
+        params = [query_vector, *cond_params, query_vector, limit]
+
+        rows = self._conn.execute(query, params).fetchall()
+        self._conn.rollback()
+        return [
+            {
+                "item_id": r["item_id"],
+                "title": r["title"],
+                "source": r["source"],
+                "url": r["url"],
+                "ccir": r["ccir"],
+                "score": r["score"],
+                "similarity": 1.0 - r["dist"],
+            }
+            for r in rows
+        ]
+
+    def audit_write(
+        self,
+        *,
+        op: str,
+        table_name: str,
+        item_id: str,
+        details: "dict | None" = None,
+    ) -> None:
+        """Write a structured audit row with optional JSONB details."""
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
+        self._conn.execute(
+            """
+            INSERT INTO infotriage.audit (op, table_name, item_id, details)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (op, table_name, item_id, Jsonb(details) if details is not None else None),
+        )
+        self._conn.commit()

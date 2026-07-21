@@ -58,7 +58,7 @@ def pg_store(tmp_path):
     # Truncate all infotriage tables for per-test isolation
     with psycopg.connect(dsn, autocommit=True) as conn:
         conn.execute(
-            "TRUNCATE infotriage.entity_links, infotriage.embeddings, "
+            "TRUNCATE infotriage.entity_links, infotriage.embeddings, infotriage.ccir_vectors, "
             "infotriage.enrichment, infotriage.ccir, infotriage.audit, "
             "infotriage.articles, infotriage.entities RESTART IDENTITY"
         )

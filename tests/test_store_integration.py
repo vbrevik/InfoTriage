@@ -148,6 +148,7 @@ def test_all_tables_exist(pg_store):
         "articles",
         "audit",
         "ccir",
+        "ccir_vectors",
         "embeddings",
         "enrichment",
         "entities",
