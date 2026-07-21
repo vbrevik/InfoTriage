@@ -263,6 +263,8 @@ Plans consume:
 - AIS adapter emits structured items with position/metadata fields.
 - Mock API tests pass without real credentials.
 
+**Status:** ✅ COMPLETE
+
 ## Wave 4: Translation on Demand (Phase 999.1 backlog)
 
 ### Task 8: Add local-LLM translation helper
