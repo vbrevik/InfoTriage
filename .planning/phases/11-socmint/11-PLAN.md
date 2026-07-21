@@ -224,6 +224,8 @@ Plans consume:
 - Unit tests mock Telethon and verify emitted `Item` shape.
 - Adapter rejects private-channel IDs or missing credentials.
 
+**Status:** ✅ COMPLETE
+
 ### Task 6: Containerize `ingest-telegram`
 
 **Files:** `apps/ingest-telegram/main.py`, `apps/ingest-telegram/Dockerfile`, `apps/ingest-telegram/requirements.txt`
