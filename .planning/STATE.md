@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: M1 Foundation re-audited and passed; Phase 8 (entity resolution) complete; Phase 9 (RAG recall) complete; Phase 10 (Wiki-LLM) Waves 1-3 complete, Wave 4 in progress
-stopped_at: Phase 10 Waves 2-3 committed and pushed; ready for Wave 4 (cross-language verification)
+status: M1 Foundation re-audited and passed; Phase 8 (entity resolution) complete; Phase 9 (RAG recall) complete; Phase 10 (Wiki-LLM) COMPLETE
+stopped_at: Phase 10 Wave 4 committed and pushed; ready for Phase 11 (SOCMINT + Arctic collection)
 last_updated: "2026-07-21T00:00:00.000Z"
 progress:
   total_phases: 13
@@ -17,6 +17,25 @@ progress:
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-07-21 — Phase 10 (Wiki-LLM) Wave 4 COMPLETE
+
+### Just-completed
+
+- **Wave 4: Cross-Language Verification.** Moved `verify_language_coverage()` to
+  `libs/contracts/src/contracts/_verify.py` and shared the citation / cross-language /
+  contradiction prompt-instruction constants between `apps/wiki/generator.py` and
+  `apps/triage/recall.py`. Hardened both synthesis prompts with `.get()` fallbacks for
+  optional item fields. Added `tests/test_cross_language_synthesis.py` covering missing
+  IDs, shared-instruction presence, recall hardening, and wiki-page flag behavior.
+- **Verification.** `pytest tests/test_cross_language_synthesis.py tests/test_wiki_generator.py tests/test_recall.py`
+  → 38 passed, 0 failed. `mypy` clean on affected files. Black formatting clean. Full
+  non-integration suite: 462 passed, 50 skipped, 0 failed.
+- **Ship.** Phase 10 Wave 4 committed and pushed to `origin/main`.
+
+### Next
+
+- **Phase 11 (SOCMINT + Arctic collection)** is next. Review / create 11-PLAN.md and begin execution.
 
 ## Session: 2026-07-21 — Phase 10 (Wiki-LLM) Waves 2-3 COMPLETE
 

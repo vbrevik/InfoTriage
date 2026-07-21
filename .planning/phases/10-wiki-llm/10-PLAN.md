@@ -195,7 +195,7 @@ Plans consume:
 - `recall.py --topic ... --synthesize --backend dgx` routes to the DGX backend.
 - Default remains local.
 
-## Wave 4: Cross-Language Verification (Former Phase 999.4)
+## Wave 4: Cross-Language Verification (Former Phase 999.4) ✅ COMPLETE
 
 ### Task 7: Enforce Language Coverage in Synthesis
 
