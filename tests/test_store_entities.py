@@ -306,3 +306,75 @@ def test_entity_links_cross_language(tmp_path):
         assert links1[0]["entity_id"] == entity_id
         assert links2[0]["entity_id"] == entity_id
         assert links2[0]["mention"] == "НАТО"
+
+
+def test_get_active_entities_stats_and_since_filter(store):
+    """get_active_entities returns stats, ccirs, and filters by since."""
+    now = _ts()
+    past = now - datetime.timedelta(days=2)
+
+    item1 = _make_item("item-a")
+    item1.ts = past
+    store.put_item(item1)
+    store.put_enrichment(item1.id, {"ccir": "PIR-1"})
+
+    item2 = _make_item("item-b")
+    item2.ts = now
+    store.put_item(item2)
+    store.put_enrichment(item2.id, {"ccir": "PIR-2"})
+
+    entity_id = store.put_entity("NATO", "nato", "en", "ORG", None)
+    store.link_entity(entity_id, item1.id, "NATO", "en")
+    store.link_entity(entity_id, item2.id, "NATO", "en")
+
+    active = store.get_active_entities()
+    assert len(active) == 1
+    assert active[0]["entity_id"] == entity_id
+    assert active[0]["name"] == "NATO"
+    assert active[0]["link_count"] == 2
+    assert active[0]["first_seen"] == past
+    assert active[0]["last_seen"] == now
+    assert set(active[0]["ccirs"]) == {"PIR-1", "PIR-2"}
+
+    active_since = store.get_active_entities(since=now - datetime.timedelta(days=1))
+    assert len(active_since) == 1
+    assert active_since[0]["link_count"] == 1
+    assert active_since[0]["first_seen"] == now
+    assert active_since[0]["ccirs"] == ["PIR-2"]
+
+
+def test_get_active_entities_empty(store):
+    """get_active_entities returns [] when no entities have linked items."""
+    _seed_item(store)
+    assert store.get_active_entities() == []
+
+
+def test_get_active_entities_orders_by_link_count_then_name_norm(store):
+    """get_active_entities orders results by link_count DESC, then name_norm."""
+    item1 = _seed_item(store)
+    item2 = _make_item("item-b")
+    store.put_item(item2)
+
+    entity_a = store.put_entity("EntityA", "entitya", "en", "ORG", None)
+    entity_b = store.put_entity("EntityB", "entityb", "en", "ORG", None)
+    store.link_entity(entity_a, item1.id, "EntityA", "en")
+    store.link_entity(entity_a, item2.id, "EntityA", "en")
+    store.link_entity(entity_b, item1.id, "EntityB", "en")
+
+    active = store.get_active_entities()
+    assert [a["entity_id"] for a in active] == [entity_a, entity_b]
+    assert active[0]["link_count"] == 2
+    assert active[1]["link_count"] == 1
+
+
+def test_get_active_entities_respects_limit(store):
+    """get_active_entities respects the limit parameter."""
+    item1 = _seed_item(store)
+    entity_a = store.put_entity("EntityA", "entitya", "en", "ORG", None)
+    entity_b = store.put_entity("EntityB", "entityb", "en", "ORG", None)
+    store.link_entity(entity_a, item1.id, "EntityA", "en")
+    store.link_entity(entity_b, item1.id, "EntityB", "en")
+
+    active = store.get_active_entities(limit=1)
+    assert len(active) == 1
+    assert active[0]["entity_id"] == entity_a

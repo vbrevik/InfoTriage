@@ -168,6 +168,7 @@ services:
       INFOTRIAGE_PG_DSN: ${INFOTRIAGE_PG_DSN:-postgresql://infotriage:infotriage_dev@postgres:5432/infotriage}
       INFOTRIAGE_AMQP_DSN: ${INFOTRIAGE_AMQP_DSN:-amqp://infotriage:infotriage_rmq@rabbitmq:5672}
       INFOTRIAGE_BLOB_ROOT: /data/blobs
+      INFOTRIAGE_PREFILTER_THRESHOLD: ${INFOTRIAGE_PREFILTER_THRESHOLD:-0.50}
       # NOT ${LLM_BASE_URL:-...}: .env's LLM_BASE_URL=127.0.0.1 is for host-side scripts
       # (e.g. triage_score.py run on the Mac); 127.0.0.1 inside this container is the
       # container itself, not the host, so that value must never leak in here.

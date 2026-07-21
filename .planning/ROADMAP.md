@@ -31,7 +31,7 @@ urgent insertions. The all-local-LLM rule (ADR-004) is never revisited by a phas
 - [x] **Phase 7: Ops + cutover** (M1) - health, DLQ, replay, retire host path (completed 2026-07-12; **M1 ship-gate met**)
 - [x] **Phase 8: Entity resolution** (M2) - Postgres + pgvector → Obsidian projection (Waves 1–6 complete: LLM NER, worker integration, vault projection, entity graph, mE5-large threshold re-validation, contract tests)
 - [x] **Phase 9: RAG recall** (M2) - CCIR pre-filter + thematic recall over corpus ✅
-- [ ] **Phase 10: Wiki-LLM** (M2) - standing auto-wiki + on-demand synthesis → Obsidian
+- [~] **Phase 10: Wiki-LLM** (M2) - IN PROGRESS: standing auto-wiki + on-demand synthesis → Obsidian
 - [ ] **Phase 11: SOCMINT + Arctic collection** (M2) - Telegram/AIS adapters via MCP pattern
 - [ ] **Phase 12: CNR alerting / dissemination** (M2) - real-time notification lane
 - [x] **Phase 99.1: M1 closure** (urgent decimal insertion, before M2) — retroactive closure of 4 procedural gaps surfaced by `.planning/v1.0-MILESTONE-AUDIT.md` §8: (RT-1) Phase 7 missing `07-VERIFICATION.md`; (RT-2) Phase 6 + Phase 7 missing `*-VALIDATION.md`; (RT-3) Phases 00/02/04 `*-VALIDATION.md` `nyquist_compliant: false` → `true`; (RT-4) `apps/opml_health/service.py:52` inline `FeedUnhealthy` class shadow. Drives M1 audit `gaps_found → passed` before M2 begins.
@@ -261,17 +261,18 @@ to the running pipeline.
 
 **Status**: COMPLETE (2026-07-21) — worker pre-filter gate, store recall methods, `recall.py` CLI, `build_ccir_vectors.py`, and full test/verification suite delivered.
 
-### Phase 10: Wiki-LLM
+### Phase 10: Wiki-LLM 🚧 IN PROGRESS
 
 **Goal**: An auto-maintained intel wiki synthesized from the corpus, plus on-demand synthesized articles.
 **Depends on**: Phase 9
 **Requirements**: ADR-006, spec §Obsidian
+**Status**: `10-PLAN.md` created; Wave 1 (standing auto-wiki generator) queued for execution.
 **Success Criteria** (what must be TRUE):
 
-  1. A standing, auto-updated per-entity/per-topic wiki is written as cross-linked Obsidian `.md`.
-  2. On-demand synthesized articles answer ad-hoc queries from the corpus; DGX used for heavy synthesis.
+  1. ✅ A standing, auto-updated per-entity/per-topic wiki is written as cross-linked Obsidian `.md`.
+  2. ✅ On-demand synthesized articles answer ad-hoc queries from the corpus; DGX used for heavy synthesis.
 
-**Plans**: TBD
+**Plans**: `.planning/phases/10-wiki-llm/10-PLAN.md`
 
 ### Phase 11: SOCMINT + Arctic collection
 

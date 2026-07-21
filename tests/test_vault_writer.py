@@ -4,10 +4,12 @@ import os
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 from contracts import from_frontmatter
 from apps.brief.vault_writer import (
+    ENTITY_GRAPH_ACTIVE_LIMIT,
     render_entity_graph,
     render_wikilinked,
     write_entity_graph,
@@ -439,43 +441,47 @@ def test_write_vault_digest_includes_entity_graph(temp_vault):
 
 def test_write_entity_graph_from_store_uses_store_data(temp_vault):
     """write_entity_graph_from_store queries the store and writes Entity Graph.md."""
-    class FakeStore:
-        def get_all_entities(self):
-            return [
-                {
-                    "id": "1",
-                    "name": "NATO",
-                    "name_norm": "nato",
-                    "lang": "en",
-                    "type": "ORG",
-                    "aliases": ["NATO (en)", "НАТО (ru)"],
-                    "link_count": 5,
-                }
-            ]
+    store = MagicMock()
+    store.get_active_entities.return_value = [
+        {
+            "entity_id": "1",
+            "name": "NATO",
+            "name_norm": "nato",
+            "lang": "en",
+            "type": "ORG",
+            "first_seen": datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+            "last_seen": datetime(2024, 2, 1, 12, 0, 0, tzinfo=timezone.utc),
+            "link_count": 5,
+            "ccirs": ["PIR-1"],
+        }
+    ]
 
-    path = write_entity_graph_from_store(FakeStore(), temp_vault)
+    path = write_entity_graph_from_store(store, temp_vault)
     assert path.exists()
     text = path.read_text(encoding="utf-8")
     assert "## NATO" in text
-    assert "**Aliases:** NATO (en), НАТО (ru)" in text
+    assert "**CCIRs:** PIR-1" in text
     assert "**Linked items:** 5" in text
+    assert "**Seen:** 2024-01-01 to 2024-02-01" in text
+    store.get_active_entities.assert_called_once_with(limit=ENTITY_GRAPH_ACTIVE_LIMIT)
 
 
 def test_write_vault_digest_prefers_store_graph_when_store_provided(temp_vault):
     """When a store is passed, write_vault_digest uses the store-backed graph."""
-    class FakeStore:
-        def get_all_entities(self):
-            return [
-                {
-                    "id": "1",
-                    "name": "StoreEntity",
-                    "name_norm": "storeentity",
-                    "lang": "en",
-                    "type": "ORG",
-                    "aliases": ["StoreEntity (en)"],
-                    "link_count": 3,
-                }
-            ]
+    store = MagicMock()
+    store.get_active_entities.return_value = [
+        {
+            "entity_id": "1",
+            "name": "StoreEntity",
+            "name_norm": "storeentity",
+            "lang": "en",
+            "type": "ORG",
+            "first_seen": datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+            "last_seen": datetime(2024, 6, 1, 12, 0, 0, tzinfo=timezone.utc),
+            "link_count": 3,
+            "ccirs": ["PIR-1", "FFIR-2"],
+        }
+    ]
 
     rows = [
         {
@@ -490,9 +496,11 @@ def test_write_vault_digest_prefers_store_graph_when_store_provided(temp_vault):
             "entities": [],
         },
     ]
-    paths = write_vault_digest(rows, temp_vault, store=FakeStore())
+    paths = write_vault_digest(rows, temp_vault, store=store)
     graph_path = temp_vault / "Entity Graph.md"
     assert graph_path in paths
     text = graph_path.read_text(encoding="utf-8")
     assert "## StoreEntity" in text
-    assert "**Aliases:** StoreEntity (en)" in text
+    assert "**CCIRs:** PIR-1, FFIR-2" in text
+    assert "**Seen:** 2024-01-01 to 2024-06-01" in text
+    store.get_active_entities.assert_called_once_with(limit=ENTITY_GRAPH_ACTIVE_LIMIT)

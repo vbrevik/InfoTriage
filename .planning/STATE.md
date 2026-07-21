@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: M1 Foundation re-audited and passed; Phase 8 (entity resolution) complete; Phase 9 (RAG recall) complete; Phase 10 ready to execute
-stopped_at: Phase 9 closed out; amended plan, implementation, tests, and live verification done
+status: M1 Foundation re-audited and passed; Phase 8 (entity resolution) complete; Phase 9 (RAG recall) complete; Phase 10 (Wiki-LLM) in progress
+stopped_at: Phase 10 plan created; moving to execution
 last_updated: "2026-07-21T00:00:00.000Z"
 progress:
   total_phases: 13
@@ -29,8 +29,8 @@ progress:
 
 ### Next
 
-- **Phase 10** is ready to execute when scheduled.
-- **M1 ship decision** remains open; accumulated Phase 7/8/9 commits are still ahead of `origin/main` and await explicit push.
+- **Phase 10 (Wiki-LLM)** is now in progress. `10-PLAN.md` has been created; Wave 1 (standing auto-wiki generator) is next.
+- **M1 ship decision** remains open; accumulated commits up through Phase 9 are on `origin/main`.
 
 ## Session: 2026-07-12 — Backlog 999.3 closeout: mE5-large entity-link threshold re-validated (T*=0.92, PARTIAL)
 

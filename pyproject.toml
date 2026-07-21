@@ -12,6 +12,7 @@ pythonpath = [
     "apps/ingest-gmail",
     "apps/ingest-obsidian",
     "apps/scheduler",
+    "apps/wiki",
 ]
 markers = [
     "db_live: requires INFOTRIAGE_TEST_DSN pointing at a reachable isolated test Postgres",

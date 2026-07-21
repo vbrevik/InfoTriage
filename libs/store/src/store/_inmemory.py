@@ -325,6 +325,51 @@ class InMemoryStore:
         results.sort(key=lambda r: (-r["link_count"], r["name_norm"]))
         return results
 
+    def get_active_entities(
+        self,
+        since: Optional[datetime.datetime] = None,
+        limit: int = 100,
+    ) -> list[dict]:
+        """Return active canonical entities enriched with activity stats."""
+        stats: dict[str, dict] = {}
+        for link in self._entity_links.values():
+            entity_id = link["entity_id"]
+            item_id = link["item_id"]
+            item = self._items.get(item_id)
+            if item is None:
+                continue
+            if since is not None and item.ts < since:
+                continue
+            if entity_id not in stats:
+                stats[entity_id] = {"items": set(), "ccirs": set(), "ts_list": []}
+            stats[entity_id]["items"].add(item_id)
+            stats[entity_id]["ts_list"].append(item.ts)
+            enrichment = self._enrichments.get(item_id)
+            if enrichment and enrichment.get("ccir"):
+                stats[entity_id]["ccirs"].add(enrichment["ccir"])
+
+        results = []
+        for entity_id, data in stats.items():
+            entity = self.get_entity(entity_id)
+            if entity is None:
+                continue
+            results.append(
+                {
+                    "entity_id": entity_id,
+                    "name": entity["name"],
+                    "name_norm": entity["name_norm"],
+                    "type": entity["type"],
+                    "lang": entity["lang"],
+                    "first_seen": min(data["ts_list"]),
+                    "last_seen": max(data["ts_list"]),
+                    "link_count": len(data["items"]),
+                    "ccirs": sorted(data["ccirs"]),
+                }
+            )
+
+        results.sort(key=lambda r: (-r["link_count"], r["name_norm"]))
+        return results[:limit]
+
     # -------------------------------------------------------------------------
     # CCIR pre-filter + recall — Phase 9 (RAG recall)
     # -------------------------------------------------------------------------

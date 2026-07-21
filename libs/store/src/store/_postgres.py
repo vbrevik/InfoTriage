@@ -629,6 +629,61 @@ class PostgresStore:
             for r in rows
         ]
 
+    def get_active_entities(
+        self,
+        since: "datetime.datetime | None" = None,
+        limit: int = 100,
+    ) -> list[dict]:
+        """Return active canonical entities enriched with activity stats."""
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
+        # Compose the optional WHERE clause with a real placeholder so psycopg
+        # binds ``since`` safely. No f-string interpolation touches the SQL.
+        where: psycopg.sql.Composable = psycopg.sql.SQL("")
+        params: list[Any] = []
+        if since is not None:
+            where = psycopg.sql.SQL(" WHERE a.ts >= {since} ").format(
+                since=psycopg.sql.Placeholder()
+            )
+            params.append(since)
+        query = psycopg.sql.SQL(
+            """
+            SELECT
+                e.id AS entity_id,
+                e.name,
+                e.name_norm,
+                e.type,
+                e.lang,
+                MIN(a.ts) AS first_seen,
+                MAX(a.ts) AS last_seen,
+                COUNT(DISTINCT a.id) AS link_count,
+                ARRAY_AGG(DISTINCT en.ccir) FILTER (WHERE en.ccir IS NOT NULL) AS ccirs
+            FROM infotriage.entities e
+            JOIN infotriage.entity_links el ON el.entity_id = e.id
+            JOIN infotriage.articles a ON a.id = el.item_id
+            LEFT JOIN infotriage.enrichment en ON en.item_id = a.id
+            {where}
+            GROUP BY e.id, e.name, e.name_norm, e.type, e.lang
+            ORDER BY link_count DESC, e.name_norm
+            LIMIT {limit}
+            """
+        ).format(where=where, limit=psycopg.sql.Literal(limit))
+        rows = self._conn.execute(query, params).fetchall()
+        self._conn.rollback()
+        return [
+            {
+                "entity_id": str(r["entity_id"]),
+                "name": r["name"],
+                "name_norm": r["name_norm"],
+                "type": r["type"],
+                "lang": r["lang"],
+                "first_seen": r["first_seen"],
+                "last_seen": r["last_seen"],
+                "link_count": r["link_count"],
+                "ccirs": sorted(r["ccirs"]) if r["ccirs"] else [],
+            }
+            for r in rows
+        ]
+
     # -------------------------------------------------------------------------
     # CCIR pre-filter + recall — Phase 9 (RAG recall)
     # -------------------------------------------------------------------------

@@ -221,6 +221,24 @@ class Store(Protocol):
         """
         ...
 
+    def get_active_entities(
+        self,
+        since: datetime.datetime | None = None,
+        limit: int = 100,
+    ) -> list[dict]:
+        """Return active canonical entities enriched with activity stats.
+
+        Each dict contains: entity_id, name, name_norm, type, lang, first_seen,
+        last_seen, link_count, ccirs. ``ccirs`` is a sorted list of distinct
+        CCIR IDs observed on linked items. ``first_seen``/``last_seen`` come
+        from the linked article timestamps.
+
+        Ordered by link_count DESC, then name_norm. If ``since`` is provided,
+        only entities with at least one linked article at or after ``since``
+        are returned.
+        """
+        ...
+
     # -------------------------------------------------------------------------
     # CCIR pre-filter + recall — Phase 9 (RAG recall)
     # -------------------------------------------------------------------------
