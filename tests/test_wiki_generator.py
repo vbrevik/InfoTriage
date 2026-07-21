@@ -1,9 +1,10 @@
 """tests/test_wiki_generator.py — Phase 10 Wiki-LLM generator tests."""
+
 from __future__ import annotations
 
 import datetime
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -54,7 +55,9 @@ def mock_llm():
     return lambda messages: "This is a synthesized answer with [id1] and [id2]."
 
 
-def test_wiki_generator_writes_obsidian_page(tmp_path, fake_store, mock_embed, mock_llm):
+def test_wiki_generator_writes_obsidian_page(
+    tmp_path, fake_store, mock_embed, mock_llm
+):
     vault = tmp_path / "vault"
     gen = WikiGenerator(
         fake_store,
@@ -134,9 +137,62 @@ def test_worker_run_once_skips_entities_without_name(tmp_path, mock_embed, mock_
     ]
     from wiki_worker import run_once
 
-    paths = run_once(store, tmp_path / "vault", top_n=10, embed=mock_embed, llm=mock_llm)
+    paths = run_once(
+        store, tmp_path / "vault", top_n=10, embed=mock_embed, llm=mock_llm
+    )
     assert paths == []
     store.get_active_entities.assert_called_once_with(limit=10)
+
+
+@pytest.mark.asyncio
+async def test_wiki_worker_health_endpoint(tmp_path):
+    from wiki_worker import _handle_health
+
+    reader = AsyncMock()
+    writer = AsyncMock()
+    writer.write = MagicMock()
+    writer.drain = AsyncMock()
+    writer.close = MagicMock()
+
+    await _handle_health(reader, writer)
+
+    writer.write.assert_called_once()
+    response = writer.write.call_args[0][0]
+    assert b"HTTP/1.1 200 OK" in response
+    assert b"OK" in response
+
+
+@pytest.mark.asyncio
+async def test_wiki_worker_event_driven_generates_page(tmp_path, mock_embed, mock_llm):
+    from wiki_worker import _on_verdict_ready
+
+    store = MagicMock()
+    store.get_active_entities.return_value = [
+        {"entity_id": "e1", "name": "NATO", "link_count": 10},
+    ]
+
+    class FakeMessage:
+        def __init__(self):
+            self.headers = {"item_id": "item-123"}
+            self.processed = False
+
+        def process(self):
+            class CM:
+                async def __aenter__(self2):
+                    return self2
+
+                async def __aexit__(self2, *args):
+                    return None
+
+            return CM()
+
+    message = FakeMessage()
+    await _on_verdict_ready(
+        message, store, tmp_path / "vault", top_n=1, embed=mock_embed, llm=mock_llm
+    )
+
+    store.get_active_entities.assert_called_once_with(limit=1)
+    assert (tmp_path / "vault" / "wiki" / "auto" / "nato.md").exists()
 
 
 def test_verify_language_coverage_passes_when_all_cited():
@@ -179,10 +235,85 @@ def test_build_prompt_includes_subject_and_source_items():
     gen = WikiGenerator(MagicMock(), "/vault")
     items = [
         {"item_id": "id1", "title": "Arctic security", "source": "NRK", "lang": "en"},
-        {"item_id": "id2", "title": "NATO summit", "source": "Aftenposten", "lang": "no"},
+        {
+            "item_id": "id2",
+            "title": "NATO summit",
+            "source": "Aftenposten",
+            "lang": "no",
+        },
     ]
     prompt = gen.build_prompt("NATO", items)
     assert "Topic: NATO" in prompt
     assert "[item_id: id1]" in prompt
     assert "Arctic security" in prompt
     assert "Aftenposten" in prompt
+
+
+def test_write_wiki_page_creates_new_file(tmp_path):
+    from generator import write_wiki_page
+
+    path = write_wiki_page(
+        "NATO",
+        "# NATO\n\nBody content",
+        {"title": "NATO", "subject": "NATO"},
+        tmp_path / "vault",
+    )
+    assert path.exists()
+    assert path == tmp_path / "vault" / "wiki" / "auto" / "nato.md"
+    text = path.read_text(encoding="utf-8")
+    assert text.startswith("---\n")
+    assert "title: NATO" in text
+    assert "Body content" in text
+
+
+def test_write_wiki_page_preserves_operator_frontmatter_keys(tmp_path):
+    from generator import write_wiki_page
+
+    vault = tmp_path / "vault"
+    path = write_wiki_page(
+        "NATO",
+        "# NATO\n\nOriginal body",
+        {"title": "NATO", "subject": "NATO", "generated_at": "2024-01-01T00:00:00"},
+        vault,
+    )
+    # Simulate operator adding a custom frontmatter key
+    existing = path.read_text(encoding="utf-8")
+    path.write_text(
+        existing.replace("title: NATO", "title: NATO\nreviewed_by: analyst-a"),
+        encoding="utf-8",
+    )
+
+    updated_path = write_wiki_page(
+        "NATO",
+        "# NATO\n\nUpdated body",
+        {"title": "NATO", "subject": "NATO", "generated_at": "2024-02-01T00:00:00"},
+        vault,
+    )
+    assert updated_path == path
+    text = updated_path.read_text(encoding="utf-8")
+    assert "reviewed_by: analyst-a" in text
+    assert "2024-02-01T00:00:00" in text
+    assert "Updated body" in text
+    assert "Original body" not in text
+
+
+def test_write_wiki_page_overwrites_corrupt_frontmatter(tmp_path):
+    from generator import write_wiki_page
+
+    vault = tmp_path / "vault"
+    wiki_dir = vault / "wiki" / "auto"
+    wiki_dir.mkdir(parents=True, exist_ok=True)
+    path = wiki_dir / "nato.md"
+    path.write_text("---\nnot yaml: [unclosed\n---\n\nOld body", encoding="utf-8")
+
+    updated_path = write_wiki_page(
+        "NATO",
+        "# NATO\n\nNew body",
+        {"title": "NATO", "subject": "NATO"},
+        vault,
+    )
+    assert updated_path == path
+    text = updated_path.read_text(encoding="utf-8")
+    assert "New body" in text
+    assert "Old body" not in text
+    assert "title: NATO" in text

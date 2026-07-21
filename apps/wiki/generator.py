@@ -15,7 +15,9 @@ import urllib.request
 from pathlib import Path
 from typing import Callable, Iterable, cast
 
-from contracts import to_frontmatter
+import yaml
+
+from contracts import from_frontmatter, to_frontmatter
 from store import Store
 
 
@@ -109,8 +111,6 @@ def verify_language_coverage(items: Iterable[dict], text: str) -> list[str]:
 
     Each item must have a 'lang' key or 'item_id'. Citation format is [item_id].
     """
-    from collections import defaultdict
-
     lang_by_item: dict[str, str] = {}
     for item in items:
         item_id = str(item.get("item_id") or item.get("id"))
@@ -131,6 +131,55 @@ def verify_language_coverage(items: Iterable[dict], text: str) -> list[str]:
             found_langs.add(lang_by_item[cited])
 
     return sorted(required_langs - found_langs)
+
+
+# ---------------------------------------------------------------------------
+# Public file writer
+# ---------------------------------------------------------------------------
+
+
+def write_wiki_page(
+    subject: str, content: str, metadata: dict, vault_path: Path | str
+) -> Path:
+    """Write or update a standing wiki page in the Obsidian vault.
+
+    The note is written to ``<vault_path>/wiki/auto/<slug>.md``. If the file
+    already exists, the existing YAML frontmatter is parsed, merged with the
+    new ``metadata`` (new keys override, operator-added custom keys are kept),
+    and only the markdown body is replaced.
+
+    Args:
+        subject: Human-readable topic/entity title.
+        content: Markdown body to write (excluding frontmatter).
+        metadata: Frontmatter keys to persist/override.
+        vault_path: Root of the Obsidian vault.
+
+    Returns:
+        Path to the written note.
+    """
+    vault_path = Path(vault_path)
+    wiki_dir = vault_path / "wiki" / "auto"
+    wiki_dir.mkdir(parents=True, exist_ok=True)
+
+    filepath = wiki_dir / f"{_slugify(subject)}.md"
+
+    if filepath.exists():
+        existing_text = filepath.read_text(encoding="utf-8")
+        try:
+            existing_meta = from_frontmatter(existing_text)
+        except (ValueError, yaml.YAMLError):
+            existing_meta = {}
+        merged_meta = {**existing_meta, **metadata}
+    else:
+        merged_meta = metadata
+
+    frontmatter = to_frontmatter(merged_meta)
+    full_text = f"{frontmatter}\n{content}"
+
+    tmp = filepath.with_suffix(".tmp")
+    tmp.write_text(full_text, encoding="utf-8")
+    os.replace(tmp, filepath)
+    return filepath
 
 
 # ---------------------------------------------------------------------------
@@ -171,33 +220,18 @@ class WikiGenerator:
         return _synthesis_prompt(subject, items)
 
     def _write_page(self, subject: str, synthesis: str, items: list[dict]) -> Path:
-        self.vault_path.mkdir(parents=True, exist_ok=True)
-        wiki_dir = self.vault_path / "wiki" / "auto"
-        wiki_dir.mkdir(parents=True, exist_ok=True)
-
-        filepath = wiki_dir / f"{_slugify(subject)}.md"
-
-        frontmatter = to_frontmatter(
-            {
-                "title": subject,
-                "subject": subject,
-                "generated_at": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
-                "source_count": len(items),
-                "sources": [i["item_id"] for i in items],
-            }
+        metadata = {
+            "title": subject,
+            "subject": subject,
+            "generated_at": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
+            "source_count": len(items),
+            "sources": [i["item_id"] for i in items],
+        }
+        cited_list = "\n".join(
+            f"- [{i['title']}]({i.get('url', '')})" for i in items if i.get("url")
         )
-        cited_list = "\n".join(f"- [{i['title']}]({i.get('url', '')})" for i in items if i.get("url"))
-        body = (
-            f"{frontmatter}\n\n"
-            f"# {subject}\n\n"
-            f"{synthesis}\n\n"
-            f"## Sources\n\n{cited_list}\n"
-        )
-
-        tmp = filepath.with_suffix(".tmp")
-        tmp.write_text(body, encoding="utf-8")
-        os.replace(tmp, filepath)
-        return filepath
+        body = f"# {subject}\n\n" f"{synthesis}\n\n" f"## Sources\n\n{cited_list}\n"
+        return write_wiki_page(subject, body, metadata, self.vault_path)
 
     def generate_page(self, subject: str) -> Path:
         """Generate or refresh a standing wiki page for ``subject``.
