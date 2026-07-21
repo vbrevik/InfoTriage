@@ -22,6 +22,7 @@ target; spike stays runnable while we build toward this.
 | [ADR-011](adr/ADR-011-pmesii-ajp01-ajp5-citation.md) | PMESII AJP-01 / AJP-5 citation | Accepted |
 | [ADR-012](adr/ADR-012-dimefil-cop-cip-evaluation.md) | DIMEFIL / COP / CIP / CRP evaluation | Accepted |
 | [ADR-013](adr/ADR-013-recognized-picture-doctrine.md) | Recognized Picture doctrine | Accepted |
+| [ADR-014](adr/ADR-014-socmint-legal-and-tos.md) | SOCMINT, Arctic data and ACLED legal / ToS posture | Proposed |
 
 ---
 
