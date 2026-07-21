@@ -243,6 +243,8 @@ Plans consume:
 - `docker compose up -d ingest-telegram` starts and reports healthy.
 - Container runs the adapter on schedule or on demand.
 
+**Status:** ✅ COMPLETE
+
 ### Task 7: Scaffold `ingest-barentswatch`
 
 **Files:** `apps/ingest-barentswatch/barentswatch_ingest.py`, `apps/ingest-barentswatch/main.py`, `apps/ingest-barentswatch/Dockerfile`, `apps/ingest-barentswatch/requirements.txt`
