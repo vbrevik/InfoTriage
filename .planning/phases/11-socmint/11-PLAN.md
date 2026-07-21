@@ -199,6 +199,8 @@ Plans consume:
 - `docker compose up -d ingest-telegram ingest-barentswatch` starts both services.
 - `/health` endpoints return 200.
 
+**Status:** ✅ COMPLETE
+
 ## Wave 3: MCP Adapters — Telegram & BarentsWatch
 
 ### Task 5: Scaffold `ingest-telegram` core adapter
