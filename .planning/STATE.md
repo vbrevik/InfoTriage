@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: M1 Foundation re-audited and passed; Phase 8 (entity resolution) complete; Phase 9 (RAG recall) complete; Phase 10 (Wiki-LLM) in progress
-stopped_at: Phase 10 plan created; moving to execution
+status: M1 Foundation re-audited and passed; Phase 8 (entity resolution) complete; Phase 9 (RAG recall) complete; Phase 10 (Wiki-LLM) Wave 1 complete, Wave 2 queued
+stopped_at: Phase 10 Wave 1 committed and pushed; ready for Wave 2 (DGX backend)
 last_updated: "2026-07-21T00:00:00.000Z"
 progress:
   total_phases: 13
@@ -17,6 +17,29 @@ progress:
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-07-21 — Phase 10 (Wiki-LLM) Wave 1 COMPLETE
+
+### Just-completed
+
+- **Wave 1: Data Foundation & Store Protocol.** Added `Store.get_active_entities(since, limit)` to
+  `libs/store/src/store/_protocol.py` with Postgres and InMemory implementations, plus tests in
+  `tests/test_store_entities.py`.
+- **Wave 1: Wiki generator scaffold.** Created/updated `apps/wiki/generator.py` with prompt
+  instruction constants (citation, cross-language, contradiction) and `write_wiki_page()` for
+  creating/updating Obsidian notes with frontmatter merge.
+- **Wave 1: Worker scaffold.** Rewrote `apps/wiki/wiki_worker.py` to support `--mode {once,periodic,events}`;
+  added `/health` endpoint and `verdict.ready` consumer. Periodic mode passes a `since` window to
+  `get_active_entities`.
+- **Verification.** `pytest tests/test_wiki_generator.py tests/test_store_entities.py` → 30 passed,
+  15 skipped. `mypy` clean. Black formatting clean. Full non-integration suite: 448 passed,
+  50 skipped, 0 failed.
+- **Ship.** Phase 10 Wave 1 committed (`b736493`) and pushed to `origin/main`.
+
+### Next
+
+- **Phase 10 Wave 2 (DGX backend):** build `apps/wiki/dgx_client.py` as a `RecallBackend`
+  implementation and wire `--backend dgx` into `apps/triage/recall.py`.
 
 ## Session: 2026-07-21 — Phase 9 (RAG recall) COMPLETE
 
