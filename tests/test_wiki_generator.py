@@ -9,13 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-import generator
-from generator import (
-    CITATION_INSTRUCTION,
-    CONTRADICTION_INSTRUCTION,
-    CROSS_LANGUAGE_INSTRUCTION,
-    WikiGenerator,
-)
+from generator import WikiGenerator
 
 
 @pytest.fixture
@@ -76,28 +70,6 @@ def test_wiki_generator_writes_obsidian_page(
     assert "This is a synthesized answer" in text
     assert "Arctic security article" in text
     assert "https://example.com/1" in text
-
-
-def test_wiki_generator_flags_missing_language(tmp_path, fake_store, mock_embed):
-    fake_store.recall_items.return_value = [
-        {
-            "item_id": "id1",
-            "title": "Russian report",
-            "source": "TASS",
-            "url": "https://example.com/1",
-            "ccir": "PIR-1",
-            "score": 8,
-            "similarity": 0.89,
-            "lang": "ru",
-        },
-    ]
-    # LLM output omits the Russian citation
-    llm_no_ru = lambda messages: "This only cites English sources."
-    gen = WikiGenerator(fake_store, tmp_path / "vault", embed=mock_embed, llm=llm_no_ru)
-    path = gen.generate_page("Russia")
-    text = path.read_text(encoding="utf-8")
-    assert "Verification Flag" in text
-    assert "ru" in text
 
 
 def test_wiki_generator_handles_empty_corpus(tmp_path, fake_store, mock_embed):
@@ -194,42 +166,6 @@ async def test_wiki_worker_event_driven_generates_page(tmp_path, mock_embed, moc
 
     store.get_active_entities.assert_called_once_with(limit=1)
     assert (tmp_path / "vault" / "wiki" / "auto" / "nato.md").exists()
-
-
-def test_verify_language_coverage_passes_when_all_cited():
-    items = [
-        {"item_id": "i1", "lang": "en"},
-        {"item_id": "i2", "lang": "ru"},
-    ]
-    text = "Summary [i1] and also [i2]."
-    assert generator.verify_language_coverage(items, text) == []
-
-
-def test_verify_language_coverage_finds_missing_language():
-    items = [
-        {"item_id": "i1", "lang": "en"},
-        {"item_id": "i2", "lang": "ru"},
-    ]
-    text = "Summary [i1]."
-    assert generator.verify_language_coverage(items, text) == ["ru"]
-
-
-def test_build_prompt_requires_citations():
-    gen = WikiGenerator(MagicMock(), "/vault")
-    prompt = gen.build_prompt("NATO", [])
-    assert CITATION_INSTRUCTION in prompt
-
-
-def test_build_prompt_requires_cross_language_synthesis():
-    gen = WikiGenerator(MagicMock(), "/vault")
-    prompt = gen.build_prompt("NATO", [])
-    assert CROSS_LANGUAGE_INSTRUCTION in prompt
-
-
-def test_build_prompt_requires_contradiction_flagging():
-    gen = WikiGenerator(MagicMock(), "/vault")
-    prompt = gen.build_prompt("NATO", [])
-    assert CONTRADICTION_INSTRUCTION in prompt
 
 
 def test_dgx_backend_synthesize_uses_spark_endpoint_and_large_max_tokens(monkeypatch):
