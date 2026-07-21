@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: M1 Foundation re-audited and passed; Phase 8 (entity resolution) complete; Phase 9 (RAG recall) complete; Phase 10 (Wiki-LLM) COMPLETE
-stopped_at: Phase 10 Wave 4 committed and pushed; ready for Phase 11 (SOCMINT + Arctic collection)
+status: M1 Foundation re-audited and passed; Phases 8-10 complete; Phase 11 (SOCMINT + Arctic collection) in progress
+stopped_at: Phase 11 11-PLAN.md created; ready to begin Wave 1 (doctrine & schema foundation)
 last_updated: "2026-07-21T00:00:00.000Z"
 progress:
   total_phases: 13
