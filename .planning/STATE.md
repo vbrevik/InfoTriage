@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: M1 Foundation re-audited and passed; Phase 8 (entity resolution) complete; Phase 9 (RAG recall) complete; Phase 10 (Wiki-LLM) Wave 1 complete, Wave 2 queued
-stopped_at: Phase 10 Wave 1 committed and pushed; ready for Wave 2 (DGX backend)
+status: M1 Foundation re-audited and passed; Phase 8 (entity resolution) complete; Phase 9 (RAG recall) complete; Phase 10 (Wiki-LLM) Waves 1-3 complete, Wave 4 in progress
+stopped_at: Phase 10 Waves 2-3 committed and pushed; ready for Wave 4 (cross-language verification)
 last_updated: "2026-07-21T00:00:00.000Z"
 progress:
   total_phases: 13
@@ -17,6 +17,32 @@ progress:
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-07-21 — Phase 10 (Wiki-LLM) Waves 2-3 COMPLETE
+
+### Just-completed
+
+- **Wave 2: Auto-Wiki File Writer & Worker.** `write_wiki_page()` in `apps/wiki/generator.py` creates
+  and updates Obsidian notes at `Vault/wiki/auto/<slug>.md`, merging operator-added frontmatter
+  keys with new auto-generated metadata and rewriting only the body. `apps/wiki/wiki_worker.py`
+  was scaffolded with `--mode {once,periodic,events}`, a `/health` endpoint, structured logging,
+  and `verdict.ready` event consumption; periodic mode passes a `since` window to
+  `get_active_entities`.
+- **Wave 3: DGX Backend Integration.** Added `apps/wiki/dgx_client.py` with the `RecallBackend`
+  protocol and `DGXSynthesisBackend`, which routes heavy synthesis to the DGX Spark endpoint with
+  larger `max_tokens` and thinking-token stripping. Refactored `apps/triage/recall.py` to support
+  `--backend {local,dgx}` with `LocalSynthesisBackend` implementing `RecallBackend`, and wired the
+  backend selection into synthesis.
+- **Verification.** `pytest tests/test_wiki_generator.py tests/test_recall.py` → 28 passed, 0 failed.
+  `mypy apps/triage/recall.py apps/wiki/dgx_client.py` clean. Full non-integration suite: 451 passed,
+  50 skipped, 0 failed.
+- **Ship.** Phase 10 Waves 2-3 committed (`3fe8429`) and pushed to `origin/main`.
+
+### Next
+
+- **Phase 10 Wave 4 (cross-language verification):** strengthen per-language coverage checks in
+  `apps/wiki/generator.py` so cross-language corpus items are not silently omitted from synthesized
+  wiki pages, building on the existing `verify_language_coverage()` helper.
 
 ## Session: 2026-07-21 — Phase 10 (Wiki-LLM) Wave 1 COMPLETE
 

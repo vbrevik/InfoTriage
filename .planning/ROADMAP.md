@@ -266,7 +266,7 @@ to the running pipeline.
 **Goal**: An auto-maintained intel wiki synthesized from the corpus, plus on-demand synthesized articles.
 **Depends on**: Phase 9
 **Requirements**: ADR-006, spec §Obsidian
-**Status**: Wave 1 complete (active-entity lookup, prompt templates, Obsidian create/update writer, periodic/event-driven worker + /health). Wave 2 (DGX backend) queued.
+**Status**: Waves 1-3 complete (active-entity lookup, prompt templates, Obsidian create/update writer, periodic/event-driven worker + /health, DGX backend integration). Wave 4 (cross-language verification) queued.
 **Success Criteria** (what must be TRUE):
 
   1. ✅ A standing, auto-updated per-entity/per-topic wiki is written as cross-linked Obsidian `.md`.
