@@ -23,6 +23,7 @@ from ._verify import (
     CROSS_LANGUAGE_INSTRUCTION,
     verify_language_coverage,
 )
+from ._translation import translate_to, TranslationCache
 
 __all__ = [
     "Item",
@@ -41,4 +42,6 @@ __all__ = [
     "CITATION_INSTRUCTION",
     "CROSS_LANGUAGE_INSTRUCTION",
     "CONTRADICTION_INSTRUCTION",
+    "translate_to",
+    "TranslationCache",
 ]
