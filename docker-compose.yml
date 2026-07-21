@@ -370,7 +370,79 @@ services:
         condition: service_healthy
     networks: [infotriage]
 
-  # Scheduler — APScheduler 3.x fires all four adapters on per-adapter cron schedules.
+  # ── Phase 11: SOCMINT / Arctic adapters ───────────────────────────────────
+  # Telegram (SOCMINT) and BarentsWatch AIS (MASINT/AIS) ingest adapters.
+  # They follow the same Phase 4 MCP/adapter pattern; credentials arrive via .env.
+
+  ingest-telegram:
+    build:
+      context: .
+      dockerfile: apps/ingest-telegram/Dockerfile
+    container_name: infotriage-ingest-telegram
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:22015:8000"   # trigger endpoint: localhost:22015 → container:8000
+    env_file:
+      - path: .env
+        required: false   # .env is gitignored; present on host, not in repo
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      INFOTRIAGE_PG_DSN: ${INFOTRIAGE_PG_DSN:-postgresql://infotriage:infotriage_dev@postgres:5432/infotriage}
+      INFOTRIAGE_AMQP_DSN: ${INFOTRIAGE_AMQP_DSN:-amqp://infotriage:infotriage_rmq@rabbitmq:5672}
+      INFOTRIAGE_BLOB_ROOT: /data/blobs
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH}
+      TELEGRAM_CHANNELS: ${TELEGRAM_CHANNELS:-}
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks: [infotriage]
+
+  ingest-barentswatch:
+    build:
+      context: .
+      dockerfile: apps/ingest-barentswatch/Dockerfile
+    container_name: infotriage-ingest-barentswatch
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:22016:8000"   # trigger endpoint: localhost:22016 → container:8000
+    env_file:
+      - path: .env
+        required: false   # .env is gitignored; present on host, not in repo
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      INFOTRIAGE_PG_DSN: ${INFOTRIAGE_PG_DSN:-postgresql://infotriage:infotriage_dev@postgres:5432/infotriage}
+      INFOTRIAGE_AMQP_DSN: ${INFOTRIAGE_AMQP_DSN:-amqp://infotriage:infotriage_rmq@rabbitmq:5672}
+      INFOTRIAGE_BLOB_ROOT: /data/blobs
+      BARENTSWATCH_CLIENT_ID: ${BARENTSWATCH_CLIENT_ID}
+      BARENTSWATCH_CLIENT_SECRET: ${BARENTSWATCH_CLIENT_SECRET}
+      BARENTSWATCH_AREA: ${BARENTSWATCH_AREA:-}
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks: [infotriage]
+
+  # Scheduler — APScheduler 3.x fires all ingest adapters on per-adapter cron schedules.
   # On 409 (adapter already running) the trigger is logged as 'skipped' (D-04, SPEC R5).
   scheduler:
     build:
