@@ -2,7 +2,7 @@
 phase: 11-socmint
 plan: 01
 type: execute
-wave: 1
+wave: 2
 depends_on:
   - 04-ingest-mcp-pattern
   - 08-entity-resolution
@@ -67,8 +67,8 @@ must_haves:
 Phase 11 rounds out the InfoTriage collection picture by integrating SOCMINT and authoritative Arctic data using the MCP adapter pattern, and closes the Phase 999.1 backlog item (on-demand translation for non-Norwegian/English source items).
 
 1. **Doctrine & Schema Foundation**: Extend the `Item` schema and store layer with discipline tags (OSINT, SOCMINT, MASINT/AIS, etc.) and Admiralty reliability ratings (A-F, 1-6) so every corpus item carries explicit provenance and reliability metadata.
-2. **Translation on Demand (Phase 999.1 backlog)**: Provide local-LLM translation in the Obsidian vault and SAB reading surfaces for Russian/German/Spanish source items, without sending source data to cloud APIs.
-3. **MCP Adapters**: Build `ingest-telegram` (Telethon) and `ingest-barentswatch` (AIS) services following the Phase 4 MCP adapter pattern, including containerization and health endpoints.
+2. **MCP Adapters**: Build `ingest-telegram` (Telethon) and `ingest-barentswatch` (AIS) services following the Phase 4 MCP adapter pattern, including containerization and health endpoints.
+3. **Translation on Demand (Phase 999.1 backlog)**: Provide local-LLM translation in the Obsidian vault and SAB reading surfaces for Russian/German/Spanish source items, without sending source data to cloud APIs.
 4. **Advanced Media**: Upgrade the existing `ingest-youtube` pipeline with local audio transcription for richer source content.
 </objective>
 
@@ -150,7 +150,6 @@ Plans consume:
 1. Add to `Item`:
    - `discipline: str | None` (OSINT, SOCMINT, MASINT/AIS, GEOINT, etc.)
    - `admiralty_reliability: str | None` (A-F + 1-6, e.g. "A1")
-   - `source_reliability: str | None` (optional human-readable justification)
 2. Update Postgres schema (migration) to store the new columns with sensible defaults.
 3. Update InMemory store.
 4. Add tests in `tests/test_store_contract.py` or new `tests/test_store_item_metadata.py`.
@@ -161,9 +160,104 @@ Plans consume:
 
 **Status:** ✅ COMPLETE
 
-## Wave 2: Translation on Demand (Phase 999.1 backlog)
+## Wave 2: Validation, ACLED Gate & Compose Wiring
 
-### Task 3: Add local-LLM translation helper
+### Task 3: Add adapter-level validation and ACLED license gate stub
+
+**Files:** `libs/contracts/src/contracts/_item.py`, `libs/contracts/src/contracts/__init__.py`, optional stub `apps/ingest-acled/`
+
+**Read first:**
+- ADR-014 ACLED section
+- Existing `Item` model and validators
+
+**Action:**
+1. Add Pydantic validation (or adapter-level check) ensuring `discipline` is populated for every item emitted by a Phase 11 adapter.
+2. Add a stub `ingest-acled` adapter or `contracts` helper that refuses to run unless `ACLED_LICENSE_KEY` is present and non-empty.
+3. Add tests proving the gate blocks ingestion when the license is missing.
+
+**Acceptance Criteria:**
+- `Item` rejects items with empty `discipline` when created through adapter-specific helpers.
+- ACLED gate raises/ exits non-zero without a valid `ACLED_LICENSE_KEY`.
+- No real ACLED data is ingested in tests.
+
+### Task 4: Wire `ingest-telegram` and `ingest-barentswatch` into docker-compose
+
+**Files:** `docker-compose.yml`, `.env.example`
+
+**Read first:**
+- Phase 4 docker-compose service definitions
+- Existing ingest services
+
+**Action:**
+1. Add `ingest-telegram` and `ingest-barentswatch` services to `docker-compose.yml` with health checks, restart policy, and required environment variables.
+2. Update `.env.example` with new environment variables (`TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `BARENTSWATCH_CLIENT_ID`, `ACLED_LICENSE_KEY`, etc.).
+3. Verify `docker compose config` parses without errors.
+
+**Acceptance Criteria:**
+- `docker compose up -d ingest-telegram ingest-barentswatch` starts both services.
+- `/health` endpoints return 200.
+
+## Wave 3: MCP Adapters — Telegram & BarentsWatch
+
+### Task 5: Scaffold `ingest-telegram` core adapter
+
+**Files:** `apps/ingest-telegram/telegram_ingest.py`, `tests/test_ingest_telegram.py`
+
+**Read first:**
+- `apps/ingest-imap/imap_ingest.py` and `apps/ingest-youtube/youtube_ingest.py` for MCP adapter pattern
+- `libs/ingest_common/` for shared ingestion helpers
+- Telethon documentation for channel/listen patterns
+
+**Action:**
+1. Create `telegram_ingest.py` with functions to:
+   - Read Telegram channels/chats by list of IDs/usernames.
+   - Fetch messages within a configurable time window.
+   - Emit `Item` records with `source_type="telegram"`, `discipline="SOCMINT"`, and a default `admiralty_reliability`.
+2. Add `--since`, `--channel`, and `--dry-run` CLI arguments.
+3. Add unit tests mocking Telethon client calls and verifying emitted `Item` shape.
+
+**Acceptance Criteria:**
+- Unit tests mock Telethon and verify emitted `Item` shape.
+- Adapter rejects private-channel IDs or missing credentials.
+
+### Task 6: Containerize `ingest-telegram`
+
+**Files:** `apps/ingest-telegram/main.py`, `apps/ingest-telegram/Dockerfile`, `apps/ingest-telegram/requirements.txt`
+
+**Read first:**
+- Phase 4 containerization pattern
+- `apps/ingest-imap/Dockerfile` and `main.py`
+
+**Action:**
+1. Add `main.py` with a FastAPI/health endpoint and periodic runner.
+2. Create `Dockerfile` and `requirements.txt`.
+3. Wire the container into `docker-compose.yml` (covered in Task 4).
+
+**Acceptance Criteria:**
+- `docker compose up -d ingest-telegram` starts and reports healthy.
+- Container runs the adapter on schedule or on demand.
+
+### Task 7: Scaffold `ingest-barentswatch`
+
+**Files:** `apps/ingest-barentswatch/barentswatch_ingest.py`, `apps/ingest-barentswatch/main.py`, `apps/ingest-barentswatch/Dockerfile`, `apps/ingest-barentswatch/requirements.txt`
+
+**Read first:**
+- BarentsWatch/AIS public API documentation
+- Existing ingest adapters for polling patterns
+
+**Action:**
+1. Create `barentswatch_ingest.py` to poll AIS data for a configurable area/ship list.
+2. Emit `Item` records with `source_type="ais"`, `discipline="MASINT/AIS"`, and `admiralty_reliability`.
+3. Containerize and add health endpoint.
+4. Add tests in `tests/test_ingest_barentswatch.py`.
+
+**Acceptance Criteria:**
+- AIS adapter emits structured items with position/metadata fields.
+- Mock API tests pass without real credentials.
+
+## Wave 4: Translation on Demand (Phase 999.1 backlog)
+
+### Task 8: Add local-LLM translation helper
 
 **Files:** `libs/contracts/src/contracts/_translation.py`, `apps/brief/vault_writer.py`, `apps/brief/renderer.py`
 
@@ -183,7 +277,7 @@ Plans consume:
 - `translate_to` works without network calls to cloud APIs.
 - Caching is tested.
 
-### Task 4: Surface translation in the Obsidian vault / SAB brief
+### Task 9: Surface translation in the Obsidian vault / SAB brief
 
 **Files:** `apps/brief/vault_writer.py`, `apps/brief/renderer.py`, `apps/brief/html_renderer.py`
 
@@ -200,51 +294,9 @@ Plans consume:
 - Russian source item shows an English/Norwegian translation in the vault/brief.
 - Translations are cached and not re-requested for the same text.
 
-## Wave 3: MCP Adapters — Telegram & BarentsWatch
+## Wave 5: Advanced Media — YouTube Transcription
 
-### Task 5: Scaffold `ingest-telegram`
-
-**Files:** `apps/ingest-telegram/telegram_ingest.py`, `apps/ingest-telegram/main.py`, `apps/ingest-telegram/Dockerfile`, `apps/ingest-telegram/requirements.txt`
-
-**Read first:**
-- `apps/ingest-imap/imap_ingest.py` and `apps/ingest-youtube/youtube_ingest.py` for MCP adapter pattern
-- `libs/ingest_common/` for shared ingestion helpers
-- Telethon documentation for channel/listen patterns
-
-**Action:**
-1. Create `telegram_ingest.py` with functions to:
-   - Read Telegram channels/chats by list of IDs/usernames.
-   - Fetch messages within a configurable time window.
-   - Emit `Item` records with `source_type="telegram"`, `discipline="SOCMINT"`, and a default Admiralty rating.
-2. Containerize with `Dockerfile` and `requirements.txt`.
-3. Add `--since`, `--channel`, and `--dry-run` CLI arguments.
-4. Add health endpoint in `main.py`.
-
-**Acceptance Criteria:**
-- `docker compose up -d ingest-telegram` starts and reports healthy.
-- Unit tests mock Telethon and verify emitted `Item` shape.
-
-### Task 6: Scaffold `ingest-barentswatch`
-
-**Files:** `apps/ingest-barentswatch/barentswatch_ingest.py`, `apps/ingest-barentswatch/main.py`, `apps/ingest-barentswatch/Dockerfile`, `apps/ingest-barentswatch/requirements.txt`
-
-**Read first:**
-- BarentsWatch/AIS public API documentation
-- Existing ingest adapters for polling patterns
-
-**Action:**
-1. Create `barentswatch_ingest.py` to poll AIS data for a configurable area/ship list.
-2. Emit `Item` records with `source_type="ais"`, `discipline="MASINT/AIS"`, and Admiralty rating.
-3. Containerize and add health endpoint.
-4. Add tests in `tests/test_ingest_barentswatch.py`.
-
-**Acceptance Criteria:**
-- AIS adapter emits structured items with position/metadata fields.
-- Mock API tests pass without real credentials.
-
-## Wave 4: Advanced Media — YouTube Transcription
-
-### Task 7: Add local audio transcription to `ingest-youtube`
+### Task 10: Add local audio transcription to `ingest-youtube`
 
 **Files:** `apps/ingest-youtube/youtube_ingest.py`, `apps/ingest-youtube/Dockerfile`, `apps/ingest-youtube/requirements.txt`
 
@@ -261,6 +313,22 @@ Plans consume:
 **Acceptance Criteria:**
 - `--transcribe` produces a transcript for a downloaded video.
 - Transcript is retrievable via the store blob path.
+
+## Wave 6: Closeout
+
+### Task 11: Update ROADMAP/STATE and close backlog item
+
+**Files:** `.planning/ROADMAP.md`, `.planning/STATE.md`, `.planning/phases/999.1-translation-on-demand-per-item-ru-de-es-to-no-en/.gitkeep`
+
+**Action:**
+1. Mark Phase 11 complete in `ROADMAP.md` and `STATE.md`.
+2. Delete or archive the 999.1 backlog placeholder.
+3. Create `.planning/phases/11-socmint/11-01-SUMMARY.md`.
+
+**Acceptance Criteria:**
+- Planning docs reflect Phase 11 completion.
+- Phase 999.1 backlog item is closed/removed.
+- Summary artifact exists.
 
 </tasks>
 
