@@ -135,6 +135,8 @@ Plans consume:
 - ADR-014 exists and is referenced from ROADMAP.md.
 - ACLED restriction is explicit and tied to a configuration/env-var check.
 
+**Status:** ✅ COMPLETE
+
 ### Task 2: Extend `Item` schema with discipline and reliability metadata
 
 **Files:** `libs/contracts/src/contracts/_item.py`, `libs/store/src/store/_protocol.py`, `libs/store/src/store/_postgres.py`, `libs/store/src/store/_inmemory.py`
