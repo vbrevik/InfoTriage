@@ -180,7 +180,7 @@ Plans consume:
 - ACLED gate raises/ exits non-zero without a valid `ACLED_LICENSE_KEY`.
 - No real ACLED data is ingested in tests.
 
-**Status:** 🔄 IN PROGRESS (pattern validation complete; ACLED gate pending)
+**Status:** ✅ COMPLETE
 
 ### Task 4: Wire `ingest-telegram` and `ingest-barentswatch` into docker-compose
 
