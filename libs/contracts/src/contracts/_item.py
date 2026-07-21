@@ -11,7 +11,7 @@ Usage:
 import hashlib
 from typing import Optional
 
-from pydantic import AwareDatetime, BaseModel, computed_field
+from pydantic import AwareDatetime, BaseModel, Field, computed_field
 
 
 class Item(BaseModel):
@@ -34,8 +34,16 @@ class Item(BaseModel):
     body_ref: Optional[str] = None
 
     # Phase 11: collection discipline + Admiralty reliability rating
-    discipline: Optional[str] = None  # e.g. "OSINT", "SOCMINT", "MASINT"
-    admiralty_reliability: Optional[str] = None  # e.g. "A1", "B2"
+    discipline: Optional[str] = Field(
+        default=None,
+        pattern=r"^(OSINT|SOCMINT|MASINT|GEOINT|SIGINT|HUMINT|MASINT/AIS)$",
+        description="Collection discipline tag (e.g. OSINT, SOCMINT, MASINT/AIS)",
+    )
+    admiralty_reliability: Optional[str] = Field(
+        default=None,
+        pattern=r"^[A-F][1-6]$",
+        description="Admiralty reliability rating (A-F + 1-6, e.g. A1, B2)",
+    )
 
     # Rich / open
     payload: dict = {}  # open dict — Phase 5 writes ccir, cnr, score, bucket, why

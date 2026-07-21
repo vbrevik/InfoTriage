@@ -99,6 +99,91 @@ def test_item_payload_open_dict():
     assert item.payload["score"] == 8
 
 
+def test_item_discipline_and_admiralty_reliability_valid():
+    """Known discipline tags and Admiralty ratings are accepted."""
+    item = Item(
+        source="NRK",
+        source_type="rss",
+        title="Test",
+        ts=TS,
+        lang="no",
+        discipline="SOCMINT",
+        admiralty_reliability="B2",
+    )
+    assert item.discipline == "SOCMINT"
+    assert item.admiralty_reliability == "B2"
+
+
+@pytest.mark.parametrize("discipline", ["socmint", "Socmint", "OSINT "])
+def test_item_discipline_case_and_whitespace_invalid(discipline: str):
+    """Discipline values are case-sensitive and must match exactly."""
+    with pytest.raises(ValidationError):
+        Item(
+            source="NRK",
+            source_type="rss",
+            title="Test",
+            ts=TS,
+            lang="no",
+            discipline=discipline,
+        )
+
+
+def test_item_discipline_masint_ais_valid():
+    """The MASINT/AIS variant is accepted."""
+    item = Item(
+        source="NRK",
+        source_type="rss",
+        title="Test",
+        ts=TS,
+        lang="no",
+        discipline="MASINT/AIS",
+    )
+    assert item.discipline == "MASINT/AIS"
+
+
+def test_item_discipline_masint_valid():
+    """Plain MASINT is also accepted as the generic measurement discipline."""
+    item = Item(
+        source="NRK",
+        source_type="rss",
+        title="Test",
+        ts=TS,
+        lang="no",
+        discipline="MASINT",
+    )
+    assert item.discipline == "MASINT"
+
+
+@pytest.mark.parametrize(
+    "reliability",
+    ["Z9", "G1", "A0", "A7", "b2", "B"],
+)
+def test_item_admiralty_reliability_invalid_patterns(reliability: str):
+    """Admiralty ratings outside the exact A-F/1-6 pattern are rejected."""
+    with pytest.raises(ValidationError):
+        Item(
+            source="NRK",
+            source_type="rss",
+            title="Test",
+            ts=TS,
+            lang="no",
+            admiralty_reliability=reliability,
+        )
+
+
+def test_item_discipline_and_reliability_optional():
+    """Both fields remain optional (NULL in the database)."""
+    item = Item(
+        source="NRK",
+        source_type="rss",
+        title="Test",
+        ts=TS,
+        lang="no",
+    )
+    assert item.discipline is None
+    assert item.admiralty_reliability is None
+
+
 # ---------------------------------------------------------------------------
 # Event model tests (R2)
 # ---------------------------------------------------------------------------
