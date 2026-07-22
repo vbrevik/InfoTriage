@@ -32,7 +32,7 @@ urgent insertions. The all-local-LLM rule (ADR-004) is never revisited by a phas
 - [x] **Phase 8: Entity resolution** (M2) - Postgres + pgvector → Obsidian projection (Waves 1–6 complete: LLM NER, worker integration, vault projection, entity graph, mE5-large threshold re-validation, contract tests)
 - [x] **Phase 9: RAG recall** (M2) - CCIR pre-filter + thematic recall over corpus ✅
 - [x] **Phase 10: Wiki-LLM** (M2) - COMPLETE: Waves 1-4 done
-- [~] **Phase 11: SOCMINT + Arctic collection** (M2) - IN PROGRESS: 11-PLAN.md; Waves 1-5 complete; Wave 6 (closeout) next
+- [x] **Phase 11: SOCMINT + Arctic collection** (M2) - COMPLETE (Waves 1-6, 2026-07-22)
 - [ ] **Phase 12: CNR alerting / dissemination** (M2) - real-time notification lane
 - [x] **Phase 99.1: M1 closure** (urgent decimal insertion, before M2) — retroactive closure of 4 procedural gaps surfaced by `.planning/v1.0-MILESTONE-AUDIT.md` §8: (RT-1) Phase 7 missing `07-VERIFICATION.md`; (RT-2) Phase 6 + Phase 7 missing `*-VALIDATION.md`; (RT-3) Phases 00/02/04 `*-VALIDATION.md` `nyquist_compliant: false` → `true`; (RT-4) `apps/opml_health/service.py:52` inline `FeedUnhealthy` class shadow. Drives M1 audit `gaps_found → passed` before M2 begins.
 
@@ -284,7 +284,9 @@ to the running pipeline.
   1. `ingest-telegram` (Telethon), advanced YouTube/transcription, and `ingest-barentswatch` (AIS) land as MCP-pattern adapters with `discipline` tags + Admiralty reliability ratings.
   2. SOCMINT legal/ToS posture documented; ACLED only with a paid license (never fed to the local LLM without one).
 
-**Plans**: `.planning/phases/11-socmint/11-PLAN.md` — Waves 1-5 complete; Wave 6 (closeout / SUMMARY) next.
+**Status**: ✅ COMPLETE (2026-07-22) — Waves 1-6 done; SOCMINT/Arctic adapters, on-demand translation (Phase 999.1 closed), schema provenance, and ADR-014 delivered.
+
+**Plans**: `.planning/phases/11-socmint/11-PLAN.md` — all waves complete.
 
 ### Phase 12: CNR alerting / dissemination
 
@@ -300,7 +302,7 @@ to the running pipeline.
 
 ## Backlog
 
-### Phase 999.1: On-demand per-item translation (ru/de/es → no/en) (BACKLOG)
+### Phase 999.1: On-demand per-item translation (ru/de/es → no/en) (CLOSED 2026-07-22 — shipped as Phase 11 Wave 4)
 
 **Goal:** On-demand, per-item translation of source items into Norwegian/English so the
 operator (no/en only) can read and **verify** non-no/en sources. Primary driver is citation
