@@ -177,6 +177,12 @@ def test_load_area_prefers_cli():
     assert barentswatch_ingest._load_area("1,2,3,4") == "1,2,3,4"
 
 
+def test_load_area_exits_cleanly_on_malformed_bbox():
+    """_load_area exits cleanly when the area string is malformed."""
+    with pytest.raises(SystemExit):
+        barentswatch_ingest._load_area("not,a,bbox")
+
+
 def test_missing_credentials_aborts(monkeypatch):
     """_load_credentials exits cleanly when OAuth2 credentials are missing."""
     monkeypatch.delenv("BARENTSWATCH_CLIENT_ID", raising=False)
@@ -242,3 +248,142 @@ async def test_ingest_retries_on_401_then_succeeds(
     # Token cache should have been refreshed (stale token evicted, new token set).
     assert barentswatch_ingest._TOKEN_CACHE is not None
     assert barentswatch_ingest._TOKEN_CACHE[0] == "fake-token"
+
+
+@pytest.mark.asyncio
+async def test_fetch_with_retries_on_transient_503_then_succeeds(
+    fake_position, creds_env, monkeypatch
+):
+    """A 503 from the AIS API is retried and then succeeds."""
+    calls = {"fetch": 0}
+
+    class _FakeResponse:
+        def __init__(self, payload, status=200):
+            self._payload = payload
+            self.status_code = status
+
+        def json(self):
+            return self._payload
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise RuntimeError("HTTP error")
+
+    class _503Client:
+        async def post(self, url, **kwargs):
+            if "connect/token" in url:
+                return _FakeResponse({"access_token": "fake-token", "expires_in": 3600})
+            calls["fetch"] += 1
+            if calls["fetch"] == 1:
+                request = httpx.Request("POST", url)
+                response = httpx.Response(503, request=request)
+                raise httpx.HTTPStatusError(
+                    "Service Unavailable", request=request, response=response
+                )
+            return _FakeResponse([fake_position])
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+    monkeypatch.setattr(barentswatch_ingest, "_RETRY_DELAY_SECONDS", 0)
+    items = await barentswatch_ingest.ingest(
+        since="7d",
+        area="74.0,15.0,81.0,35.0",
+        dry_run=True,
+        _client=_503Client(),
+    )
+    assert len(items) == 1
+    assert calls["fetch"] == 2
+
+
+@pytest.mark.asyncio
+async def test_fetch_with_retries_gives_up_after_max_retries(
+    fake_position, creds_env, monkeypatch
+):
+    """Persistent 503 errors are raised after the configured number of retries."""
+
+    class _FakeResponse:
+        def __init__(self, payload, status=200):
+            self._payload = payload
+            self.status_code = status
+
+        def json(self):
+            return self._payload
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise RuntimeError("HTTP error")
+
+    class _Always503Client:
+        async def post(self, url, **kwargs):
+            if "connect/token" in url:
+                return _FakeResponse({"access_token": "fake-token", "expires_in": 3600})
+            request = httpx.Request("POST", url)
+            response = httpx.Response(503, request=request)
+            raise httpx.HTTPStatusError(
+                "Service Unavailable", request=request, response=response
+            )
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+    monkeypatch.setattr(barentswatch_ingest, "_RETRY_DELAY_SECONDS", 0)
+    monkeypatch.setattr(barentswatch_ingest, "_MAX_RETRIES", 2)
+    with pytest.raises(httpx.HTTPStatusError):
+        await barentswatch_ingest.ingest(
+            since="7d",
+            area="74.0,15.0,81.0,35.0",
+            dry_run=True,
+            _client=_Always503Client(),
+        )
+
+
+@pytest.mark.asyncio
+async def test_fetch_with_retries_on_network_error_then_succeeds(
+    fake_position, creds_env, monkeypatch
+):
+    """A network-level failure is retried and then succeeds."""
+    calls = {"fetch": 0}
+
+    class _FakeResponse:
+        def __init__(self, payload, status=200):
+            self._payload = payload
+            self.status_code = status
+
+        def json(self):
+            return self._payload
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise RuntimeError("HTTP error")
+
+    class _NetworkErrorClient:
+        async def post(self, url, **kwargs):
+            if "connect/token" in url:
+                return _FakeResponse({"access_token": "fake-token", "expires_in": 3600})
+            calls["fetch"] += 1
+            if calls["fetch"] == 1:
+                raise httpx.NetworkError("connection reset")
+            return _FakeResponse([fake_position])
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+    monkeypatch.setattr(barentswatch_ingest, "_RETRY_DELAY_SECONDS", 0)
+    items = await barentswatch_ingest.ingest(
+        since="7d",
+        area="74.0,15.0,81.0,35.0",
+        dry_run=True,
+        _client=_NetworkErrorClient(),
+    )
+    assert len(items) == 1
+    assert calls["fetch"] == 2

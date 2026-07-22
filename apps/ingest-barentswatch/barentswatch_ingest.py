@@ -14,6 +14,7 @@ Environment variables:
     INFOTRIAGE_BLOB_ROOT       — filesystem root for blob storage (default: data/blobs)
 """
 import argparse
+import asyncio
 import datetime
 import logging
 import os
@@ -35,6 +36,11 @@ HISTORIC_URL = "https://historic.ais.barentswatch.no/v1/historic/combined"
 
 # Default bounding box: a slice of the Norwegian Arctic (Barents Sea / Svalbard-ish)
 DEFAULT_AREA = "74.0,15.0,81.0,35.0"
+
+# Retry/backoff configuration for transient API failures
+_MAX_RETRIES = 3
+_RETRY_DELAY_SECONDS = 2
+_RETRYABLE_STATUS_CODES = frozenset({408, 429, 502, 503, 504})
 
 # Module-level token cache: (access_token, expires_at_utc)
 _TOKEN_CACHE: Optional[tuple[str, datetime.datetime]] = None
@@ -65,7 +71,15 @@ def _load_area(cli_area: Optional[str] = None) -> str:
         or DEFAULT_AREA
     )
     # Validate early so bad configuration fails before any API call.
-    _bbox_to_polygon(area)
+    try:
+        _bbox_to_polygon(area)
+    except ValueError as exc:
+        log.error(
+            "Invalid BARENTSWATCH_AREA / --area: %s. "
+            "Expected format: lat_min,lon_min,lat_max,lon_max",
+            exc,
+        )
+        raise SystemExit(1) from exc
     return area
 
 
@@ -175,6 +189,58 @@ async def fetch_positions(
     return data.get("results", []) or []
 
 
+async def _fetch_with_retries(
+    client: httpx.AsyncClient,
+    client_id: str,
+    client_secret: str,
+    area: str,
+    since: Optional[datetime.datetime],
+) -> list[dict]:
+    """Fetch AIS positions with token-refresh on 401 and retry on transient errors.
+
+    Retries up to ``_MAX_RETRIES`` times with exponential backoff on network
+    failures and retryable HTTP status codes (408, 429, 502, 503, 504).
+    """
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            token = await _get_token(client, client_id, client_secret)
+            return await fetch_positions(client, token, area, since)
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            if status == 401:
+                log.warning(
+                    "BarentsWatch token rejected; retrying once with fresh token"
+                )
+                _clear_token_cache()
+                token = await _get_token(client, client_id, client_secret)
+                return await fetch_positions(client, token, area, since)
+            if status in _RETRYABLE_STATUS_CODES and attempt < _MAX_RETRIES:
+                log.warning(
+                    "BarentsWatch API returned %d (attempt %d/%d); retrying",
+                    status,
+                    attempt + 1,
+                    _MAX_RETRIES + 1,
+                )
+                await asyncio.sleep(_RETRY_DELAY_SECONDS * (2**attempt))
+                continue
+            raise
+        except httpx.RequestError as exc:
+            if attempt < _MAX_RETRIES:
+                log.warning(
+                    "BarentsWatch API request error: %s (attempt %d/%d); retrying",
+                    exc,
+                    attempt + 1,
+                    _MAX_RETRIES + 1,
+                )
+                await asyncio.sleep(_RETRY_DELAY_SECONDS * (2**attempt))
+                continue
+            raise
+    # All retry attempts exhausted for retryable request errors.
+    # The loop always returns or raises, so this is unreachable; kept for type
+    # checker completeness.
+    return []
+
+
 # ---------------------------------------------------------------------------
 # AIS report → Item mapping
 # ---------------------------------------------------------------------------
@@ -259,19 +325,9 @@ async def ingest(
 
     client_ctx = _client or httpx.AsyncClient()
     async with client_ctx as client:
-        token = await _get_token(client, client_id, client_secret)
-        try:
-            positions = await fetch_positions(client, token, area_str, since_dt)
-        except httpx.HTTPStatusError as exc:
-            if exc.response.status_code == 401:
-                log.warning(
-                    "BarentsWatch token rejected; retrying once with fresh token"
-                )
-                _clear_token_cache()
-                token = await _get_token(client, client_id, client_secret)
-                positions = await fetch_positions(client, token, area_str, since_dt)
-            else:
-                raise
+        positions = await _fetch_with_retries(
+            client, client_id, client_secret, area_str, since_dt
+        )
         log.info("barentswatch fetched %d positions", len(positions))
         for pos in positions:
             item = _position_to_item(pos)
