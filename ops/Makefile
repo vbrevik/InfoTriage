@@ -97,16 +97,16 @@ test-safe: ## Run scripts/check_test_dsn.sh first, then make test-full
 	$(MAKE) -f $(OPS_MAKEFILE) test-full
 
 test-full: ## Run the full pytest suite against a throwaway test Postgres container
-	$(COMPOSE) -f $(OPS_DIR)/../docker-compose.test.yml up -d --wait
-	@trap '$(COMPOSE) -f $(OPS_DIR)/../docker-compose.test.yml down' EXIT; \
+	$(COMPOSE) -p infotriage-test -f $(OPS_DIR)/../docker-compose.test.yml up -d --wait
+	@trap '$(COMPOSE) -p infotriage-test -f $(OPS_DIR)/../docker-compose.test.yml down' EXIT; \
 	cd $(OPS_DIR)/.. && \
 	INFOTRIAGE_TEST_DSN=postgresql://test:test@localhost:22062/infotriage_test \
 		python -m pytest tests/ -q
 
 test-integration: ## Run pytest with both test Postgres and RabbitMQ so no tests skip
-	$(COMPOSE) -f $(OPS_DIR)/../docker-compose.test.yml up -d --wait
+	$(COMPOSE) -p infotriage-test -f $(OPS_DIR)/../docker-compose.test.yml up -d --wait
 	$(COMPOSE) up -d --wait rabbitmq
-	@trap '$(COMPOSE) -f $(OPS_DIR)/../docker-compose.test.yml down; $(COMPOSE) down rabbitmq' EXIT; \
+	@trap '$(COMPOSE) -p infotriage-test -f $(OPS_DIR)/../docker-compose.test.yml down; $(COMPOSE) down rabbitmq' EXIT; \
 	cd $(OPS_DIR)/.. && \
 	INFOTRIAGE_TEST_DSN=postgresql://test:test@localhost:22062/infotriage_test \
 		python -m pytest tests/ -q
