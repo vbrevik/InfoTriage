@@ -36,7 +36,7 @@ status: ## Show container status and health
 	@echo "=== health checks ==="
 	@printf "%-20s %s\n" "freshrss:" "$$(curl -sf http://127.0.0.1:8088/ >/dev/null 2>&1 && echo "up" || echo "down")"
 	@printf "%-20s %s\n" "rssbridge:" "$$(curl -sf http://127.0.0.1:3000/ >/dev/null 2>&1 && echo "up" || echo "down")"
-	@printf "%-20s %s\n" "feeds:" "$$(curl -sf http://127.0.0.1:22041/ >/dev/null 2>&1 && echo "up" || echo "down")"
+	@printf "%-20s %s\n" "feeds:" "$$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:22041/ 2>/dev/null | grep -qE '200|403' && echo "up" || echo "down")"
 	@for svc in $(SERVICES); do \
 		if [ "$$svc" = "rssbridge" ] || [ "$$svc" = "feeds" ] || [ "$$svc" = "freshrss" ]; then \
 			continue; \

@@ -25,7 +25,9 @@ services:
     volumes:
       - ./data/freshrss:/var/www/FreshRSS/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:80/ | grep -q '<title>' || exit 1"]
+      # FreshRSS root redirects (302) before serving the login page, so just check
+      # that PHP can fetch the page and that it contains a <title> tag.
+      test: ["CMD-SHELL", "php -r 'exit(strpos(@file_get_contents(\"http://localhost:80/\"), \"<title>\") !== false ? 0 : 1);'"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -41,7 +43,8 @@ services:
     volumes:
       - ./data/rssbridge:/config
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:80/ || exit 1"]
+      # PHP is available, but curl is not. $$h escapes the $ for docker-compose.
+      test: ["CMD-SHELL", "php -r '$$h=get_headers(\"http://localhost:80/\"); if (!$$h || strpos($$h[0], \"200\") === false) exit(1);'"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -51,18 +54,17 @@ services:
   # Static server so FreshRSS can subscribe to the locally-generated email feed
   # at http://feeds/  (on the compose network). Host writes into ./data/feeds.
   feeds:
-    image: halverneus/static-file-server:latest
+    image: nginx:1.27-alpine
     container_name: infotriage-feeds
     restart: unless-stopped
     ports:
       - "127.0.0.1:22041:80"   # Atom feed server: localhost:22041
-    environment:
-      FOLDER: /web
-      PORT: "80"
     volumes:
-      - ./data/feeds:/web:ro
+      - ./data/feeds:/usr/share/nginx/html:ro
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:80/ || exit 1"]
+      # Nginx returns 403 when the directory has no index.html; that still means
+      # the server is up, so accept both 200 and 403 as healthy.
+      test: ["CMD-SHELL", "wget --spider -S http://localhost:80/ 2>&1 | grep -qE 'HTTP/[0-9.]+ (200|403)'"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -295,7 +297,7 @@ services:
       CLIENT_SECRET: ${GMAIL_OAUTH2_CLIENT_SECRET}
       REFRESH_TOKEN: ${GMAIL_OAUTH2_REFRESH_TOKEN}
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:3000/health || exit 1"]
+      test: ["CMD-SHELL", "node -e \"require('net').connect(3000, '127.0.0.1', () => process.exit(0)).on('error', () => process.exit(1))\""]
       interval: 10s
       timeout: 5s
       retries: 5
