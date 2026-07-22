@@ -31,6 +31,7 @@ from apps.brief.html_renderer import build_html
 from apps.brief.renderer import render_list
 from apps.brief.vault_writer import render_sab_obsidian
 from apps.brief.views import filter_rows
+from store import PostgresTranslationCache
 from contracts import setup_logging
 
 setup_logging("brief")
@@ -80,7 +81,7 @@ _ENRICHMENT_SQL = (
     "WHERE e.created_at >= %s ORDER BY e.score DESC"
 )
 
-_state: dict = {"store": None, "consumer_task": None}
+_state: dict = {"store": None, "consumer_task": None, "translation_cache": None}
 
 
 def _fetch_rows(since: datetime.datetime) -> list[dict]:
@@ -154,6 +155,7 @@ async def lifespan(app: FastAPI):
     blob_root = _P(os.environ.get("INFOTRIAGE_BLOB_ROOT", "data/blobs"))
     with PostgresStore(dsn=pg_dsn, blob_root=blob_root) as store:
         _state["store"] = store
+        _state["translation_cache"] = PostgresTranslationCache(store)
         if os.environ.get("BRIEF_CONSUME", "1") == "1":
             try:
                 from contracts import RabbitMQBus
@@ -227,7 +229,10 @@ async def sab(
             rows = filter_rows(rows, view, crp_params)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
-        return PlainTextResponse(render_list(rows), media_type="text/markdown")
+        return PlainTextResponse(
+            render_list(rows, cache=_state["translation_cache"]),
+            media_type="text/markdown",
+        )
     if mode is not None:
         raise HTTPException(status_code=422, detail="mode must be 'list'")
 
@@ -296,7 +301,9 @@ async def vault(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    md = await asyncio.to_thread(render_sab_obsidian, rows)
+    md = await asyncio.to_thread(
+        render_sab_obsidian, rows, cache=_state["translation_cache"]
+    )
     return PlainTextResponse(md, media_type="text/markdown")
 
 

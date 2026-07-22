@@ -26,7 +26,9 @@ from typing import Optional, cast
 # Import CCIR_ORDER from digest.py — never redefine here
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "triage"))
 from digest import CCIR_ORDER  # noqa: E402
+from apps.brief._i18n import _maybe_translate  # noqa: E402
 from apps.brief.clustering import cluster_items_in_memory, EnrichedItem  # noqa: E402
+from contracts import TranslationCache  # noqa: E402
 
 # LLM import for BLUF synthesis
 try:
@@ -47,6 +49,10 @@ _CNR_PRIORITY = {
     "I": 0,  # CAT I first
     "II": 1,  # CAT II second
 }
+
+
+# _maybe_translate is imported from apps.brief._i18n so the same helper is
+# shared with vault_writer.py.
 
 
 def _parse_ccir_display(title_map: dict[str, str], ccir: Optional[str]) -> str:
@@ -101,6 +107,7 @@ def _rows_to_enriched_items(rows: list[dict]) -> list[EnrichedItem]:
             why=r.get("why", ""),
             pmesii=r.get("pmesii"),
             tessoc=r.get("tessoc"),
+            lang=r.get("lang"),
             embedding=r.get("embedding"),
         )
         for i, r in enumerate(rows)
@@ -123,6 +130,7 @@ def _enriched_to_dicts(items: list[EnrichedItem]) -> list[dict]:
             "why": i.why,
             "pmesii": i.pmesii,
             "tessoc": i.tessoc,
+            "lang": i.lang,
             "embedding": i.embedding,
         }
         for i in items
@@ -154,6 +162,7 @@ def render_brief(
     ccir_order: list[tuple[str, str]] | None = None,
     *,
     cluster_threshold: float = 0.75,
+    cache: "TranslationCache | None" = None,
 ) -> str:
     """Produce SAB markdown: CNR CAT I first, then CCIR sections.
 
@@ -194,8 +203,9 @@ def render_brief(
                 else ""
             )
             flag = "🚩 " if any(i.get("cnr") == "I" for i in cl["items"]) else ""
+            title = _maybe_translate(lead.get("title", ""), lead, cache=cache)
             lines.append(
-                f"- {flag}**[{lead.get('score')}] {lead.get('title','')}**{tag}"
+                f"- {flag}**[{lead.get('score')}] {title}**{tag}"
                 f"  [les]({lead.get('url','')})"
             )
         lines.append("")
@@ -230,11 +240,17 @@ def render_brief(
                     f"  _({len(cl['items'])} kilder)_" if len(cl["items"]) > 1 else ""
                 )
                 flag = "🚩 " if any(i.get("cnr") == "I" for i in cl["items"]) else ""
-                why_str = f" · {lead.get('why', '')}" if lead.get("why") else ""
+                title = _maybe_translate(lead.get("title", ""), lead, cache=cache)
+                why_text = lead.get("why", "")
+                why_str = (
+                    f" · {_maybe_translate(why_text, lead, cache=cache)}"
+                    if why_text
+                    else ""
+                )
                 # Inline format (NOT digest.line(): it uses `why or title`,
                 # dropping the title whenever why is truthy).
                 lines.append(
-                    f"- {flag}**[{lead.get('score')}] {lead.get('title','')}**{why_str}{extra}"
+                    f"- {flag}**[{lead.get('score')}] {title}**{why_str}{extra}"
                     f"  [les]({lead.get('url','')})"
                 )
             lines.append("")
@@ -258,6 +274,8 @@ def render_brief(
 
 def render_list(
     enrichment_rows: list[dict],
+    *,
+    cache: "TranslationCache | None" = None,
 ) -> str:
     """Return markdown with items having score >= 8, sorted by score descending.
 
@@ -280,11 +298,13 @@ def render_list(
     for r in strict:
         flag = "🚩 " if r.get("cnr") == "I" else ""
         ccir_display = _parse_ccir_display(dict(CCIR_ORDER), r.get("ccir"))
+        title = _maybe_translate(r.get("title", ""), r, cache=cache)
+        why = _maybe_translate(r.get("why", ""), r, cache=cache)
         lines.append(
-            f"- {flag}**[{r['score']}] {r.get('title','')}**"
+            f"- {flag}**[{r['score']}] {title}**"
             f"  · {r.get('source','')}  ·  {ccir_display or 'none'}"
         )
-        lines.append(f"  - {r.get('why','')} — [les]({r.get('url','')})")
+        lines.append(f"  - {why} — [les]({r.get('url','')})")
 
     return "\n".join(lines)
 
@@ -390,6 +410,7 @@ def render_cluster(
     ccir_order: list[tuple[str, str]] | None = None,
     *,
     cluster_threshold: float = 0.75,
+    cache: "TranslationCache | None" = None,
 ) -> str:
     """Produce cluster markdown grouped by CCIR section.
 
@@ -435,8 +456,9 @@ def render_cluster(
                 else ""
             )
             flag = "🚩 " if any(i.get("cnr") == "I" for i in cl["items"]) else ""
+            title = _maybe_translate(lead.get("title", ""), lead, cache=cache)
             lines.append(
-                f"- {flag}**[{lead.get('score')}] {lead.get('title','')}**{tag}"
+                f"- {flag}**[{lead.get('score')}] {title}**{tag}"
                 f"  [les]({lead.get('url','')})"
             )
         lines.append("")
@@ -449,9 +471,9 @@ def render_cluster(
         lines.append("## Uten CCIR")
         for cl in _cluster_rows(no_ccir, threshold=cluster_threshold):
             lead = max(cl["items"], key=lambda i: i.get("score", 0))
+            title = _maybe_translate(lead.get("title", ""), lead, cache=cache)
             lines.append(
-                f"- **[{lead.get('score')}] {lead.get('title','')}**"
-                f"  [les]({lead.get('url','')})"
+                f"- **[{lead.get('score')}] {title}**" f"  [les]({lead.get('url','')})"
             )
         lines.append("")
 

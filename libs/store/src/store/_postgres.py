@@ -36,7 +36,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from pgvector.psycopg import register_vector  # Pitfall 1: NOT pgvector.psycopg2
 
-from contracts import Item
+from contracts import Item, TranslationCache
 
 from ._blob import get_blob as _get_blob
 from ._blob import put_blob as _put_blob
@@ -819,3 +819,57 @@ class PostgresStore:
             (op, table_name, item_id, Jsonb(details) if details is not None else None),
         )
         self._conn.commit()
+
+
+class PostgresTranslationCache:
+    """Postgres-backed implementation of contracts.TranslationCache.
+
+    Stores translations keyed by ``(text_hash, target_lang)`` in
+    ``infotriage.translation_cache``. Designed to be used inside the same
+    ``with PostgresStore(...)`` context as the caller so the underlying
+    psycopg3 connection is active.
+
+    Notes:
+        - ``put`` commits immediately so translations are persisted even when
+          the calling code holds the store open for a long time (e.g. a web
+          server lifespan).
+        - get/put are safe to call from asyncio.to_thread worker threads
+          because psycopg3 connections serialize operations internally.
+    """
+
+    def __init__(self, store: PostgresStore) -> None:
+        self._store = store
+
+    def get(self, text_hash: str, target_lang: str) -> str | None:
+        """Return cached translation, or None on miss."""
+        conn = self._store._conn
+        assert conn is not None, "PostgresStore must be used as a context manager"
+        row = conn.execute(
+            """
+            SELECT translation
+            FROM infotriage.translation_cache
+            WHERE text_hash = %s AND target_lang = %s
+            """,
+            (text_hash, target_lang),
+        ).fetchone()
+        conn.rollback()  # end read txn — avoid idle-in-transaction
+        if row is None:
+            return None
+        return cast(str, row["translation"])
+
+    def put(self, text_hash: str, target_lang: str, translation: str) -> None:
+        """Upsert a translation into the cache and commit."""
+        conn = self._store._conn
+        assert conn is not None, "PostgresStore must be used as a context manager"
+        conn.execute(
+            """
+            INSERT INTO infotriage.translation_cache
+                (text_hash, target_lang, translation)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (text_hash, target_lang) DO UPDATE SET
+                translation = EXCLUDED.translation,
+                updated_at = NOW()
+            """,
+            (text_hash, target_lang, translation),
+        )
+        conn.commit()

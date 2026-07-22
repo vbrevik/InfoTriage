@@ -12,15 +12,18 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from contracts import to_frontmatter
+from contracts import to_frontmatter, TranslationCache
+
+from apps.brief._i18n import _maybe_translate
+
+
+# Number of active entities to include in the store-backed Entity Graph note.
+ENTITY_GRAPH_ACTIVE_LIMIT = 500
 
 # Production email adapters signal email via the row's url scheme, not source:
 # gmail rows carry url=gmail://..., imap rows carry url=imap://... while their
 # source field holds the adapter/mailbox name (e.g. "gmail" or "Telegraph Ukraine").
 _EMAIL_URL_SCHEMES = ("imap://", "gmail://")
-
-# Number of active entities to include in the store-backed Entity Graph note.
-ENTITY_GRAPH_ACTIVE_LIMIT = 500
 
 
 def extract_entities(text: str, known_topics: Optional[list[str]] = None) -> list[str]:
@@ -73,7 +76,9 @@ def render_wikilinked(text: str, entities: list[str]) -> str:
     return result
 
 
-def write_item_obsidian(item: dict, vault_path: Path) -> Path:
+def write_item_obsidian(
+    item: dict, vault_path: Path, *, cache: "TranslationCache | None" = None
+) -> Path:
     """Write a single enrichment item to an Obsidian .md file.
 
     Args:
@@ -102,9 +107,14 @@ def write_item_obsidian(item: dict, vault_path: Path) -> Path:
     summary_wikilinked = render_wikilinked(summary, entities)
     why_wikilinked = render_wikilinked(why, entities)
 
+    # On-demand translation for non-no/en items (Phase 11 Wave 4)
+    title = _maybe_translate(item.get("title", ""), item, cache=cache)
+    summary_translated = _maybe_translate(summary_wikilinked, item, cache=cache)
+    why_translated = _maybe_translate(why_wikilinked, item, cache=cache)
+
     frontmatter = to_frontmatter(
         {
-            "title": item.get("title", ""),
+            "title": title,
             "date": item.get("ts", ""),
             "ccir": item.get("ccir", ""),
             "score": item.get("score", 0),
@@ -118,13 +128,13 @@ def write_item_obsidian(item: dict, vault_path: Path) -> Path:
     file_content = f"""{frontmatter}
 
 ## Summary
-{summary_wikilinked}
+{summary_translated}
 
 ## Source
 {item.get('source', '')} — [les]({item.get('url', '')})
 
 ## Why
-{why_wikilinked}
+{why_translated}
 
 ## Entities
 {', '.join(entities) if entities else '(ingen oppdaget)'}
@@ -139,7 +149,9 @@ def write_item_obsidian(item: dict, vault_path: Path) -> Path:
     return filepath
 
 
-def render_sab_obsidian(enrichment_rows: list[dict]) -> str:
+def render_sab_obsidian(
+    enrichment_rows: list[dict], *, cache: "TranslationCache | None" = None
+) -> str:
     """Render the Obsidian SAB projection markdown for the given rows.
 
     Args:
@@ -170,8 +182,12 @@ def render_sab_obsidian(enrichment_rows: list[dict]) -> str:
             entities = _entity_names(item)
             summary_wikilinked = render_wikilinked(summary, entities)
 
-            lines.append(f"- **[{item.get('score') or 0}] {item.get('title', '')}**")
-            lines.append(f"  - {summary_wikilinked}")
+            # On-demand translation for non-no/en items (Phase 11 Wave 4)
+            title = _maybe_translate(item.get("title", ""), item, cache=cache)
+            summary_translated = _maybe_translate(summary_wikilinked, item, cache=cache)
+
+            lines.append(f"- **[{item.get('score') or 0}] {title}**")
+            lines.append(f"  - {summary_translated}")
             lines.append(f"  - {item.get('source', '')} — [les]({item.get('url', '')})")
             if entities:
                 lines.append(f"  - **Emner**: {', '.join(entities)}")
@@ -185,6 +201,7 @@ def write_sab_obsidian(
     vault_path: Path,
     *,
     filename: str = "obsidian-sab.md",
+    cache: "TranslationCache | None" = None,
 ) -> Path:
     """Write a projection of the SAB (or summary) to Obsidian.
 
@@ -199,7 +216,7 @@ def write_sab_obsidian(
     vault_path.mkdir(parents=True, exist_ok=True)
     filepath = vault_path / filename
 
-    file_content = render_sab_obsidian(enrichment_rows)
+    file_content = render_sab_obsidian(enrichment_rows, cache=cache)
     tmp_path = filepath.with_suffix(".tmp")
     tmp_path.write_text(file_content, encoding="utf-8")
     os.replace(tmp_path, filepath)
@@ -224,7 +241,13 @@ def render_entity_graph(items: list[dict]) -> str:
             if not name:
                 continue
             node = graph.setdefault(
-                name, {"aliases": set(), "items": set(), "lang": e.get("lang") or "?", "type": e.get("type") or "MISC"}
+                name,
+                {
+                    "aliases": set(),
+                    "items": set(),
+                    "lang": e.get("lang") or "?",
+                    "type": e.get("type") or "MISC",
+                },
             )
             mention = e.get("mention")
             lang = e.get("lang") or "?"
@@ -328,6 +351,7 @@ def write_vault_digest(
     write_items: bool = True,
     sab_filename: str = "obsidian-sab.md",
     store=None,
+    cache: "TranslationCache | None" = None,
 ) -> list[Path]:
     """Write all high-extraction items to the vault.
 
@@ -374,13 +398,13 @@ def write_vault_digest(
     if write_items:
         for item in kept:
             try:
-                path = write_item_obsidian(item, vault_path)
+                path = write_item_obsidian(item, vault_path, cache=cache)
                 paths.append(path)
             except Exception as e:
                 print(f"Error writing item {item.get('item_id')}: {e}", flush=True)
 
     # Write SAB projection
-    write_sab_obsidian(kept, vault_path, filename=sab_filename)
+    write_sab_obsidian(kept, vault_path, filename=sab_filename, cache=cache)
     paths.append(vault_path / sab_filename)
 
     # Write the aggregated entity graph note. Prefer the store-backed graph

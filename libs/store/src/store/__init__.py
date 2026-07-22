@@ -12,12 +12,13 @@ Usage:
 
 from ._atom import render_atom
 from ._inmemory import InMemoryStore
-from ._postgres import PostgresStore
+from ._postgres import PostgresStore, PostgresTranslationCache
 from ._protocol import Store
 
 __all__ = [
     "Store",
     "PostgresStore",
+    "PostgresTranslationCache",
     "InMemoryStore",
     "render_atom",
 ]

@@ -11,13 +11,14 @@ import json
 import logging
 import os
 import sys
+from functools import partial
 from pathlib import Path
 
 from contracts import RabbitMQBus, SabPublished
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from store import PostgresStore  # noqa: E402
+from store import PostgresStore, PostgresTranslationCache  # noqa: E402
 from apps.brief.renderer import (  # noqa: E402
     render_brief,
     render_list,
@@ -112,18 +113,33 @@ async def process_verdict(
     cop_rows = filter_rows(enrichment_rows, "cop")
     cip_rows = filter_rows(enrichment_rows, "cip")
 
+    # Persistent translation cache backed by Postgres (Phase 11 Wave 4)
+    cache = PostgresTranslationCache(store)
+
     # Render all four outputs for default, COP, and CIP views
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     async def _render_view(rows: list[dict], suffix: str) -> dict[str, str]:
         """Render the four digest files for a given row set."""
         brief_md, cluster_md, list_md, bluf_md = await asyncio.gather(
-            asyncio.to_thread(render_brief, rows, cluster_threshold=cluster_threshold),
             asyncio.to_thread(
-                render_cluster, rows, cluster_threshold=cluster_threshold
+                partial(
+                    render_brief,
+                    rows,
+                    cluster_threshold=cluster_threshold,
+                    cache=cache,
+                )
             ),
-            asyncio.to_thread(render_list, rows),
-            asyncio.to_thread(_render_bluf_all_sections, rows),
+            asyncio.to_thread(
+                partial(
+                    render_cluster,
+                    rows,
+                    cluster_threshold=cluster_threshold,
+                    cache=cache,
+                )
+            ),
+            asyncio.to_thread(partial(render_list, rows, cache=cache)),
+            asyncio.to_thread(partial(_render_bluf_all_sections, rows)),
         )
         return {
             f"brief{suffix}.md": brief_md,
@@ -155,6 +171,7 @@ async def process_verdict(
         write_items=True,
         sab_filename="obsidian-sab.md",
         store=store,
+        cache=cache,
     )
     await asyncio.to_thread(
         write_vault_digest,
@@ -163,6 +180,7 @@ async def process_verdict(
         write_items=False,
         sab_filename="obsidian-sab-cop.md",
         store=store,
+        cache=cache,
     )
     await asyncio.to_thread(
         write_vault_digest,
@@ -171,6 +189,7 @@ async def process_verdict(
         write_items=False,
         sab_filename="obsidian-sab-cip.md",
         store=store,
+        cache=cache,
     )
     log.info("wrote Obsidian vault projections (default, cop, cip)")
 

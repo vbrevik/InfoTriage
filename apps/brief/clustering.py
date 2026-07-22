@@ -42,7 +42,7 @@ class EnrichedItem:
     Fields match the enrichment row keys defined in the store contract:
       item_id, ccir, cnr, score, bucket, why, pmesii, tessoc
     Plus article fields:
-      title, summary, source, url
+      title, summary, source, url, lang
     Plus embedding from infotriage.embeddings table.
     """
 
@@ -58,7 +58,8 @@ class EnrichedItem:
     why: str
     pmesii: str | None
     tessoc: str | None
-    embedding: list[float] | None
+    lang: str | None = None
+    embedding: list[float] | None = None
 
 
 def _as_list(vec) -> list[float]:
@@ -129,7 +130,7 @@ def cluster_items(
     # within the time window. Joined so we get all fields in one query.
     query = """
         SELECT e.item_id, e.ccir, e.cnr, e.score, e.bucket, e.why,
-               e.pmesii, e.tessoc,
+               e.pmesii, e.tessoc, a.lang,
                a.title, a.summary, a.source, a.url
         FROM infotriage.enrichment e
         JOIN infotriage.articles a ON a.id = e.item_id
@@ -184,6 +185,7 @@ def cluster_items(
             why=row["why"],
             pmesii=row["pmesii"],
             tessoc=row["tessoc"],
+            lang=row.get("lang"),
             embedding=emb,
         )
         cid = (row["ccir"] or "none").upper()
