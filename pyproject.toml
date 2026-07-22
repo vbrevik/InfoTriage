@@ -19,6 +19,12 @@ markers = [
     "rabbitmq: requires RabbitMQ :22001 to be running",
     "integration: used by the superclaude pytest plugin for integration tests",
 ]
+filterwarnings = [
+    # Starlette 0.38.x still imports the legacy `multipart` package name.
+    # This is a transitive dependency of FastAPI; suppress the upstream noise.
+    # Remove once FastAPI/Starlette no longer triggers this warning.
+    "ignore::PendingDeprecationWarning:starlette.formparsers",
+]
 asyncio_default_fixture_loop_scope = "function"
 
 [tool.mypy]
