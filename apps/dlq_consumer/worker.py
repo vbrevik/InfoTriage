@@ -137,7 +137,9 @@ class DLQConsumer:
         async with message.process():
             await self._handle_message(message)
 
-    async def _handle_message(self, message: aio_pika.abc.AbstractIncomingMessage) -> None:
+    async def _handle_message(
+        self, message: aio_pika.abc.AbstractIncomingMessage
+    ) -> None:
         try:
             body = json.loads(message.body.decode())
         except Exception:
@@ -253,18 +255,27 @@ class DLQConsumer:
                 "DLQ_DEPTH_CRITICAL_N", str(DEPTH_PROBE_DEFAULT_THRESHOLD_N)
             )
         )
-        mgmt_url = str(mgmt_url or os.environ.get(
-            "RABBITMQ_MGMT_URL",
-            _default_mgmt_url(self.amqp_url),
-        ))
-        mgmt_user = str(mgmt_user or os.environ.get(
-            "RABBITMQ_MGMT_USER",
-            os.environ.get("RABBITMQ_DEFAULT_USER", "infotriage"),
-        ))
-        mgmt_pass = str(mgmt_pass or os.environ.get(
-            "RABBITMQ_MGMT_PASS",
-            os.environ.get("RABBITMQ_DEFAULT_PASS", "infotriage_rmq"),
-        ))
+        mgmt_url = str(
+            mgmt_url
+            or os.environ.get(
+                "RABBITMQ_MGMT_URL",
+                _default_mgmt_url(self.amqp_url),
+            )
+        )
+        mgmt_user = str(
+            mgmt_user
+            or os.environ.get(
+                "RABBITMQ_MGMT_USER",
+                os.environ.get("RABBITMQ_DEFAULT_USER", "infotriage"),
+            )
+        )
+        mgmt_pass = str(
+            mgmt_pass
+            or os.environ.get(
+                "RABBITMQ_MGMT_PASS",
+                os.environ.get("RABBITMQ_DEFAULT_PASS", "infotriage_rmq"),
+            )
+        )
         mgmt_vhost = str(mgmt_vhost or os.environ.get("RABBITMQ_MGMT_VHOST", "/"))
 
         # The default vhost "/" MUST be URL-encoded as %2F per the RabbitMQ
@@ -330,7 +341,9 @@ class DLQConsumer:
             if message is None:
                 break
             async with message.process():
-                original_exchange, original_routing_key = self._extract_x_death_info(message)
+                original_exchange, original_routing_key = self._extract_x_death_info(
+                    message
+                )
                 if not original_routing_key:
                     log.error("Cannot replay message without original routing key")
                     continue

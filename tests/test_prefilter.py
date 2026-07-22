@@ -1,4 +1,5 @@
 """tests/test_prefilter.py — Phase 9 CCIR pre-filter integration tests."""
+
 from __future__ import annotations
 
 import asyncio
@@ -21,7 +22,9 @@ class FakeBus:
         self.published: list[dict] = []
 
     async def publish(self, routing_key: str, item_id: str, payload: dict) -> None:
-        self.published.append({"routing_key": routing_key, "item_id": item_id, "payload": payload})
+        self.published.append(
+            {"routing_key": routing_key, "item_id": item_id, "payload": payload}
+        )
 
 
 @pytest.fixture
@@ -198,7 +201,9 @@ def test_prefilter_threshold_configurable(store, bus):
     env_orig = os.environ.get("INFOTRIAGE_PREFILTER_THRESHOLD")
     try:
         os.environ["INFOTRIAGE_PREFILTER_THRESHOLD"] = "0.9"
-        asyncio.run(process_item(item.id, store, bus, embed=lambda text: VEC, score=score))
+        asyncio.run(
+            process_item(item.id, store, bus, embed=lambda text: VEC, score=score)
+        )
         assert len(score_calls) == 1
     finally:
         if env_orig is not None:
@@ -232,7 +237,11 @@ def test_prefilter_threshold_above_similarity_skips(store, bus):
     env_orig = os.environ.get("INFOTRIAGE_PREFILTER_THRESHOLD")
     try:
         os.environ["INFOTRIAGE_PREFILTER_THRESHOLD"] = "0.9"
-        asyncio.run(process_item(item.id, store, bus, embed=lambda text: [0.0, 1.0], score=score))
+        asyncio.run(
+            process_item(
+                item.id, store, bus, embed=lambda text: [0.0, 1.0], score=score
+            )
+        )
         assert len(score_calls) == 0
     finally:
         if env_orig is not None:

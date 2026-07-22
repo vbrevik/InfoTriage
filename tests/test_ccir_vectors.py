@@ -1,4 +1,5 @@
 """tests/test_ccir_vectors.py — Phase 9 CCIR vectors and recall search."""
+
 from __future__ import annotations
 
 import datetime
@@ -9,6 +10,7 @@ import pytest
 from store import InMemoryStore, PostgresStore
 
 from tests.conftest import db_live, pg_store  # noqa: F401
+
 
 @pytest.fixture
 def inmemory_store(tmp_path):
@@ -73,7 +75,15 @@ def test_recall_items_skips_by_default(inmemory_store):
     store.put_embedding(item.id, [1.0] * 1024)
     store.put_enrichment(
         item.id,
-        {"ccir": "PIR-2", "cnr": "II", "score": 6, "bucket": "skip", "why": "", "pmesii": "Military", "tessoc": "Espionage"},
+        {
+            "ccir": "PIR-2",
+            "cnr": "II",
+            "score": 6,
+            "bucket": "skip",
+            "why": "",
+            "pmesii": "Military",
+            "tessoc": "Espionage",
+        },
     )
     results = store.recall_items([1.0] * 1024)
     assert results == []
@@ -100,7 +110,15 @@ def test_recall_items_filters_by_ccir(inmemory_store):
         store.put_embedding(item.id, [float(i + 1)] * 1024)
         store.put_enrichment(
             item.id,
-            {"ccir": ccir, "cnr": "II", "score": 6, "bucket": "keep", "why": "", "pmesii": "Military", "tessoc": "Espionage"},
+            {
+                "ccir": ccir,
+                "cnr": "II",
+                "score": 6,
+                "bucket": "keep",
+                "why": "",
+                "pmesii": "Military",
+                "tessoc": "Espionage",
+            },
         )
 
     results = store.recall_items([1.0] * 1024, ccir="PIR-1")
@@ -130,7 +148,15 @@ def test_recall_items_filters_by_since(inmemory_store):
         store.put_embedding(item.id, [1.0] * 1024)
         store.put_enrichment(
             item.id,
-            {"ccir": "PIR-1", "cnr": "II", "score": 6, "bucket": "keep", "why": "", "pmesii": "Military", "tessoc": "Espionage"},
+            {
+                "ccir": "PIR-1",
+                "cnr": "II",
+                "score": 6,
+                "bucket": "keep",
+                "why": "",
+                "pmesii": "Military",
+                "tessoc": "Espionage",
+            },
         )
 
     results = store.recall_items([1.0] * 1024, since=new)
@@ -140,7 +166,9 @@ def test_recall_items_filters_by_since(inmemory_store):
 
 def test_audit_write(inmemory_store):
     store = inmemory_store
-    store.audit_write(op="pre_filter_skip", table_name="enrichment", item_id="x", details={"foo": 1})
+    store.audit_write(
+        op="pre_filter_skip", table_name="enrichment", item_id="x", details={"foo": 1}
+    )
     assert len(store._audit) == 1
     assert store._audit[0]["op"] == "pre_filter_skip"
     assert store._audit[0]["details"] == {"foo": 1}
@@ -200,7 +228,15 @@ def test_recall_items_db_live(pg_store):
     pg_store.put_embedding(item.id, _unit())
     pg_store.put_enrichment(
         item.id,
-        {"ccir": "PIR-2", "cnr": "II", "score": 6, "bucket": "keep", "why": "", "pmesii": "Military", "tessoc": "Espionage"},
+        {
+            "ccir": "PIR-2",
+            "cnr": "II",
+            "score": 6,
+            "bucket": "keep",
+            "why": "",
+            "pmesii": "Military",
+            "tessoc": "Espionage",
+        },
     )
     results = pg_store.recall_items(_unit(), ccir="PIR-2")
     assert len(results) == 1
@@ -210,7 +246,9 @@ def test_recall_items_db_live(pg_store):
 
 @db_live
 def test_audit_write_db_live(pg_store):
-    pg_store.audit_write(op="pre_filter_skip", table_name="enrichment", item_id="x", details={"foo": 1})
+    pg_store.audit_write(
+        op="pre_filter_skip", table_name="enrichment", item_id="x", details={"foo": 1}
+    )
     row = pg_store._conn.execute(
         "SELECT op, table_name, item_id, details FROM infotriage.audit WHERE item_id = %s",
         ("x",),

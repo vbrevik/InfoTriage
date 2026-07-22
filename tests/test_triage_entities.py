@@ -78,8 +78,12 @@ def test_extract_entities_llm_error_returns_empty():
 
 
 def test_extract_entities_malformed_json_returns_empty():
-    assert extract_entities("x", "en", lambda m, max_tokens=800: "not json at all") == []
-    assert extract_entities("x", "en", lambda m, max_tokens=800: '{"name": "NATO"}') == []
+    assert (
+        extract_entities("x", "en", lambda m, max_tokens=800: "not json at all") == []
+    )
+    assert (
+        extract_entities("x", "en", lambda m, max_tokens=800: '{"name": "NATO"}') == []
+    )
 
 
 def test_parse_entities_strips_code_fences():
@@ -96,11 +100,11 @@ def test_parse_entities_ignores_prose_around_array():
 def test_parse_entities_coerces_unknown_type_and_dedups():
     raw = json.dumps(
         [
-            {"name": "NATO", "type": "WEAPON"},   # unknown -> MISC
-            {"name": "nato", "type": "ORG"},      # dup (case-insensitive) -> dropped
-            {"name": "", "type": "ORG"},          # empty name -> dropped
-            {"type": "ORG"},                       # no name -> dropped
-            "garbage",                             # non-dict -> dropped
+            {"name": "NATO", "type": "WEAPON"},  # unknown -> MISC
+            {"name": "nato", "type": "ORG"},  # dup (case-insensitive) -> dropped
+            {"name": "", "type": "ORG"},  # empty name -> dropped
+            {"type": "ORG"},  # no name -> dropped
+            "garbage",  # non-dict -> dropped
         ]
     )
     out = _parse_entities(raw)
@@ -213,7 +217,9 @@ def test_resolve_entities_stores_and_links():
             return [0.0, 1.0] + [0.0] * 1022
         return [0.5] * 1024
 
-    resolve_entities("item-1", "NATO meets in Oslo.", "en", store, fake_embed, fake_chat)
+    resolve_entities(
+        "item-1", "NATO meets in Oslo.", "en", store, fake_embed, fake_chat
+    )
 
     assert len(store.entities) == 2
     assert len(store.links) == 2
@@ -235,7 +241,9 @@ def test_resolve_entities_links_similar_cross_language_entity():
             return [0.0, 1.0] + [0.0] * 1022
         return [0.5] * 1024
 
-    resolve_entities("item-en", "NATO summit in Oslo.", "en", store, fake_embed, fake_chat)
+    resolve_entities(
+        "item-en", "NATO summit in Oslo.", "en", store, fake_embed, fake_chat
+    )
     assert len(store.entities) == 2
 
     resolve_entities("item-ru", "НАТО в Осло.", "ru", store, fake_embed, fake_chat)

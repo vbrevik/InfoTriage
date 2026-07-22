@@ -216,7 +216,9 @@ def test_get_all_entities_aggregates_aliases_and_links(store):
     entity_id = store.put_entity(
         name="NATO", name_norm="nato", lang="en", type="ORG", embedding=None
     )
-    store.put_entity(name="Oslo", name_norm="oslo", lang="en", type="GPE", embedding=None)
+    store.put_entity(
+        name="Oslo", name_norm="oslo", lang="en", type="GPE", embedding=None
+    )
     store.link_entity(entity_id, item1.id, "NATO", "en")
     store.link_entity(entity_id, item2.id, "NATO", "en")
     store.link_entity(entity_id, item2.id, "НАТО", "ru")

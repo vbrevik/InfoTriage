@@ -1,4 +1,5 @@
 """tests/test_build_ccir_vectors.py — build_ccir_vectors parser tests."""
+
 from __future__ import annotations
 
 import importlib.util

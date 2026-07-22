@@ -416,7 +416,12 @@ def test_entity_resolution_failure_does_not_block_verdict(store, bus):
 
     asyncio.run(
         process_item(
-            item.id, store, bus, embed=lambda text: VEC_A, score=score, ner_chat=boom_ner
+            item.id,
+            store,
+            bus,
+            embed=lambda text: VEC_A,
+            score=score,
+            ner_chat=boom_ner,
         )
     )
 

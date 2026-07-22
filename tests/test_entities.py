@@ -117,7 +117,7 @@ class TestExtractEntities:
 
     def test_truncates_text_to_max_chars(self):
         """extract_entities caps the prompt at _MAX_NER_CHARS."""
-        chat = Mock(return_value='[]')
+        chat = Mock(return_value="[]")
         extract_entities("A " * 10000, "en", chat)
         prompt = chat.call_args[0][0][0]["content"]
         # Instruction text ~500 chars + "Text:\n" + truncated 6000 chars.
@@ -208,10 +208,12 @@ class TestResolveEntities:
 
     def _chat(self, _messages, max_tokens=800):
         """Mock LLM that returns a fixed entity set."""
-        return json.dumps([
-            {"name": "NATO", "type": "ORG"},
-            {"name": "Putin", "type": "PER"},
-        ])
+        return json.dumps(
+            [
+                {"name": "NATO", "type": "ORG"},
+                {"name": "Putin", "type": "PER"},
+            ]
+        )
 
     def _embed(self, text):
         """Mock embedder: deterministic vector derived from text hash."""
@@ -279,9 +281,7 @@ class TestResolveEntities:
 
     def test_ignores_empty_entity_names(self, store):
         chat = Mock(return_value=json.dumps([{"name": "", "type": "ORG"}]))
-        resolve_entities(
-            "item-001", "text", "en", store, self._embed, chat
-        )
+        resolve_entities("item-001", "text", "en", store, self._embed, chat)
         links = store.get_entity_links("item-001")
         assert len(links) == 0
 
@@ -289,9 +289,7 @@ class TestResolveEntities:
         """resolve_entities should log but not raise on LLM/embed failures."""
         chat = Mock(side_effect=RuntimeError("boom"))
         # Should NOT raise.
-        resolve_entities(
-            "item-001", "text", "en", store, self._embed, chat
-        )
+        resolve_entities("item-001", "text", "en", store, self._embed, chat)
         # No crash — that's the test.
 
     def test_resolve_entities_async_propagates(self):
@@ -306,9 +304,7 @@ class TestResolveEntities:
             return [v / mag for v in vec]
 
         asyncio.run(
-            resolve_entities_async(
-                "item-001", "async text", "en", store, _embed, chat
-            )
+            resolve_entities_async("item-001", "async text", "en", store, _embed, chat)
         )
         links = store.get_entity_links("item-001")
         assert len(links) == 1

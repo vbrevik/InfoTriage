@@ -122,7 +122,9 @@ async def process_item(
     vec = cast(list[float], await asyncio.to_thread(embed, text))
 
     # Phase 9: CCIR pre-filter — skip clearly off-topic items before dedup/score.
-    _prefilter_threshold = float(os.environ.get("INFOTRIAGE_PREFILTER_THRESHOLD", "0.50"))
+    _prefilter_threshold = float(
+        os.environ.get("INFOTRIAGE_PREFILTER_THRESHOLD", "0.50")
+    )
     ccir_lookup_failed = False
     best_ccir: dict | None = None
     try:
@@ -170,7 +172,8 @@ async def process_item(
             }
         else:
             result = await asyncio.to_thread(
-                score, {"title": item.title, "source": item.source, "summary": item.summary}
+                score,
+                {"title": item.title, "source": item.source, "summary": item.summary},
             )
             fields = {
                 "ccir": result.get("ccir"),
@@ -211,16 +214,16 @@ async def process_item(
                 },
             )
         except Exception as exc:
-            log.warning("pre-filter audit write failed for item_id=%s: %s", item_id, exc)
+            log.warning(
+                "pre-filter audit write failed for item_id=%s: %s", item_id, exc
+            )
 
     # Phase 8: extract, embed, and link entities to this item.
     # This is best-effort: entity-linking failures (including timeouts) are
     # logged but must not prevent the verdict.ready event from being published.
     # A timeout guard ensures a hung LLM NER call cannot block the scoring
     # pipeline indefinitely (ADR-004, R5 prohibition).
-    _ENTITY_NER_TIMEOUT = float(
-        os.environ.get("INFOTRIAGE_ENTITY_NER_TIMEOUT", "15")
-    )
+    _ENTITY_NER_TIMEOUT = float(os.environ.get("INFOTRIAGE_ENTITY_NER_TIMEOUT", "15"))
     try:
         entity_text = item.title + " " + (item.summary or "")
         await asyncio.wait_for(
@@ -242,9 +245,15 @@ async def process_item(
         event="verdict.ready",
         item_id=item_id,
         ccir=cast("str | None", fields.get("ccir")),
-        cnr=cast(Literal["I", "II", "Routine"], map_cnr(cast(str, fields.get("cnr") or "none"))),
+        cnr=cast(
+            Literal["I", "II", "Routine"],
+            map_cnr(cast(str, fields.get("cnr") or "none")),
+        ),
         score=cast(int, fields.get("score", 0)),
-        bucket=cast(Literal["keep", "maybe", "skip"], map_bucket(cast(str, fields.get("bucket") or "skip"))),
+        bucket=cast(
+            Literal["keep", "maybe", "skip"],
+            map_bucket(cast(str, fields.get("bucket") or "skip")),
+        ),
         why=cast(str, fields.get("why") or ""),
         ts=datetime.datetime.now(tz=datetime.timezone.utc),
     )

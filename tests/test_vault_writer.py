@@ -375,7 +375,12 @@ def test_render_entity_graph_aggregates_aliases_and_counts():
             "item_id": "2",
             "entities": [
                 {"name": "NATO", "mention": "NATO", "lang": "no", "type": "ORG"},
-                {"name": "NATO", "mention": "NATO", "lang": "en", "type": "ORG"},  # dup alias
+                {
+                    "name": "NATO",
+                    "mention": "NATO",
+                    "lang": "en",
+                    "type": "ORG",
+                },  # dup alias
             ],
         },
     ]
@@ -404,13 +409,20 @@ def test_render_entity_graph_empty():
 
 def test_render_entity_graph_skips_nameless_links():
     """Entity links without a name are ignored (no crash, no empty section)."""
-    md = render_entity_graph([{"item_id": "1", "entities": [{"mention": "x", "lang": "en"}]}])
+    md = render_entity_graph(
+        [{"item_id": "1", "entities": [{"mention": "x", "lang": "en"}]}]
+    )
     assert "No entities linked yet" in md
 
 
 def test_write_entity_graph_writes_file(temp_vault):
     """write_entity_graph produces Entity Graph.md in the vault."""
-    items = [{"item_id": "1", "entities": [{"name": "NATO", "mention": "NATO", "lang": "en"}]}]
+    items = [
+        {
+            "item_id": "1",
+            "entities": [{"name": "NATO", "mention": "NATO", "lang": "en"}],
+        }
+    ]
     path = write_entity_graph(items, temp_vault)
     assert path == temp_vault / "Entity Graph.md"
     assert path.exists()
