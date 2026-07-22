@@ -135,9 +135,10 @@ def test_init_schema_idempotent(tmp_path):
 
 @db_live
 def test_all_tables_exist(pg_store):
-    """All 7 infotriage tables must be present after init_schema (R2).
+    """All infotriage tables must be present after init_schema (R2).
 
-    Expected: articles, audit, ccir, embeddings, enrichment, entities, entity_links.
+    Expected: articles, audit, ccir, ccir_vectors, embeddings, enrichment,
+    entities, entity_links, translation_cache.
     """
     rows = pg_store._conn.execute(
         "SELECT table_name FROM information_schema.tables "
@@ -153,6 +154,7 @@ def test_all_tables_exist(pg_store):
         "enrichment",
         "entities",
         "entity_links",
+        "translation_cache",
     }
     assert tables == expected, f"Expected {sorted(expected)}, got {sorted(tables)}"
 

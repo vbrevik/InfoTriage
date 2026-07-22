@@ -59,7 +59,7 @@ def pg_store(tmp_path):
     with psycopg.connect(dsn, autocommit=True) as conn:
         conn.execute(
             "TRUNCATE infotriage.entity_links, infotriage.embeddings, infotriage.ccir_vectors, "
-            "infotriage.enrichment, infotriage.ccir, infotriage.audit, "
+            "infotriage.enrichment, infotriage.ccir, infotriage.audit, infotriage.translation_cache, "
             "infotriage.articles, infotriage.entities RESTART IDENTITY"
         )
     with PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs") as store:
