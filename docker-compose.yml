@@ -220,6 +220,8 @@ services:
       CLUSTER_THRESHOLD: ${CLUSTER_THRESHOLD:-0.75}
       BRIEF_WINDOW_HOURS: ${BRIEF_WINDOW_HOURS:-24}
       VAULT_INCLUDE_EMAIL: ${VAULT_INCLUDE_EMAIL:-1}
+      TRANSLATION_ENABLED: ${TRANSLATION_ENABLED:-0}
+      TRANSLATION_TARGET_LANG: ${TRANSLATION_TARGET_LANG:-no}
       # NOT ${LLM_BASE_URL:-...}: .env's LLM_BASE_URL=127.0.0.1 is for host-side scripts;
       # inside the container that resolves to the container itself (see triage note).
       LLM_BASE_URL: http://host.docker.internal:8600/v1   # host LLM router: Spark primary / oMLX fallback (embeddings->oMLX) — ADR-004, local only
@@ -260,6 +262,8 @@ services:
       INFOTRIAGE_PG_DSN: ${INFOTRIAGE_PG_DSN:-postgresql://infotriage:infotriage_dev@postgres:5432/infotriage}
       INFOTRIAGE_AMQP_DSN: ${INFOTRIAGE_AMQP_DSN:-amqp://infotriage:infotriage_rmq@rabbitmq:5672}
       INFOTRIAGE_BLOB_ROOT: /data/blobs
+      INFOTRIAGE_YOUTUBE_TRANSCRIBE: ${INFOTRIAGE_YOUTUBE_TRANSCRIBE:-0}
+      INFOTRIAGE_WHISPER_MODEL: ${INFOTRIAGE_WHISPER_MODEL:-tiny}
     volumes:
       - ./data:/data
       - ./data/feeds:/app/data/feeds   # writable: ingest-youtube writes Atom XML for FreshRSS
