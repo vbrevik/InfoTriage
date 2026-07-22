@@ -12,3 +12,5 @@ feedgen>=0.3.1
 # contracts.setup_logging is invoked at module level; json-log-formatter is a
 # contracts runtime dep that's stripped by --no-deps in the Dockerfile. (Phase 7)
 json-log-formatter>=1.1
+# Local, offline audio transcription (ADR-004). Requires ffmpeg at runtime.
+faster-whisper>=1.0.0

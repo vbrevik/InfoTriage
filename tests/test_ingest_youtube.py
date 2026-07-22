@@ -263,3 +263,167 @@ def test_blob_dedup_distinct_content_distinct_files(tmp_path: pathlib.Path) -> N
     assert hash_a != hash_b, "distinct content must produce distinct hashes"
     blob_files = [f for f in (tmp_path / "blobs").rglob("*") if f.is_file()]
     assert len(blob_files) == 2, f"expected 2 blob files, got {len(blob_files)}"
+
+
+# ---------------------------------------------------------------------------
+# Wave 5: local audio transcription path (mocked backend)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_ingest_transcribe_path(tmp_path: pathlib.Path, monkeypatch) -> None:
+    """Per-channel transcribe:true routes audio through _download_audio + _transcribe_audio."""
+    import youtube_ingest
+
+    blob_root = tmp_path / "blobs"
+    atom_dir = tmp_path / "feeds"
+    store = InMemoryStore(blob_root=blob_root)
+    bus = _ClosableInMemoryBus()
+
+    channels = [
+        {
+            "channel": "https://youtube.com/@test",
+            "max_n": 3,
+            "name": "TestChannel",
+            "transcribe": True,
+        }
+    ]
+    monkeypatch.setattr(youtube_ingest, "load_channels", lambda: channels)
+    monkeypatch.setattr(youtube_ingest, "build_store", lambda: store)
+    monkeypatch.setattr(youtube_ingest, "build_bus", lambda: bus)
+    monkeypatch.setattr(
+        youtube_ingest,
+        "yt_dlp_list",
+        lambda ch, max_n: [("vid1", "Video One")],
+    )
+    monkeypatch.setattr(youtube_ingest, "OUT_DIR", str(atom_dir))
+
+    # Mock the heavy audio/STT steps so the test needs no ffmpeg/whisper deps.
+    monkeypatch.setattr(
+        youtube_ingest, "_download_audio", lambda video_id: ("/tmp", "/tmp/vid1.mp3")
+    )
+    monkeypatch.setattr(
+        youtube_ingest,
+        "_transcribe_audio",
+        lambda audio_path, model_name="tiny": "This is the mocked transcript.",
+    )
+
+    await youtube_ingest.ingest()
+
+    items = store.list_items()
+    assert len(items) == 1
+    assert items[0].body_ref is not None, "body_ref must be set"
+    assert (
+        store.get_blob(items[0].body_ref) == b"This is the mocked transcript."
+    ), "blob must contain the transcript text"
+
+    # The transcript is also surfaced in the Atom summary.
+    atom_files = list(atom_dir.glob("youtube-*.xml"))
+    assert len(atom_files) == 1
+    assert "This is the mocked transcript." in atom_files[0].read_text()
+
+
+@pytest.mark.asyncio
+async def test_ingest_transcribe_failure_falls_back_to_stub(
+    tmp_path: pathlib.Path, monkeypatch
+) -> None:
+    """When the STT backend fails, ingest continues and stores a fallback stub."""
+    import youtube_ingest
+
+    blob_root = tmp_path / "blobs"
+    atom_dir = tmp_path / "feeds"
+    store = InMemoryStore(blob_root=blob_root)
+    bus = _ClosableInMemoryBus()
+
+    channels = [
+        {
+            "channel": "https://youtube.com/@test",
+            "max_n": 3,
+            "name": "TestChannel",
+            "transcribe": True,
+        }
+    ]
+    monkeypatch.setattr(youtube_ingest, "load_channels", lambda: channels)
+    monkeypatch.setattr(youtube_ingest, "build_store", lambda: store)
+    monkeypatch.setattr(youtube_ingest, "build_bus", lambda: bus)
+    monkeypatch.setattr(
+        youtube_ingest,
+        "yt_dlp_list",
+        lambda ch, max_n: [("vid1", "Video One")],
+    )
+    monkeypatch.setattr(youtube_ingest, "OUT_DIR", str(atom_dir))
+
+    # Simulate a download/transcription failure.
+    monkeypatch.setattr(youtube_ingest, "_download_audio", lambda video_id: None)
+
+    await youtube_ingest.ingest()
+
+    items = store.list_items()
+    assert len(items) == 1
+    assert items[0].body_ref is not None
+    blob_bytes = store.get_blob(items[0].body_ref)
+    assert (
+        b"transcription failed" in blob_bytes
+    ), "fallback stub must be stored when transcription fails"
+
+
+def test_transcribe_default_env_var(monkeypatch) -> None:
+    """_transcribe_default reads INFOTRIAGE_YOUTUBE_TRANSCRIBE at call time."""
+    import youtube_ingest
+
+    monkeypatch.setenv("INFOTRIAGE_YOUTUBE_TRANSCRIBE", "1")
+    assert youtube_ingest._transcribe_default() is True
+    monkeypatch.setenv("INFOTRIAGE_YOUTUBE_TRANSCRIBE", "false")
+    assert youtube_ingest._transcribe_default() is False
+    monkeypatch.delenv("INFOTRIAGE_YOUTUBE_TRANSCRIBE", raising=False)
+    assert youtube_ingest._transcribe_default() is False
+
+
+def test_whisper_model_env_var(monkeypatch) -> None:
+    """_whisper_model reads INFOTRIAGE_WHISPER_MODEL at call time, defaulting to tiny."""
+    import youtube_ingest
+
+    monkeypatch.setenv("INFOTRIAGE_WHISPER_MODEL", "base")
+    assert youtube_ingest._whisper_model() == "base"
+    monkeypatch.delenv("INFOTRIAGE_WHISPER_MODEL", raising=False)
+    assert youtube_ingest._whisper_model() == "tiny"
+
+
+@pytest.mark.asyncio
+async def test_ingest_transcribe_env_var_enables_transcription(
+    tmp_path: pathlib.Path, monkeypatch
+) -> None:
+    """Global INFOTRIAGE_YOUTUBE_TRANSCRIBE=1 enables transcription without per-channel flag."""
+    import youtube_ingest
+
+    blob_root = tmp_path / "blobs"
+    atom_dir = tmp_path / "feeds"
+    store = InMemoryStore(blob_root=blob_root)
+    bus = _ClosableInMemoryBus()
+
+    # No per-channel "transcribe" key — the env var should turn transcription on.
+    monkeypatch.setattr(youtube_ingest, "load_channels", lambda: _test_channels())
+    monkeypatch.setattr(youtube_ingest, "build_store", lambda: store)
+    monkeypatch.setattr(youtube_ingest, "build_bus", lambda: bus)
+    monkeypatch.setattr(
+        youtube_ingest,
+        "yt_dlp_list",
+        lambda ch, max_n: [("vid1", "Video One")],
+    )
+    monkeypatch.setattr(youtube_ingest, "OUT_DIR", str(atom_dir))
+    monkeypatch.setenv("INFOTRIAGE_YOUTUBE_TRANSCRIBE", "1")
+    monkeypatch.setattr(
+        youtube_ingest, "_download_audio", lambda video_id: ("/tmp", "/tmp/vid1.mp3")
+    )
+    monkeypatch.setattr(
+        youtube_ingest,
+        "_transcribe_audio",
+        lambda audio_path, model_name="tiny": "Env-enabled transcript.",
+    )
+
+    await youtube_ingest.ingest()
+
+    items = store.list_items()
+    assert len(items) == 1
+    assert items[0].body_ref is not None
+    assert store.get_blob(items[0].body_ref) == b"Env-enabled transcript."

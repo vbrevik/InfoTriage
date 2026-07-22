@@ -7,33 +7,77 @@ Produces DUAL output per channel run:
   2. data/feeds/youtube-<slug>.xml Atom feed → FreshRSS river-browsing (preserved
      from yt_to_atom.py; OUT_DIR bind-mounted by docker-compose Plan 06 stanza).
 
-Transcription is FORCED to the stub path — real transcription requires macOS Metal
-and is never available in the Linux container. The transcribe() function always
-returns a stub string regardless of transcribe_wanted.
+Transcription is opt-in. When a channel config sets ``transcribe: true`` (or the
+``INFOTRIAGE_YOUTUBE_TRANSCRIBE`` environment variable is set to ``1``/``true``),
+the adapter downloads the audio track with yt-dlp and transcribes it locally using
+``faster-whisper`` (CPU, int8). On any failure the function falls back to a stub
+message, so ingestion is never blocked. Real transcription requires ``ffmpeg``
+and the faster-whisper model files.
 
 yt-dlp is invoked only via subprocess (read-only public-channel metadata; no audio
 download). No YouTube credentials are required or accepted (ADR-004 / SPEC C-9).
 
 Environment variables (production; monkeypatched in tests):
-    YT_CHANNELS          — JSON array of channel config objects (required)
-    INFOTRIAGE_PG_DSN    — PostgreSQL libpq connection string (required)
-    INFOTRIAGE_AMQP_DSN  — AMQP URL for RabbitMQ (required; never logged)
-    INFOTRIAGE_BLOB_ROOT — filesystem root for blob storage (default: data/blobs)
+    YT_CHANNELS                         — JSON array of channel config objects (required)
+    INFOTRIAGE_PG_DSN                   — PostgreSQL libpq connection string (required)
+    INFOTRIAGE_AMQP_DSN                 — AMQP URL for RabbitMQ (required; never logged)
+    INFOTRIAGE_BLOB_ROOT                — filesystem root for blob storage (default: data/blobs)
+    INFOTRIAGE_YOUTUBE_TRANSCRIBE       — global enable flag (1/true/yes)
+    INFOTRIAGE_WHISPER_MODEL            — faster-whisper model name (default: tiny)
 """
+
+import asyncio
 import datetime
 import json
+import logging
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
+import threading
+from typing import Any, cast
 
 from contracts import Item
 from ingest_common import build_bus, build_store, persist_and_publish
 
 from _util import escape
 
+# Logger for structured diagnostics from the ingest-youtube adapter.
+logger = logging.getLogger("ingest-youtube")
+
 # Atom output directory (bind-mounted in the container; tests monkeypatch this).
 OUT_DIR = os.path.join("data", "feeds")
+
+# Global transcription model name. Per-channel "transcribe" key in YT_CHANNELS wins.
+_WHISPER_MODEL_LOCK = threading.Lock()
+
+
+def _whisper_model() -> str:
+    """Return the configured faster-whisper model name.
+
+    Read at call time so tests and container restarts pick up env changes.
+    """
+    return os.environ.get("INFOTRIAGE_WHISPER_MODEL", "tiny")
+
+
+def _transcribe_default() -> bool:
+    """Return the global transcription enable flag from the environment.
+
+    Kept as a function so tests can monkeypatch ``os.environ`` and the
+    adapter sees the change at runtime (avoids import-time env capture).
+    """
+    return os.environ.get("INFOTRIAGE_YOUTUBE_TRANSCRIBE", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+# Module-level cache for faster-whisper models keyed by model name.
+# This avoids re-loading the model on every video in a run.
+_WHISPER_MODELS: dict[str, Any] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -47,7 +91,7 @@ def slug(s: str) -> str:
     return (s or "untitled")[-32:] or "untitled"
 
 
-def load_channels() -> list[dict]:
+def load_channels() -> list[dict[str, Any]]:
     """Load channel configs from YT_CHANNELS environment variable (JSON array).
 
     Raises SystemExit if YT_CHANNELS is not set (clean fail, not a traceback).
@@ -55,7 +99,7 @@ def load_channels() -> list[dict]:
     raw = os.environ.get("YT_CHANNELS", "").strip()
     if not raw:
         raise SystemExit("Set YT_CHANNELS (JSON) with the channel config list.")
-    return json.loads(raw)
+    return cast(list[dict[str, Any]], json.loads(raw))
 
 
 _TAB_SUFFIXES = ("/videos", "/shorts", "/streams", "/playlists")
@@ -84,8 +128,6 @@ def yt_dlp_list(channel: str, max_n: int) -> list[tuple[str, str]]:
     Returns [] on yt-dlp absence, subprocess timeout, or empty channel.
     yt-dlp failures (non-zero exit) are reported to stderr, not swallowed.
     """
-    import shutil
-
     if not shutil.which("yt-dlp"):
         print(
             "yt-dlp not on PATH — install with pip install yt-dlp",
@@ -113,21 +155,114 @@ def yt_dlp_list(channel: str, max_n: int) -> list[tuple[str, str]]:
             file=sys.stderr,
         )
     return [
-        tuple(line.split("|||", 1)) for line in out.stdout.splitlines() if "|||" in line
+        (line.split("|||", 1)[0], line.split("|||", 1)[1])
+        for line in out.stdout.splitlines()
+        if "|||" in line
     ]
 
 
-def transcribe(video_id: str, transcribe_wanted: bool = False) -> str:
-    """Stub transcription — always returns a stub string. No audio pipeline invoked.
+def _download_audio(video_id: str) -> tuple[str, str] | None:
+    """Download the audio track for a YouTube video to a temporary directory.
 
-    transcribe_wanted is accepted for API compatibility with yt_to_atom.py but
-    is always treated as False in this container (real transcription requires
-    macOS Metal; SPEC R2 constraint / CONTEXT specifics).
+    Uses yt-dlp in extract-audio mode (no video download, no credentials).
+    Returns ``(tmpdir, audio_path)`` on success. The caller is responsible for
+    deleting ``tmpdir``. Returns ``None`` if yt-dlp is missing, the download
+    times out, or the audio file is not produced.
     """
-    return (
-        "(transcription disabled — stub mode only; "
-        "real transcription requires Apple Silicon + a transcription backend)"
-    )
+    if not shutil.which("yt-dlp"):
+        logger.warning("yt-dlp not on PATH; cannot download audio for %s", video_id)
+        return None
+
+    tmp_dir = tempfile.mkdtemp(prefix="infotriage-yt-audio-")
+    audio_path = os.path.join(tmp_dir, f"{video_id}.mp3")
+    cmd = [
+        "yt-dlp",
+        "-x",
+        "--audio-format",
+        "mp3",
+        "--audio-quality",
+        "0",
+        "-o",
+        audio_path,
+        f"https://youtu.be/{video_id}",
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, timeout=180)
+    except subprocess.TimeoutExpired:
+        logger.warning("yt-dlp audio download timed out for %s", video_id)
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        return None
+
+    if result.returncode != 0 or not os.path.exists(audio_path):
+        logger.warning(
+            "yt-dlp audio download failed for %s (exit %s): %s",
+            video_id,
+            result.returncode,
+            result.stderr.decode(errors="ignore")[-200:],
+        )
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        return None
+
+    return tmp_dir, audio_path
+
+
+def _transcribe_audio(audio_path: str, model_name: str = "tiny") -> str | None:
+    """Transcribe an audio file using a local faster-whisper model.
+
+    The model is loaded once per process and cached by ``model_name``.
+    Returns the transcribed text, or ``None`` if faster-whisper is unavailable
+    or transcription fails.
+    """
+    try:
+        from faster_whisper import WhisperModel
+    except Exception as exc:
+        logger.warning("faster-whisper not available: %s", exc)
+        return None
+
+    try:
+        with _WHISPER_MODEL_LOCK:
+            model = _WHISPER_MODELS.get(model_name)
+            if model is None:
+                model = WhisperModel(model_name, device="cpu", compute_type="int8")
+                _WHISPER_MODELS[model_name] = model
+        segments, _ = model.transcribe(audio_path, beam_size=5)
+        text = " ".join(segment.text for segment in segments).strip()
+        return text or None
+    except Exception as exc:
+        logger.warning("faster-whisper transcription failed: %s", exc)
+        return None
+
+
+def transcribe(video_id: str, transcribe_wanted: bool = False) -> str:
+    """Return a transcript for ``video_id``.
+
+    When ``transcribe_wanted`` is true, the audio track is downloaded with
+    yt-dlp and transcribed locally with faster-whisper. On any failure the
+    function returns a stub/fallback string so that ingestion is not blocked.
+    """
+    if not transcribe_wanted:
+        return (
+            "(transcription disabled — set transcribe:true to enable; "
+            "install faster-whisper and ffmpeg)"
+        )
+
+    tmp_dir = None
+    try:
+        result = _download_audio(video_id)
+        if result is None:
+            return "(transcription failed — could not download audio)"
+        tmp_dir, audio_path = result
+
+        text = _transcribe_audio(audio_path, model_name=_whisper_model())
+        if text:
+            return text
+        return "(transcription produced no output)"
+    except Exception as exc:
+        logger.warning("transcription failed for %s: %s", video_id, exc)
+        return "(transcription failed — see logs)"
+    finally:
+        if tmp_dir:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 def write_atom(name: str, entries: list[tuple[str, str, str]]) -> tuple[str, int]:
@@ -188,12 +323,17 @@ async def ingest() -> None:
                 url = c["channel"]
                 max_n = int(c.get("max_n", 3))
                 name = c.get("name") or url.rstrip("/").split("/")[-1] or "channel"
+                transcribe_wanted = bool(c.get("transcribe", _transcribe_default()))
                 vids = yt_dlp_list(url, max_n)
 
                 atom_entries: list[tuple[str, str, str]] = []
                 for vid, title in vids:
-                    # Stub transcription — no audio pipeline invoked (SPEC R2 constraint)
-                    text = transcribe(vid, transcribe_wanted=False)
+                    # Local-only transcription is opt-in (ADR-004).
+                    # Run the heavy download/STT work off the event loop so the
+                    # FastAPI trigger stays responsive for long videos.
+                    text = await asyncio.to_thread(
+                        transcribe, vid, transcribe_wanted=transcribe_wanted
+                    )
 
                     # Write transcript stub to content-addressed blob store (R2, D-01a)
                     body_ref = store.put_blob(text.encode("utf-8"))
