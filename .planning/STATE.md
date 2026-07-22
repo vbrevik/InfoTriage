@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: M1 Foundation re-audited and passed; Phases 8-10 complete; Phase 11 (SOCMINT + Arctic collection) in progress
-stopped_at: Phase 11 11-PLAN.md created; ready to begin Wave 1 (doctrine & schema foundation)
-last_updated: "2026-07-21T00:00:00.000Z"
+status: M1 Foundation re-audited and passed; Phases 8-10 complete; Phase 11 (SOCMINT + Arctic collection) in progress — Wave 4 translation-on-demand and Postgres caching COMPLETE
+stopped_at: Phase 11 Wave 4 complete; ready to continue Wave 5 (YouTube transcription) or commit current working tree
+last_updated: "2026-07-22T00:00:00.000Z"
 progress:
   total_phases: 13
   completed_phases: 11

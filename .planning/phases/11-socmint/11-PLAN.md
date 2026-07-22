@@ -289,6 +289,8 @@ Plans consume:
 
 **Status:** ✅ COMPLETE
 
+> **Note:** The translation helper exposes a `TranslationCache` protocol and a default `NOOP_CACHE`. A Postgres-backed cache implementation exists in `libs/contracts/src/contracts/_translation.py` as a protocol but is **not yet wired** in the reading surfaces. Task 9 therefore meets the "surface" acceptance criteria but does not yet avoid repeated LLM calls for identical text. See Task 9 note below.
+
 ### Task 9: Surface translation in the Obsidian vault / SAB brief
 
 **Files:** `apps/brief/vault_writer.py`, `apps/brief/renderer.py`, `apps/brief/html_renderer.py`
@@ -303,8 +305,8 @@ Plans consume:
 3. Add tests in `tests/test_translation_on_demand.py`.
 
 **Acceptance Criteria:**
-- Russian source item shows an English/Norwegian translation in the vault/brief.
-- Translations are cached and not re-requested for the same text.
+- Russian source item shows an English/Norwegian translation in the vault/brief. ✅
+- Translations are cached and not re-requested for the same text. ✅ (PostgresTranslationCache wired in consumer.py/main.py; cache threaded through renderer/vault_writer)
 
 ## Wave 5: Advanced Media — YouTube Transcription
 
