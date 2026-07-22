@@ -119,6 +119,45 @@ def test_renderer_skips_translation_when_disabled(monkeypatch):
     assert "Привет" in content
 
 
+def test_renderer_skips_translation_for_und_lang(monkeypatch):
+    """Items with lang='und' (e.g. Telegram) are not translated by default."""
+    from apps.brief import renderer
+
+    monkeypatch.delenv("TRANSLATION_SKIP_LANGS", raising=False)
+    item = {
+        "item_id": "item-und",
+        "title": "Some Telegram title",
+        "summary": "Some Telegram summary",
+        "source": "Test",
+        "url": "https://example.com/und",
+        "ts": "2026-07-21T10:00:00+00:00",
+        "lang": "und",
+        "score": 8,
+    }
+    content = renderer.render_list([item])
+    assert "[TRANSLATED" not in content
+    assert "Some Telegram title" in content
+
+
+def test_renderer_respects_custom_translation_skip_langs(monkeypatch):
+    """TRANSLATION_SKIP_LANGS overrides the default skip list."""
+    from apps.brief import renderer
+
+    monkeypatch.setenv("TRANSLATION_SKIP_LANGS", "en")
+    item = {
+        "item_id": "item-und-translate",
+        "title": "Привет",
+        "summary": "Новости",
+        "source": "Test",
+        "url": "https://example.com/und2",
+        "ts": "2026-07-21T10:00:00+00:00",
+        "lang": "und",
+        "score": 8,
+    }
+    content = renderer.render_list([item])
+    assert "[TRANSLATED no] Привет" in content
+
+
 def test_translate_to_uses_cache():
     """contracts.translate_to only calls the LLM once per (text, target_lang)."""
     cache = _DictTranslationCache()

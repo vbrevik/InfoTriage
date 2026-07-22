@@ -21,10 +21,27 @@ def _translation_enabled() -> bool:
     )
 
 
+_skip_langs_cache: dict[str, set[str]] = {}
+
+
+def _skip_langs() -> set[str]:
+    """Return the set of language codes that should never be translated.
+
+    Defaults to ``en,no,und`` so English, Norwegian, and unknown-language
+    items (e.g. Telegram posts) are not translated by default.
+    """
+    raw = os.environ.get("TRANSLATION_SKIP_LANGS", "en,no,und")
+    if raw not in _skip_langs_cache:
+        _skip_langs_cache[raw] = {
+            lang.strip().lower() for lang in raw.split(",") if lang.strip()
+        }
+    return _skip_langs_cache[raw]
+
+
 def _maybe_translate(
     text: str, item: dict, *, cache: "TranslationCache | None" = None
 ) -> str:
-    """Return translated text for non-en/no items when translation is enabled.
+    """Return translated text for items whose language is not in the skip list.
 
     Args:
         text: The text to translate.
@@ -35,7 +52,7 @@ def _maybe_translate(
     if not _translation_enabled() or not text:
         return text
     lang = (item.get("lang") or "").lower()
-    if not lang or lang in ("en", "no"):
+    if not lang or lang in _skip_langs():
         return text
     target = os.environ.get("TRANSLATION_TARGET_LANG", "no")
     if cache is None:

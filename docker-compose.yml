@@ -222,6 +222,7 @@ services:
       VAULT_INCLUDE_EMAIL: ${VAULT_INCLUDE_EMAIL:-1}
       TRANSLATION_ENABLED: ${TRANSLATION_ENABLED:-0}
       TRANSLATION_TARGET_LANG: ${TRANSLATION_TARGET_LANG:-no}
+      TRANSLATION_SKIP_LANGS: ${TRANSLATION_SKIP_LANGS:-en,no,und}
       # NOT ${LLM_BASE_URL:-...}: .env's LLM_BASE_URL=127.0.0.1 is for host-side scripts;
       # inside the container that resolves to the container itself (see triage note).
       LLM_BASE_URL: http://host.docker.internal:8600/v1   # host LLM router: Spark primary / oMLX fallback (embeddings->oMLX) — ADR-004, local only
