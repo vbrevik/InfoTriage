@@ -84,17 +84,21 @@ def test_vault_includes_live_imap_row() -> None:
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp_vault = Path(tmp)
-        write_vault_digest([row], tmp_vault, write_items=True, sab_filename="obsidian-sab.md")
+        write_vault_digest(
+            [row], tmp_vault, write_items=True, sab_filename="obsidian-sab.md"
+        )
         item_filename = f"{row['item_id']}.md"
-        assert (tmp_vault / item_filename).exists(), (
+        assert (
+            tmp_vault / item_filename
+        ).exists(), (
             f"imap:// item not written to vault: {item_filename} missing in {tmp_vault}"
         )
         assert (tmp_vault / "obsidian-sab.md").exists(), "obsidian-sab.md missing"
         # And the SAB projection body must reference the imap:// row's title.
         sab_body = (tmp_vault / "obsidian-sab.md").read_text(encoding="utf-8")
-        assert row["title"] in sab_body, (
-            f"imap:// item title not in obsidian-sab.md body: {row['title']!r}"
-        )
+        assert (
+            row["title"] in sab_body
+        ), f"imap:// item title not in obsidian-sab.md body: {row['title']!r}"
     print(f"PASS: imap:// item included in vault by default ({item_filename})")
 
 
@@ -122,11 +126,13 @@ def test_vaul_include_email_zero_filters_out_imap() -> None:
     try:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_vault = Path(tmp)
-            write_vault_digest([imap_row], tmp_vault, write_items=True, sab_filename="obsidian-sab.md")
-            item_filename = f"{imap_row['item_id']}.md"
-            assert not (tmp_vault / item_filename).exists(), (
-                f"imap:// item leaked into vault despite VAULT_INCLUDE_EMAIL=0: {item_filename}"
+            write_vault_digest(
+                [imap_row], tmp_vault, write_items=True, sab_filename="obsidian-sab.md"
             )
+            item_filename = f"{imap_row['item_id']}.md"
+            assert not (
+                tmp_vault / item_filename
+            ).exists(), f"imap:// item leaked into vault despite VAULT_INCLUDE_EMAIL=0: {item_filename}"
     finally:
         os.environ.pop("VAULT_INCLUDE_EMAIL", None)
     print("PASS: VAULT_INCLUDE_EMAIL=0 correctly filters imap:// rows")
@@ -137,8 +143,10 @@ def main() -> None:
     if n > 0:
         test_vault_includes_live_imap_row()
     else:
-        print("NOTE: no imap:// rows in DB; live inclusion check skipped "
-              "(the negative filter check below still proves the gate works)")
+        print(
+            "NOTE: no imap:// rows in DB; live inclusion check skipped "
+            "(the negative filter check below still proves the gate works)"
+        )
     test_vaul_include_email_zero_filters_out_imap()
     print("\nUAT Test 5: all checks passed")
 

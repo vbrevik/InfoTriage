@@ -47,8 +47,10 @@ RABBIT_HOST = "infotriage-rabbitmq"
 RABBIT_USER = os.environ.get("RABBITMQ_DEFAULT_USER", "infotriage")
 RABBIT_PASS = os.environ.get("RABBITMQ_DEFAULT_PASS", "infotriage_rmq")
 EXPECTED_DIGESTS = ["brief.md", "cluster.md", "list.md", "bluf.md"]
-POLL_DIGEST_TIMEOUT_S = 300.0  # cold-stack LLM BLUF: 6 sections × 3 views = up to ~6 min
-POLL_NOTIFY_TIMEOUT_S = 60.0   # the publish fires ms after the digest write
+POLL_DIGEST_TIMEOUT_S = (
+    300.0  # cold-stack LLM BLUF: 6 sections × 3 views = up to ~6 min
+)
+POLL_NOTIFY_TIMEOUT_S = 60.0  # the publish fires ms after the digest write
 
 
 def _pick_enrichment_row() -> dict:
@@ -82,8 +84,18 @@ def _digest_mtimes() -> dict[str, float]:
 def _queue_depths() -> dict[str, int]:
     """rabbitmqctl list_queues name messages — runs inside the rabbitmq container."""
     out = subprocess.run(
-        ["docker", "exec", RABBIT_HOST, "rabbitmqctl", "list_queues", "name", "messages"],
-        capture_output=True, text=True, check=True,
+        [
+            "docker",
+            "exec",
+            RABBIT_HOST,
+            "rabbitmqctl",
+            "list_queues",
+            "name",
+            "messages",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
     )
     depths: dict[str, int] = {}
     for line in out.stdout.strip().splitlines()[1:]:
@@ -95,8 +107,18 @@ def _queue_depths() -> dict[str, int]:
 
 def _queue_consumers() -> dict[str, int]:
     out = subprocess.run(
-        ["docker", "exec", RABBIT_HOST, "rabbitmqctl", "list_queues", "name", "consumers"],
-        capture_output=True, text=True, check=True,
+        [
+            "docker",
+            "exec",
+            RABBIT_HOST,
+            "rabbitmqctl",
+            "list_queues",
+            "name",
+            "consumers",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
     )
     consumers: dict[str, int] = {}
     for line in out.stdout.strip().splitlines()[1:]:
@@ -114,9 +136,17 @@ def _publish_verdict_ready(item_id: str) -> None:
     """
     props = json.dumps({"headers": {"item_id": item_id}})
     cmd = [
-        "docker", "exec", RABBIT_HOST, "rabbitmqadmin",
-        "-u", RABBIT_USER, "-p", RABBIT_PASS,
-        "publish", "exchange=infotriage.events", "routing_key=verdict.ready",
+        "docker",
+        "exec",
+        RABBIT_HOST,
+        "rabbitmqadmin",
+        "-u",
+        RABBIT_USER,
+        "-p",
+        RABBIT_PASS,
+        "publish",
+        "exchange=infotriage.events",
+        "routing_key=verdict.ready",
         f"properties={props}",
         f"payload={item_id}",
     ]
@@ -133,14 +163,18 @@ def _publish_verdict_ready(item_id: str) -> None:
 def test_q_brief_has_consumer() -> None:
     consumers = _queue_consumers()
     n = consumers.get("q.brief", 0)
-    assert n >= 1, f"q.brief has no consumer; live brief container may be down: {consumers}"
+    assert (
+        n >= 1
+    ), f"q.brief has no consumer; live brief container may be down: {consumers}"
     print(f"PASS: q.brief has {n} consumer(s)")
 
 
 def test_republish_triggers_4_digest_rewrite() -> None:
     row = _pick_enrichment_row()
     item_id = row["item_id"]
-    print(f"INFO: republishing verdict.ready for item_id={item_id} (ccir={row.get('ccir')})")
+    print(
+        f"INFO: republishing verdict.ready for item_id={item_id} (ccir={row.get('ccir')})"
+    )
 
     before_mtimes = _digest_mtimes()
     before_notify = _queue_depths().get("q.notify", 0)
@@ -153,7 +187,10 @@ def test_republish_triggers_4_digest_rewrite() -> None:
     after_mtimes: dict[str, float] = {}
     while time.time() < deadline:
         after_mtimes = _digest_mtimes()
-        if any(after_mtimes.get(n, 0.0) > before_mtimes.get(n, 0.0) for n in EXPECTED_DIGESTS):
+        if any(
+            after_mtimes.get(n, 0.0) > before_mtimes.get(n, 0.0)
+            for n in EXPECTED_DIGESTS
+        ):
             break
         time.sleep(1.0)
     else:
@@ -163,10 +200,13 @@ def test_republish_triggers_4_digest_rewrite() -> None:
         )
 
     changed = [
-        n for n in EXPECTED_DIGESTS
+        n
+        for n in EXPECTED_DIGESTS
         if after_mtimes.get(n, 0.0) > before_mtimes.get(n, 0.0)
     ]
-    assert changed, f"No digests rewritten; before={before_mtimes}, after={after_mtimes}"
+    assert (
+        changed
+    ), f"No digests rewritten; before={before_mtimes}, after={after_mtimes}"
     # The consumer writes all 4 default digests in a single asyncio.gather — they
     # should land within ~50ms of each other. Tolerate 1 missing (e.g., if a CCIR
     # section is empty in the window, render_bluf_all_sections still writes the

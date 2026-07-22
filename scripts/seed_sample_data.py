@@ -30,9 +30,7 @@ rng = np.random.default_rng(42)
 
 
 def _item_id(source_type: str, url: str, title: str) -> str:
-    return hashlib.sha256(
-        f"{source_type}\x00{url}\x00{title}".encode()
-    ).hexdigest()
+    return hashlib.sha256(f"{source_type}\x00{url}\x00{title}".encode()).hexdigest()
 
 
 def _embedding_for_ccir(ccir: str, dim: int = 1024) -> list[float]:
@@ -55,25 +53,120 @@ def seed() -> None:
     # Sample data: list of (ccir, cnr, score, title, source, source_type, pmesii, tessoc)
     samples = [
         # CNR-I alerts (should appear in CNR slide)
-        ("PIR-1", "I", 9, "Russisk militær aktivitet øker ved ukrainsk grense", "NRK", "rss", "military", "terror"),
-        ("PIR-1", "I", 8, "Ukraina melder om nye angrep i øst", "Aftenposten", "rss", "military", "espionage"),
-        ("PIR-3", "I", 9, "NATO øker beredskap i Øst-Europa", "VG", "rss", "military", "subversion"),
-
+        (
+            "PIR-1",
+            "I",
+            9,
+            "Russisk militær aktivitet øker ved ukrainsk grense",
+            "NRK",
+            "rss",
+            "military",
+            "terror",
+        ),
+        (
+            "PIR-1",
+            "I",
+            8,
+            "Ukraina melder om nye angrep i øst",
+            "Aftenposten",
+            "rss",
+            "military",
+            "espionage",
+        ),
+        (
+            "PIR-3",
+            "I",
+            9,
+            "NATO øker beredskap i Øst-Europa",
+            "VG",
+            "rss",
+            "military",
+            "subversion",
+        ),
         # Other PIR-1 items (cluster with the CNR ones)
-        ("PIR-1", "none", 7, "EU diskuterer nye sanksjoner mot Russland", "Dagens Næringsliv", "rss", "political", "subversion"),
-        ("PIR-1", "none", 6, "Ukrainsk president holder tale til nasjonen", "NRK", "rss", "political", "sabotage"),
-
+        (
+            "PIR-1",
+            "none",
+            7,
+            "EU diskuterer nye sanksjoner mot Russland",
+            "Dagens Næringsliv",
+            "rss",
+            "political",
+            "subversion",
+        ),
+        (
+            "PIR-1",
+            "none",
+            6,
+            "Ukrainsk president holder tale til nasjonen",
+            "NRK",
+            "rss",
+            "political",
+            "sabotage",
+        ),
         # PIR-2 items
-        ("PIR-2", "none", 8, "Norsk militærøvelse i Barentshavet", "Forsvaret", "rss", "military", "terror"),
-        ("PIR-2", "none", 7, "Arktisk råd møtes i Tromsø", "High North News", "rss", "political", "subversion"),
-
+        (
+            "PIR-2",
+            "none",
+            8,
+            "Norsk militærøvelse i Barentshavet",
+            "Forsvaret",
+            "rss",
+            "military",
+            "terror",
+        ),
+        (
+            "PIR-2",
+            "none",
+            7,
+            "Arktisk råd møtes i Tromsø",
+            "High North News",
+            "rss",
+            "political",
+            "subversion",
+        ),
         # PIR-4 items
-        ("PIR-4", "II", 8, "Cyberangrep rammer norsk infrastruktur", "Tek.no", "rss", "infrastructure", "sabotage"),
-        ("PIR-4", "none", 6, "Ny malware-kampanje målretter seg nordiske bedrifter", "Digi.no", "rss", "information", "sabotage"),
-
+        (
+            "PIR-4",
+            "II",
+            8,
+            "Cyberangrep rammer norsk infrastruktur",
+            "Tek.no",
+            "rss",
+            "infrastructure",
+            "sabotage",
+        ),
+        (
+            "PIR-4",
+            "none",
+            6,
+            "Ny malware-kampanje målretter seg nordiske bedrifter",
+            "Digi.no",
+            "rss",
+            "information",
+            "sabotage",
+        ),
         # FFIR-3 items
-        ("FFIR-3", "none", 7, "Norsk forsvar investerer i droneteknologi", "Forsvaret", "rss", "military", "organized crime"),
-        ("FFIR-3", "none", 6, "Forsvarsindustrien øker produksjonen", "DN", "rss", "economic", "organized crime"),
+        (
+            "FFIR-3",
+            "none",
+            7,
+            "Norsk forsvar investerer i droneteknologi",
+            "Forsvaret",
+            "rss",
+            "military",
+            "organized crime",
+        ),
+        (
+            "FFIR-3",
+            "none",
+            6,
+            "Forsvarsindustrien øker produksjonen",
+            "DN",
+            "rss",
+            "economic",
+            "organized crime",
+        ),
     ]
 
     conn = psycopg.connect(DSN)
@@ -97,7 +190,16 @@ def seed() -> None:
                         lang = EXCLUDED.lang,
                         summary = EXCLUDED.summary
                     """,
-                    (item_id, source, source_type, url, title, ts, "no", f"Summary for {title}"),
+                    (
+                        item_id,
+                        source,
+                        source_type,
+                        url,
+                        title,
+                        ts,
+                        "no",
+                        f"Summary for {title}",
+                    ),
                 )
 
                 cur.execute(
@@ -115,7 +217,17 @@ def seed() -> None:
                         tessoc = EXCLUDED.tessoc,
                         created_at = EXCLUDED.created_at
                     """,
-                    (item_id, ccir, cnr, score, "read", f"Why: {title}", pmesii, tessoc, ts),
+                    (
+                        item_id,
+                        ccir,
+                        cnr,
+                        score,
+                        "read",
+                        f"Why: {title}",
+                        pmesii,
+                        tessoc,
+                        ts,
+                    ),
                 )
 
                 embedding = _embedding_for_ccir(ccir)

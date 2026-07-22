@@ -94,13 +94,15 @@ def main():
         old_tessoc = old.get("tessoc", "none")
         new_tessoc = new.get("tessoc", "none")
         if old_pmesii != new_pmesii or old_tessoc != new_tessoc:
-            diffs.append({
-                "title": title,
-                "old_pmesii": old_pmesii,
-                "new_pmesii": new_pmesii,
-                "old_tessoc": old_tessoc,
-                "new_tessoc": new_tessoc,
-            })
+            diffs.append(
+                {
+                    "title": title,
+                    "old_pmesii": old_pmesii,
+                    "new_pmesii": new_pmesii,
+                    "old_tessoc": old_tessoc,
+                    "new_tessoc": new_tessoc,
+                }
+            )
 
     print(f"\nScored {len(old_results)} items.")
     print(f"PMESII/TESSOC differences: {len(diffs)}")

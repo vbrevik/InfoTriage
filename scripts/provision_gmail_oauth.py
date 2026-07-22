@@ -101,7 +101,9 @@ def main() -> None:
     _write_to_env(token)
     # Confirm success WITHOUT printing the token value (NF-6)
     print("Refresh token written to .env as GMAIL_OAUTH2_REFRESH_TOKEN.")
-    print("You can now start the gmail-mcp-server container with `docker compose up gmail-mcp-server`.")
+    print(
+        "You can now start the gmail-mcp-server container with `docker compose up gmail-mcp-server`."
+    )
 
 
 if __name__ == "__main__":

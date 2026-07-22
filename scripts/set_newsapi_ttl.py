@@ -75,7 +75,9 @@ def main() -> int:
     try:
         ttl = int(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_TTL
     except ValueError:
-        print("Usage: python3 scripts/set_newsapi_ttl.py [ttl_seconds]", file=sys.stderr)
+        print(
+            "Usage: python3 scripts/set_newsapi_ttl.py [ttl_seconds]", file=sys.stderr
+        )
         return 2
 
     if ttl <= 0:
@@ -91,7 +93,9 @@ def main() -> int:
     for db_path in dbs:
         updated = set_newsapi_ttl(db_path, ttl)
         if updated:
-            print(f"\nUpdated {len(updated)} NewsAPI feed(s) in {db_path} (ttl={ttl}s):")
+            print(
+                f"\nUpdated {len(updated)} NewsAPI feed(s) in {db_path} (ttl={ttl}s):"
+            )
             for feed_id, url, old_ttl in updated:
                 print(f"  - id={feed_id}, old_ttl={old_ttl}s, url={url}")
             total += len(updated)
@@ -100,10 +104,14 @@ def main() -> int:
 
     if total:
         print(f"\nTotal NewsAPI feeds updated: {total}")
-        print("Restart FreshRSS or wait for the next cron cycle for the change to take effect.")
+        print(
+            "Restart FreshRSS or wait for the next cron cycle for the change to take effect."
+        )
     else:
         print("\nNo NewsAPI feeds were updated.")
-        print("Hint: import apps/opml/feeds.opml into FreshRSS first, then re-run this script.")
+        print(
+            "Hint: import apps/opml/feeds.opml into FreshRSS first, then re-run this script."
+        )
         return 1
 
     return 0

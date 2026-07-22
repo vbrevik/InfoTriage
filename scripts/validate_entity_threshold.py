@@ -69,11 +69,39 @@ from typing import Optional, cast  # noqa: E402
 # Cyrillic → Latin transliteration table for cross-script entity pairing in
 # _corpus_from_postgres. Lowercase only; used after .lower() on the mention.
 CYRILLIC_TO_LATIN = {
-    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "yo",
-    "ж": "zh", "з": "z", "и": "i", "й": "y", "к": "k", "л": "l", "м": "m",
-    "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u",
-    "ф": "f", "х": "h", "ц": "ts", "ч": "ch", "ш": "sh", "щ": "sch", "ъ": "",
-    "ы": "y", "ь": "", "э": "e", "ю": "yu", "я": "ya",
+    "а": "a",
+    "б": "b",
+    "в": "v",
+    "г": "g",
+    "д": "d",
+    "е": "e",
+    "ё": "yo",
+    "ж": "zh",
+    "з": "z",
+    "и": "i",
+    "й": "y",
+    "к": "k",
+    "л": "l",
+    "м": "m",
+    "н": "n",
+    "о": "o",
+    "п": "p",
+    "р": "r",
+    "с": "s",
+    "т": "t",
+    "у": "u",
+    "ф": "f",
+    "х": "h",
+    "ц": "ts",
+    "ч": "ch",
+    "ш": "sh",
+    "щ": "sch",
+    "ъ": "",
+    "ы": "y",
+    "ь": "",
+    "э": "e",
+    "ю": "yu",
+    "я": "ya",
 }
 
 
@@ -118,7 +146,8 @@ def _cyrillic_to_latin_key(text: str) -> str:
 def _resolve_model_dir() -> Path:
     """Find mE5-large weights on disk. Returns Path. Raises RuntimeError on miss."""
     candidates = [
-        Path.home() / ".cache/huggingface/hub/models--intfloat--multilingual-e5-large/snapshots",
+        Path.home()
+        / ".cache/huggingface/hub/models--intfloat--multilingual-e5-large/snapshots",
         Path.home() / ".omlx/models/multilingual-e5-large",
         Path(os.environ.get("ME5_MODEL_DIR", "")),  # CI-friendly override
     ]
@@ -170,6 +199,7 @@ def _mean_pool_l2_norm(model_pair: tuple, text: str) -> list[float]:
     1024-dim output.
     """
     import torch  # local import — torch is heavy, only load when offline invoked
+
     tokenizer, model = model_pair
     inputs = tokenizer(
         f"query: {text}",
@@ -186,6 +216,7 @@ def _mean_pool_l2_norm(model_pair: tuple, text: str) -> list[float]:
     sum_mask = attention_mask.sum(dim=1).clamp(min=1e-9)
     mean_pooled = sum_embeddings / sum_mask
     import torch.nn.functional as F
+
     normalized = F.normalize(mean_pooled, p=2, dim=1)
     return normalized[0].tolist()
 
@@ -231,10 +262,12 @@ def get_embedding(
     if mode == "http":
         base = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:8000/v1")
         key = os.environ.get("LLM_API_KEY", "omlx")
-        body = json.dumps({
-            "model": "intfloat/multilingual-e5-large",
-            "input": f"query: {text}",
-        }).encode()
+        body = json.dumps(
+            {
+                "model": "intfloat/multilingual-e5-large",
+                "input": f"query: {text}",
+            }
+        ).encode()
         req = urllib.request.Request(
             base.rstrip("/") + "/embeddings",
             data=body,
@@ -252,7 +285,9 @@ def get_embedding(
                     f"LLM endpoint unreachable ({exc}); re-run with --allow-synthetic, "
                     f"--mode offline, or fix LLM_BASE_URL"
                 ) from exc
-            print(f"WARN: LLM endpoint unreachable ({exc}); using synthetic vector for {text!r}")
+            print(
+                f"WARN: LLM endpoint unreachable ({exc}); using synthetic vector for {text!r}"
+            )
             return _deterministic_vector(text), True
 
     raise ValueError(f"unknown mode {mode!r}")
@@ -312,9 +347,25 @@ def _corpus_from_postgres() -> dict[str, list[list[str]]]:
         "ORDER BY ts DESC LIMIT 50;"
     )
     proc = subprocess.run(
-        ["docker", "exec", "infotriage-postgres", "psql", "-U", "infotriage",
-         "-d", "infotriage", "-t", "-A", "-F", "\t", "-c", sql],
-        capture_output=True, text=True, timeout=30,
+        [
+            "docker",
+            "exec",
+            "infotriage-postgres",
+            "psql",
+            "-U",
+            "infotriage",
+            "-d",
+            "infotriage",
+            "-t",
+            "-A",
+            "-F",
+            "\t",
+            "-c",
+            sql,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
         cwd=str(project_root),
     )
     if proc.returncode != 0:
@@ -345,7 +396,7 @@ def _corpus_from_postgres() -> dict[str, list[list[str]]]:
             "last 14d. Either corpus is too narrow (re-run with --corpus) or the "
             "regex heuristic missed real entities (inspect /tmp/article_titles.txt "
             "via: docker exec infotriage-postgres psql -U infotriage -d infotriage "
-            "-c \"SELECT lang, title FROM infotriage.articles WHERE lang IN "
+            '-c "SELECT lang, title FROM infotriage.articles WHERE lang IN '
             "('en','no','ru') ORDER BY ts DESC LIMIT 50;\")."
         )
 
@@ -380,7 +431,10 @@ def choose_threshold(table: list[tuple[float, float, int]]) -> tuple[float, str]
     """
     for T, collapse, overmerge in table:
         if collapse >= 1.0 and overmerge == 0:
-            return T, "all same-entity pairs merged cleanly above T, with zero over-merge"
+            return (
+                T,
+                "all same-entity pairs merged cleanly above T, with zero over-merge",
+            )
     # Conservative fallback: zero over-merge beats high collapse rate (false
     # merges are operationally expensive; missed merges can wait for re-extract).
     for T, collapse, overmerge in table:
@@ -390,11 +444,16 @@ def choose_threshold(table: list[tuple[float, float, int]]) -> tuple[float, str]
                 f"overmerge=0 (1 missed cross-lang merge accepted over false-merge safety)"
             )
             return T, note
-    return 0.85, "no clean separation found in sweep \u2014 T* = R3 default 0.85 (NO-GO sub-verdict)"
+    return (
+        0.85,
+        "no clean separation found in sweep \u2014 T* = R3 default 0.85 (NO-GO sub-verdict)",
+    )
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Validate mE5-large entity-link threshold")
+    parser = argparse.ArgumentParser(
+        description="Validate mE5-large entity-link threshold"
+    )
     parser.add_argument(
         "--mode",
         choices=["offline", "http", "synthetic"],
@@ -407,7 +466,9 @@ def main() -> None:
         action="store_true",
         help="Export multi-day cross-language corpus from production Postgres.",
     )
-    parser.add_argument("--report", required=True, help="Path to markdown report output")
+    parser.add_argument(
+        "--report", required=True, help="Path to markdown report output"
+    )
     parser.add_argument(
         "--allow-synthetic",
         action="store_true",
@@ -456,7 +517,9 @@ def main() -> None:
     # same-pair similarity must be > distinct-pair similarity (otherwise vectors
     # are degenerate / corpus shuffled). Auto-fail mode=synthetic where this is
     # trivially broken.
-    mechanism_pass = bool(same_sims and distinct_sims and min(same_sims) > max(distinct_sims))
+    mechanism_pass = bool(
+        same_sims and distinct_sims and min(same_sims) > max(distinct_sims)
+    )
 
     bar_b = bool(same_pairs) and min_same >= chosen_T
     bar_c = bool(distinct_pairs) and max_distinct < chosen_T
@@ -469,11 +532,14 @@ def main() -> None:
         verdict = "NO-GO"
         verdict_note = (
             "mechanism bar failed — min(same)=%.4f <= max(distinct)=%.4f; vectors "
-            "cannot distinguish same-entity pairs from distinct ones at any T." % (min_same, max_distinct)
+            "cannot distinguish same-entity pairs from distinct ones at any T."
+            % (min_same, max_distinct)
         )
     elif not corpus_complete:
         verdict = "PARTIAL"
-        verdict_note = "corpus incomplete — empty same_pairs or distinct_pairs at runtime"
+        verdict_note = (
+            "corpus incomplete — empty same_pairs or distinct_pairs at runtime"
+        )
     elif bar_b and not bar_c:
         verdict = "PARTIAL"
         verdict_note = (
@@ -485,8 +551,7 @@ def main() -> None:
         verdict = "PARTIAL"
         verdict_note = (
             "control separation met (max_distinct=%.4f < T*=%.4f), merge bar missed "
-            "(min_same=%.4f < T*=%.4f)"
-            % (max_distinct, chosen_T, min_same, chosen_T)
+            "(min_same=%.4f < T*=%.4f)" % (max_distinct, chosen_T, min_same, chosen_T)
         )
     else:
         # Mechanism works but neither bar lands at the chosen T*. Falls back to
@@ -496,9 +561,7 @@ def main() -> None:
             verdict_note = "choose_threshold fell back to R3 default 0.85 with no clean separation across 0.75..0.98"
         else:
             verdict = "PARTIAL"
-            verdict_note = (
-                "indeterminate at T*=%.4f — neither bar lands" % chosen_T
-            )
+            verdict_note = "indeterminate at T*=%.4f — neither bar lands" % chosen_T
 
     # Build sweep-md lines.
     sweep_md = "\n".join(
@@ -507,10 +570,12 @@ def main() -> None:
     )
 
     same_lines = "\n".join(
-        f"- {left} / {right}: {sim:.4f}" for (left, right), sim in zip(same_pairs, same_sims)
+        f"- {left} / {right}: {sim:.4f}"
+        for (left, right), sim in zip(same_pairs, same_sims)
     )
     distinct_lines = "\n".join(
-        f"- {left} / {right}: {sim:.4f}" for (left, right), sim in zip(distinct_pairs, distinct_sims)
+        f"- {left} / {right}: {sim:.4f}"
+        for (left, right), sim in zip(distinct_pairs, distinct_sims)
     )
 
     synthetic_note = (
@@ -528,9 +593,7 @@ def main() -> None:
         else f"\nCorpus source: default 12-entity pair set (--mode {args.mode}). "
     )
 
-    verdict_note_line = (
-        f"\n**Verdict note:** {verdict_note}\n" if verdict_note else ""
-    )
+    verdict_note_line = f"\n**Verdict note:** {verdict_note}\n" if verdict_note else ""
 
     report = f"""# 999.3 Entity Resolution Threshold Validation (mE5-large)
 
@@ -588,7 +651,9 @@ problem and stays unchanged.
     out_path = Path(args.report)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(report, encoding="utf-8")
-    print(f"Validation complete. Verdict={verdict} T*={chosen_T:.4f}. Report: {out_path}")
+    print(
+        f"Validation complete. Verdict={verdict} T*={chosen_T:.4f}. Report: {out_path}"
+    )
 
 
 if __name__ == "__main__":

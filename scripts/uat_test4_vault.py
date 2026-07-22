@@ -52,9 +52,7 @@ def test_vault_has_md_files() -> None:
 
 def test_sab_projection_present() -> None:
     vault = _vault_dir()
-    assert (vault / "obsidian-sab.md").exists(), (
-        f"obsidian-sab.md missing in {vault}"
-    )
+    assert (vault / "obsidian-sab.md").exists(), f"obsidian-sab.md missing in {vault}"
     print("PASS: obsidian-sab.md present")
 
 
@@ -74,9 +72,9 @@ def test_per_item_files_have_parseable_frontmatter() -> None:
         assert isinstance(fm, dict), f"{f.name}: frontmatter did not parse to a dict"
         # Must have at least one identity-bearing key from the write_item_obsidian schema.
         identity_keys = {"title", "url", "item_id", "ccir", "score"}
-        assert identity_keys & set(fm.keys()), (
-            f"{f.name}: frontmatter missing expected keys; got {list(fm.keys())}"
-        )
+        assert identity_keys & set(
+            fm.keys()
+        ), f"{f.name}: frontmatter missing expected keys; got {list(fm.keys())}"
     print(f"PASS: {len(sample)} per-item file(s) have codec-parseable front-matter")
 
 

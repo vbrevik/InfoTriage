@@ -46,10 +46,31 @@ def _seed() -> list[str]:
     now = datetime.datetime.now(datetime.timezone.utc)
     rows = [
         # PIR-1 items with same embedding but dissimilar titles
-        ("PIR-1", "none", 8, "Zebra migration patterns observed in savannah", "UAT-A", _vec_a.tolist()),
-        ("PIR-1", "none", 7, "Quantum computing advances accelerate research", "UAT-B", _vec_a.tolist()),
+        (
+            "PIR-1",
+            "none",
+            8,
+            "Zebra migration patterns observed in savannah",
+            "UAT-A",
+            _vec_a.tolist(),
+        ),
+        (
+            "PIR-1",
+            "none",
+            7,
+            "Quantum computing advances accelerate research",
+            "UAT-B",
+            _vec_a.tolist(),
+        ),
         # PIR-2 item with title keywords overlapping item1 but different embedding
-        ("PIR-2", "none", 8, "Zebra migration patterns shift northward", "UAT-C", _vec_b.tolist()),
+        (
+            "PIR-2",
+            "none",
+            8,
+            "Zebra migration patterns shift northward",
+            "UAT-C",
+            _vec_b.tolist(),
+        ),
     ]
 
     conn = psycopg.connect(DSN)
@@ -63,9 +84,7 @@ def _seed() -> list[str]:
             cur.execute(
                 "DELETE FROM infotriage.enrichment WHERE item_id IN (SELECT id FROM infotriage.articles WHERE source_type = 'uat8')"
             )
-            cur.execute(
-                "DELETE FROM infotriage.articles WHERE source_type = 'uat8'"
-            )
+            cur.execute("DELETE FROM infotriage.articles WHERE source_type = 'uat8'")
 
             for ccir, cnr, score, title, source, embedding in rows:
                 item_id = _item_id(title)
@@ -86,7 +105,16 @@ def _seed() -> list[str]:
                         lang = EXCLUDED.lang,
                         summary = EXCLUDED.summary
                     """,
-                    (item_id, source, "uat8", url, title, ts, "no", f"Summary: {title}"),
+                    (
+                        item_id,
+                        source,
+                        "uat8",
+                        url,
+                        title,
+                        ts,
+                        "no",
+                        f"Summary: {title}",
+                    ),
                 )
 
                 cur.execute(
@@ -104,7 +132,17 @@ def _seed() -> list[str]:
                         tessoc = EXCLUDED.tessoc,
                         created_at = EXCLUDED.created_at
                     """,
-                    (item_id, ccir, cnr, score, "read", f"Why: {title}", "political", "time", ts),
+                    (
+                        item_id,
+                        ccir,
+                        cnr,
+                        score,
+                        "read",
+                        f"Why: {title}",
+                        "political",
+                        "time",
+                        ts,
+                    ),
                 )
 
                 cur.execute(
@@ -180,6 +218,7 @@ def _check_sab() -> str:
 
     # Extract cluster counts for PIR-1 and PIR-2
     import re
+
     matches = re.findall(
         r'<section class="slide" id="pir-1"[\s\S]*?ccir-count">(\d+) saker · (\d+) klynger',
         html,
@@ -204,12 +243,12 @@ def main():
     pir1 = assignments.get("PIR-1", [])
     pir2 = assignments.get("PIR-2", [])
 
-    assert any(len(c) == 2 for c in pir1), (
-        "Expected two PIR-1 items to be merged into one semantic cluster"
-    )
-    assert all(len(c) == 1 for c in pir2), (
-        "Expected PIR-2 item to remain a singleton (different embedding)"
-    )
+    assert any(
+        len(c) == 2 for c in pir1
+    ), "Expected two PIR-1 items to be merged into one semantic cluster"
+    assert all(
+        len(c) == 1 for c in pir2
+    ), "Expected PIR-2 item to remain a singleton (different embedding)"
     print("Semantic clustering assertions passed.")
 
     sab_summary = _check_sab()

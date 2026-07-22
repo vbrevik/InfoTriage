@@ -46,8 +46,15 @@ def _run_import_with_env(extra_env: dict) -> subprocess.CompletedProcess:
     env.pop("INFOTRIAGE_AMQP_DSN", None)
     env.update(extra_env)
     return subprocess.run(
-        [sys.executable, "-c", "import apps.brief.main as m; print(m.CLUSTER_THRESHOLD)"],
-        capture_output=True, text=True, env=env, cwd=str(REPO_ROOT),
+        [
+            sys.executable,
+            "-c",
+            "import apps.brief.main as m; print(m.CLUSTER_THRESHOLD)",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=str(REPO_ROOT),
     )
 
 
@@ -63,9 +70,9 @@ def test_env_var_picked_up_at_import() -> None:
         result = _run_import_with_env({"CLUSTER_THRESHOLD": value})
         assert result.returncode == 0, f"Import failed for {value}: {result.stderr}"
         # Float formatting: 0.0 → "0.0", 1.0 → "1.0", 0.5 → "0.5"
-        assert value in result.stdout, (
-            f"Expected CLUSTER_THRESHOLD={value} to appear in stdout, got: {result.stdout!r}"
-        )
+        assert (
+            value in result.stdout
+        ), f"Expected CLUSTER_THRESHOLD={value} to appear in stdout, got: {result.stdout!r}"
         print(f"PASS: CLUSTER_THRESHOLD={value} → imported as {value}")
 
 
@@ -76,9 +83,9 @@ def test_invalid_thresholds_rejected() -> None:
             f"Expected ValueError for CLUSTER_THRESHOLD={bad}, but import succeeded "
             f"with stdout={result.stdout!r}"
         )
-        assert "ValueError" in result.stderr or "must be 0.0" in result.stderr, (
-            f"Expected ValueError message for {bad}, got stderr={result.stderr!r}"
-        )
+        assert (
+            "ValueError" in result.stderr or "must be 0.0" in result.stderr
+        ), f"Expected ValueError message for {bad}, got stderr={result.stderr!r}"
         print(f"PASS: CLUSTER_THRESHOLD={bad} → ValueError at import time")
 
 
@@ -124,7 +131,9 @@ def test_threshold_changes_renderer_cluster_output() -> None:
     html_strict = build_html(rows, "test", with_bluf=False, cluster_threshold=0.99)
     loose_total = total_clusters(html_loose)
     strict_total = total_clusters(html_strict)
-    print(f"  cluster counts: threshold=0.0 → {loose_total}, threshold=0.99 → {strict_total}")
+    print(
+        f"  cluster counts: threshold=0.0 → {loose_total}, threshold=0.99 → {strict_total}"
+    )
     assert strict_total > loose_total, (
         f"Higher threshold should produce MORE clusters (every item is its own cluster), "
         f"but got loose={loose_total}, strict={strict_total}"

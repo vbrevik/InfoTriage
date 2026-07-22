@@ -59,8 +59,12 @@ def test_default_threshold():
 def test_invalid_thresholds():
     for bad in ["-0.2", "1.5"]:
         result = _run_import_with_env({"CLUSTER_THRESHOLD": bad})
-        assert result.returncode != 0, f"Expected ValueError for {bad}, but import succeeded"
-        assert "ValueError" in result.stderr or "must be 0.0" in result.stderr, result.stderr
+        assert (
+            result.returncode != 0
+        ), f"Expected ValueError for {bad}, but import succeeded"
+        assert (
+            "ValueError" in result.stderr or "must be 0.0" in result.stderr
+        ), result.stderr
         print(f"PASS: CLUSTER_THRESHOLD={bad} raises ValueError")
 
 
@@ -113,12 +117,10 @@ def test_end_to_end_threshold_effect():
     strict_total = total_clusters(html_strict)
     loose_total = total_clusters(html_loose)
 
-    print(
-        f"Total clusters: strict=0.99 -> {strict_total}, loose=0.0 -> {loose_total}"
-    )
-    assert loose_total < strict_total, (
-        "Lower threshold should produce fewer total clusters than high threshold"
-    )
+    print(f"Total clusters: strict=0.99 -> {strict_total}, loose=0.0 -> {loose_total}")
+    assert (
+        loose_total < strict_total
+    ), "Lower threshold should produce fewer total clusters than high threshold"
     print("PASS: different thresholds produce different clustering output")
 
 

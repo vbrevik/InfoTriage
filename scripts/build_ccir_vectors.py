@@ -62,9 +62,7 @@ def _extract_sections(path: Path) -> dict[str, str]:
         nonlocal current, body_lines
         if current is not None:
             ccir_id, title = current
-            sections[ccir_id] = (
-                f"{ccir_id} {title}\n" + "\n".join(body_lines).strip()
-            )
+            sections[ccir_id] = f"{ccir_id} {title}\n" + "\n".join(body_lines).strip()
             current = None
             body_lines = []
 

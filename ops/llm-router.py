@@ -15,7 +15,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 SPARK = "http://192.168.10.2:8000/v1"
 SPARK_MODEL = "model"
-SPARK_MIN_MAXTOK = 4096          # extend on Spark only, so <think> + JSON both fit
+SPARK_MIN_MAXTOK = 4096  # extend on Spark only, so <think> + JSON both fit
 OMLX = "http://127.0.0.1:8000/v1"
 OMLX_CHAT = "qwen36-ud-4bit"
 OMLX_EMBED = "multilingual-e5-large"
@@ -43,7 +43,8 @@ def ensure_omlx() -> None:
 
 def fwd(base: str, path: str, body: dict, timeout: int):
     req = urllib.request.Request(
-        base + path, data=json.dumps(body).encode(),
+        base + path,
+        data=json.dumps(body).encode(),
         headers={"Content-Type": "application/json", "Authorization": f"Bearer {KEY}"},
     )
     with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -63,7 +64,12 @@ class H(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path.endswith("/models"):
-            self._send(200, json.dumps({"object": "list", "data": [{"id": "router", "object": "model"}]}).encode())
+            self._send(
+                200,
+                json.dumps(
+                    {"object": "list", "data": [{"id": "router", "object": "model"}]}
+                ).encode(),
+            )
         else:
             self._send(404, b"{}")
 
@@ -87,7 +93,9 @@ class H(BaseHTTPRequestHandler):
             if up(SPARK):
                 b = dict(body)
                 b["model"] = SPARK_MODEL
-                b["max_tokens"] = max(int(body.get("max_tokens", 400) or 400), SPARK_MIN_MAXTOK)
+                b["max_tokens"] = max(
+                    int(body.get("max_tokens", 400) or 400), SPARK_MIN_MAXTOK
+                )
                 code, out = fwd(SPARK, "/chat/completions", b, 600)
                 try:  # strip <think> from returned content
                     d = json.loads(out)
