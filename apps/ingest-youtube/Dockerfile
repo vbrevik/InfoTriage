@@ -22,13 +22,9 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt json-log-formatter
 # --build-arg PRELOAD_WHISPER_MODEL=tiny to enable.
 ARG PRELOAD_WHISPER_MODEL=
 ENV INFOTRIAGE_WHISPER_MODEL=${PRELOAD_WHISPER_MODEL:-tiny}
-RUN if [ -n "$PRELOAD_WHISPER_MODEL" ]; then python - <<'PY'
-import os
-from faster_whisper import WhisperModel
-model_name = os.environ["INFOTRIAGE_WHISPER_MODEL"]
-WhisperModel(model_name, device="cpu", compute_type="int8")
-PY
-fi
+RUN if [ -n "$PRELOAD_WHISPER_MODEL" ]; then \
+        python -c "from faster_whisper import WhisperModel; import os; WhisperModel(os.environ['INFOTRIAGE_WHISPER_MODEL'], device='cpu', compute_type='int8')"; \
+    fi
 
 # 3. Copy adapter source
 COPY apps/ingest-youtube/ .
