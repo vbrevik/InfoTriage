@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: M1 Foundation re-audited and passed; Phases 8-10 complete; Phase 11 (SOCMINT + Arctic collection) in progress — Wave 4 translation-on-demand and Postgres caching COMPLETE
-stopped_at: Phase 11 Wave 4 complete; ready to continue Wave 5 (YouTube transcription) or commit current working tree
-last_updated: "2026-07-22T00:00:00.000Z"
+status: M1 Foundation re-audited and passed; Phases 8-10 complete; Phase 11 (SOCMINT + Arctic collection) in progress — Wave 5 YouTube transcription COMPLETE
+stopped_at: Phase 11 Wave 5 complete; next Wave 6 closeout (SUMMARY + archive 999.1 backlog)
+last_updated: "2026-07-22T12:00:00.000Z"
 progress:
   total_phases: 13
   completed_phases: 11
@@ -17,6 +17,26 @@ progress:
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-07-22 — Phase 11 (SOCMINT + Arctic collection) Wave 5 COMPLETE
+
+### Just-completed
+
+- **Wave 5: Advanced Media — YouTube local audio transcription.**
+  - Upgraded `apps/ingest-youtube/youtube_ingest.py` with opt-in local transcription via `faster-whisper`.
+  - Per-channel `transcribe: true` in `YT_CHANNELS` or global `INFOTRIAGE_YOUTUBE_TRANSCRIBE=1` enables transcription.
+  - Added `_download_audio()` (yt-dlp audio extraction) and `_transcribe_audio()` (faster-whisper CPU int8) helpers with a process-level model cache and thread-safe loading.
+  - Transcription runs off the event loop via `asyncio.to_thread` so the trigger endpoint stays responsive.
+  - Added fallback stubs on any download/STT failure; ingestion is never blocked.
+  - Updated `apps/ingest-youtube/Dockerfile` to install `ffmpeg` and `libgomp1`, plus an optional `PRELOAD_WHISPER_MODEL` build arg to pre-download the model.
+  - Added `faster-whisper>=1.0.0` to `apps/ingest-youtube/requirements.txt`.
+- **Verification.** `pytest tests/test_ingest_youtube.py` → 12 passed, 0 failed. `mypy` clean on changed files. `black --check` clean across project. Full pytest suite → 518 passed, 61 skipped, 0 failed.
+- **Ship.** Commit `ef8540b` pushed to `origin/main`.
+- **Planning docs.** Updated `.planning/ROADMAP.md` to mark Wave 5 complete.
+
+### Next
+
+- **Phase 11 Wave 6 (closeout):** mark Phase 11 complete, archive the 999.1 backlog, and write `11-01-SUMMARY.md`.
 
 ## Session: 2026-07-21 — Phase 10 (Wiki-LLM) Wave 4 COMPLETE
 
