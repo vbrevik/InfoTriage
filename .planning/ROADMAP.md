@@ -381,3 +381,22 @@ Plans:
 Plans:
 
 - [x] Phase 10 10-PLAN.md Wave 4 — cross-language verification (shipped in `apps/wiki/generator.py` + `apps/triage/recall.py`)
+
+### Phase 999.5: Test-infra debt from Phase 06 deferred items (BACKLOG, folded 2026-07-23)
+
+**Goal:** Retire the three long-standing test-infra deferrals logged in `.planning/phases/06-brief-app/deferred-items.md` so bare `pytest` and `make test-integration` run clean without contention or environment-specific failures.
+
+**Items (verbatim from deferred-items.md):**
+
+1. `tests/integration/test_clustering_integration.py` hardcodes DSN `postgresql://...@127.0.0.1:5432/infotriage` (container-internal port, not prod :22000) with no reachability skip guard — errors on hosts with an unrelated local Postgres at 5432. Fix: migrate to the `INFOTRIAGE_TEST_DSN` pattern (06-05 convention).
+2. `tests/test_bus_consume.py` / `tests/test_bus_rabbitmq.py` — 4 failures against RabbitMQ :22001 when live consumers hold q.triage/q.brief (contention, not code defect). Fix: isolate test queues/vhost or gate on stopped consumers.
+3. `tests/test_bus_consume.py::test_consume_delivers_message` — `CancelledError` under the same live-consumer contention. Same fix as (2).
+
+**Source:** `.planning/phases/06-brief-app/deferred-items.md` (entries 2026-07-08 + 2026-07-11); folded into backlog by the 2026-07-23 forensic audit.
+
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (promote with /gsd-review-backlog when ready)
