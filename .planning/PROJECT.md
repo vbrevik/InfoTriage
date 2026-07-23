@@ -101,6 +101,50 @@ wiring); gap-closure plans 06-03/06-04 landed, UAT 9/9 passed, re-verification 1
 UAT round 2 (2026-07-11) found `VAULT_INCLUDE_EMAIL=0` matched the wrong field; gap-closure 06-07
 fixed exclusion to url schemes (`imap://`/`gmail://`), final re-verification 15/15 must-haves.
 
+**Phase 8 complete (2026-07-13):** `Entity resolution` shipped end-to-end — store foundation (`put_entity` /
+`get_entity` / `link_entity` / `get_entity_links` / `get_all_entities` on Protocol + Postgres +
+InMemory); LLM-based NER in `apps/triage/entities.py`; triage worker integration with
+`INFOTRIAGE_ENTITY_NER_TIMEOUT` (default 15s) to bound hung NER calls; vault projection
+(row-based + store-backed Entity Graph.md with language-tagged aliases, e.g. `NATO (en), НАТО (ru)`);
+mE5-large threshold re-validated at **T\*=0.92** per backlog 999.3 conservative-overmerge==0
+fallback (PARTIAL-but-closed: 1 missed cross-language merge accepted in exchange for zero
+false-merge safety); contract + regression tests. Pytest 405/43 (Phase 8 closeout baseline).
+
+**Phase 9 complete (2026-07-21):** `RAG recall` shipped — CCIR pre-filter
+(`find_similar_ccir` in `apps/triage/worker.py`) gates off-topic items past the LLM and
+logs them in `infotriage.audit`; `recall_items` store method exposes theme+since recall
+queries; thematic recall CLI lives at `apps/triage/recall.py` (`--topic`, `--since`, `--json`);
+`scripts/build_ccir_vectors.py` builds CCIR vectors offline. Live pytest suite 479/0/0 on
+test DB; smoke: `build_ccir_vectors.py` produced 12 CCIR vectors; `recall.py --topic
+"Arctic security" --since 7d --json` returned exit 0. Runtime fix: `get_all_entities` uses
+`ARRAY_AGG ... FILTER` to avoid `[None]` aliases.
+
+**Phase 10 complete (2026-07-21):** `Wiki-LLM` shipped across 4 waves. Wave 1 added
+`Store.get_active_entities()` + WikiGenerator + worker scaffold with `--mode {once,periodic,events}`.
+Wave 2 added `write_wiki_page()` Obsidian file writer (frontmatter-merge pattern, body-only
+rewrite preserves operator keys). Wave 3 integrated DGX Spark backend (`apps/wiki/dgx_client.py`
++ `--backend {local,dgx}` toggle). Wave 4 closed backlog 999.4: `verify_language_coverage()`
+in `libs/contracts/src/contracts/_verify.py` flags silent omission of any language present in
+the corpus context but uncited in the synthesis. Prompt templates share citation /
+cross-language / contradiction instruction constants across `apps/wiki/generator.py` and
+`apps/triage/recall.py`. Pytest 462/50/0; `tests/test_cross_language_synthesis.py` 38 pass.
+
+**Phase 11 complete (2026-07-22):** `SOCMINT + Arctic collection` shipped across 6 waves.
+ADR-014 documents legal/ToS posture for Telegram (public channels only), BarentsWatch/AIS,
+YouTube; explicitly gates unlicensed ACLED data out (no fallback). Schema extended with
+`discipline` (OSINT / SOCMINT / MASINT / GEOINT / SIGINT / HUMINT / MASINT/AIS) +
+`admiralty_reliability` (A-F/1-6) provenance on `Item`, validated at Pydantic layer and
+persisted to Postgres. MCP-pattern adapters: `apps/ingest-telegram/` (Telethon, sole public
+channels) and `apps/ingest-barentswatch/` (AIS, MASINT discipline). Wave 4 closed backlog
+999.1: on-demand per-item translation lives at `libs/contracts/src/contracts/_translation.py`
++ `PostgresTranslationCache` (durable cross-process cache, keyed by `(sha256(text).hexdigest(),
+target_lang)`). Wave 5: opt-in `faster-whisper` local audio transcription on YouTube
+(`apps/ingest-youtube/youtube_ingest.py`, `INFOTRIAGE_YOUTUBE_TRANSCRIBE=1`,
+`INFOTRIAGE_WHISPER_MODEL=tiny`, Dockerfile adds `ffmpeg`/`libgomp1`,
+`faster-whisper>=1.0` via `apps/ingest-youtube/requirements.txt`). Default pytest
+518/61/0; integration `make test-integration` 579/0/0; mypy clean; black clean;
+`docker compose config` parses. See `11-01-SUMMARY.md` for the full close-out record.
+
 ## North-star benchmark (ADR-003)
 
 | Capability | North star | InfoTriage's personal-scale shadow |

@@ -314,16 +314,14 @@ multilingual and already emits no/en). Scope: on-demand per-item, never eager wh
 Likely home: enrichment stage in **Phase 5** (store translated field) or render-time action in
 **Phase 6** (brief/Obsidian). Surfaced during R4 (00-05) Wiki-LLM spike, 2026-06-26.
 **Requirements:** TBD
-**Plans:** 7/7 plans complete
+**Plans:** 4/4 plans complete
 
 Plans:
 
-- [x] 06-03-PLAN.md
-- [x] 06-04-PLAN.md
-
-- [x] 03-PLAN.md
-
-- [ ] TBD (promote with /gsd-review-backlog when ready)
+- [x] `libs/contracts/src/contracts/_translation.py` — `translate_to()` + `TranslationCache` protocol
+- [x] `libs/store/src/store/_postgres.py` — `PostgresTranslationCache` (durable cross-process cache)
+- [x] `apps/brief/_i18n.py` — shared `_maybe_translate()` helper threaded through renderer + vault writer
+- [x] `tests/test_translation_on_demand.py` — caching + end-to-end render tests
 
 ### Phase 999.2: Dedup threshold calibration on larger corpus (BACKLOG)
 
@@ -367,26 +365,19 @@ Plans:
 **Requirements:** TBD — superseded by adoption into Phase 8 plans.
 **Plans:** 4 plans executed (999.3-SPEC.md, 999.3-PLAN.md, scripts/validate_entity_threshold.py rewrite, 999.3-VERDICT.md realtime overwrite).
 
-### Phase 999.4: Cross-language synthesis verification for Wiki-LLM (BACKLOG)
+### Phase 999.4: Cross-language synthesis verification for Wiki-LLM (CLOSED 2026-07-22 — shipped as Phase 10 Wave 4)
 
 **Goal:** Add per-language coverage verification to Wiki-LLM synthesis so that cross-language corpus items are not silently omitted from synthesized articles.
 
-**Context:** Phase 00 concept spike (R4) found PARTIAL: local qwen36 synthesis mechanism works (NATO standing page + Venezuela on-demand article both coherent with citation grounding PASS). However, the Venezuela on-demand article retrieved 17 items across 3 languages (en/no/ru) via R3 entity_links, but the synthesis cited only en (bbc) and no (nrk) — all 7 TASS (ru) items [11]–[17] were gathered into context yet went uncited. The cross-language gather works; the cross-language synthesis silently dropped Russian.
+**Verdict:** **CLOSED** via Phase 10 Wave 4 (2026-07-22). `verify_language_coverage()` lives at `libs/contracts/src/contracts/_verify.py` and is applied by both `apps/wiki/generator.py` (standing pages) and `apps/triage/recall.py` (on-demand synthesis). Cited languages are parsed via a regex on `[item_id]`-bracketed refs; uncited languages surface a `> ⚠️ **Verification Flag**: <lang> sources present but not cited.` line in the rendered wiki page. Mocked-LLM tests in `tests/test_cross_language_synthesis.py` cover both flag-trip and flag-clean paths. The intra-page contradiction flag (Phase 00 R4 nit) is now a prompt-only check (prompt instructs the LLM to surface disagreements explicitly); a dedicated contradiction-detection LLM call is deferred to Phase 12+.
 
-**Additional nit:** Minor internal contradiction in Venezuela page (Norway "har ingen egen ambassade" then "ambassaden har kommet i kontakt med nordmenn" [7]) — a reader-level coherence issue.
+**Context:** Phase 00 concept spike (R4) found PARTIAL: local qwen36 synthesis mechanism works (NATO standing page + Venezuela on-demand article both coherent with citation grounding PASS). The Venezuela on-demand article retrieved 17 items across 3 languages (en/no/ru) via R3 entity_links, but the synthesis cited only en (bbc) and no (nrk) — all 7 TASS (ru) items were gathered into context yet went uncited. Phase 10 Wave 4 closes this exact silent-omission failure mode.
 
-**Carry-forward from spike:**
-
-- Synthesis mechanism is viable on local qwen36
-- Citation grounding (every [N] → real source id, hard-exit on violation) is a sound guardrail
-- Phase 10 must add per-language coverage check before synthesis to catch silent omissions
-- Phase 10 should flag/avoid intra-page contradictions
-
-**Source:** SPIKE-FINDINGS.md §R4, R4-VERDICT.md, Phase 00 VERIFICATION.md
+**Source:** SPIKE-FINDINGS.md §R4, R4-VERDICT.md, Phase 00 VERIFICATION.md, Phase 10 Wave 4 commit sha (see git log)
 
 **Requirements:** TBD
-**Plans:** 0 plans
+**Plans:** 1 plan (Phase 10 10-PLAN.md, Wave 4); 38 tests added in `tests/test_cross_language_synthesis.py`
 
 Plans:
 
-- [ ] TBD (promote with /gsd-review-backlog when ready)
+- [x] Phase 10 10-PLAN.md Wave 4 — cross-language verification (shipped in `apps/wiki/generator.py` + `apps/triage/recall.py`)

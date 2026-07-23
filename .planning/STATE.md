@@ -2,15 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: M1 Foundation re-audited and passed; Phases 8-11 complete; Phase 12 (CNR alerting / dissemination) next
-stopped_at: Phase 11 (SOCMINT + Arctic collection) complete; Phase 12 ready for planning
-last_updated: "2026-07-22T15:00:00.000Z"
+status: M1 Foundation re-audited and passed; Phases 0–11 closed; 999.1 + 999.3 + 999.4 closed; Phase 12 (CNR alerting / dissemination) ready to plan
+stopped_at: forensic housekeeping commit (Phase 12 paper-clean) (2026-07-22)
+last_updated: "2026-07-22T17:30:00.000Z"
 progress:
   total_phases: 13
   completed_phases: 12
-  total_plans: 34
-  completed_plans: 34
-  percent: 92
+  total_plans: 54
+  completed_plans: 53
 ---
 
 # STATE — InfoTriage
@@ -48,9 +47,11 @@ progress:
   `apps/triage/recall.py`. Hardened both synthesis prompts with `.get()` fallbacks for
   optional item fields. Added `tests/test_cross_language_synthesis.py` covering missing
   IDs, shared-instruction presence, recall hardening, and wiki-page flag behavior.
+
 - **Verification.** `pytest tests/test_cross_language_synthesis.py tests/test_wiki_generator.py tests/test_recall.py`
   → 38 passed, 0 failed. `mypy` clean on affected files. Black formatting clean. Full
   non-integration suite: 462 passed, 50 skipped, 0 failed.
+
 - **Ship.** Phase 10 Wave 4 committed and pushed to `origin/main`.
 
 ### Next
@@ -67,14 +68,17 @@ progress:
   was scaffolded with `--mode {once,periodic,events}`, a `/health` endpoint, structured logging,
   and `verdict.ready` event consumption; periodic mode passes a `since` window to
   `get_active_entities`.
+
 - **Wave 3: DGX Backend Integration.** Added `apps/wiki/dgx_client.py` with the `RecallBackend`
   protocol and `DGXSynthesisBackend`, which routes heavy synthesis to the DGX Spark endpoint with
   larger `max_tokens` and thinking-token stripping. Refactored `apps/triage/recall.py` to support
   `--backend {local,dgx}` with `LocalSynthesisBackend` implementing `RecallBackend`, and wired the
   backend selection into synthesis.
+
 - **Verification.** `pytest tests/test_wiki_generator.py tests/test_recall.py` → 28 passed, 0 failed.
   `mypy apps/triage/recall.py apps/wiki/dgx_client.py` clean. Full non-integration suite: 451 passed,
   50 skipped, 0 failed.
+
 - **Ship.** Phase 10 Waves 2-3 committed (`3fe8429`) and pushed to `origin/main`.
 
 ### Next
@@ -90,15 +94,19 @@ progress:
 - **Wave 1: Data Foundation & Store Protocol.** Added `Store.get_active_entities(since, limit)` to
   `libs/store/src/store/_protocol.py` with Postgres and InMemory implementations, plus tests in
   `tests/test_store_entities.py`.
+
 - **Wave 1: Wiki generator scaffold.** Created/updated `apps/wiki/generator.py` with prompt
   instruction constants (citation, cross-language, contradiction) and `write_wiki_page()` for
   creating/updating Obsidian notes with frontmatter merge.
+
 - **Wave 1: Worker scaffold.** Rewrote `apps/wiki/wiki_worker.py` to support `--mode {once,periodic,events}`;
   added `/health` endpoint and `verdict.ready` consumer. Periodic mode passes a `since` window to
   `get_active_entities`.
+
 - **Verification.** `pytest tests/test_wiki_generator.py tests/test_store_entities.py` → 30 passed,
   15 skipped. `mypy` clean. Black formatting clean. Full non-integration suite: 448 passed,
   50 skipped, 0 failed.
+
 - **Ship.** Phase 10 Wave 1 committed (`b736493`) and pushed to `origin/main`.
 
 ### Next
@@ -141,9 +149,11 @@ progress:
 - **T\* = 0.92** for entity-level linking on mE5-large (current production carries
   0.85 from R3-bge-m3-misparse). Phase 8 plans are unblocked; Phase 8 itself ships the
   apps/triage/entities.py + libs/store/_postgres.py threshold update.
+
 - **Conservative overmerge==0 fallback** in `choose_threshold()`: prefer zero
   false-merge over perfect collapse (false-merge entrench > missed-merge recoverable
   on next item).
+
 - **`--corpus-from-postgres` now includes a Cyrillic↔Latin transliteration table**
   (dependency-free `CYRILLIC_TO_LATIN` + `_cyrillic_to_latin_key()` in
   `scripts/validate_entity_threshold.py`). The live run against production Postgres
@@ -155,6 +165,7 @@ progress:
   (ModuleSpec-mock pattern) is **throwaway-only**. The Phase 8 production code does
   not depend on that mock; only the validation script uses the offline embedding path
   when local safetensors weights are present.
+
 - The `alias_count` field was removed from `Store.get_all_entities()` in commit
   `2550de8`; any future consumers should use `len(aliases)` if they need a count.
 
@@ -162,8 +173,10 @@ progress:
 
 - **Phase 9 (RAG recall)** is ready to execute. `.planning/phases/09-rag-recall/`
   already contains `09-PLAN.md` and `09-CONTEXT.md`; decisions are locked.
+
 - **M1 ship decision** still open: the accumulated Phase 7/8 commits are ahead of
   `origin/main` and await push.
+
 - **Backlog 999.x follow-up — CLOSED.** Cyrillic↔Latin transliteration added to
   `scripts/validate_entity_threshold.py`; live `--corpus-from-postgres` run
   returned **GO at T*=0.92**, validating the cross-language entity-link bar.
@@ -185,6 +198,7 @@ progress:
 All Phase 7 sub-plans (`07-01` through `07-04`) shipped. Full pytest suite green on the way out (328 pass, 34 skip, 0 fail). `make -f ops/Makefile test-safe` runs the full chain (DSN smoke + pytest container + teardown) and exits 0. **Phase 7 → M1 ship-gate satisfied.**
 
 Local-main sync state:
+
 - `afab4d9` + `023d9b2` (07-01 ship) → ON `origin/main`
 - `591034d` (07-02 feat), `3da4932` (07-03 fix), `428f8a9` (07-03 docs), `b4ee46a` (Makefile fix), `f17e644` (07-04) → AWAITING PUSH (next-session decision: push, OR begin Phase 8 first).
 - This planning-file sweep commit closes the planning portion of that bundle.
@@ -263,16 +277,19 @@ All BLOCKINGs resolved; all advisories resolved:
 - **B1 — `LOG_LEVEL` anti-pattern**: kept `${LOG_LEVEL:-INFO}` (intentional
   operator knob; not the HANDOFF-flagged collision case). Top-of-file comment
   in `docker-compose.yml` documents the distinction explicitly.
+
 - **B2 — README removed the "do not delete fever_triage" warning**: B2's
   premise (`digest.py` imports `fever_key`/`fever`/`strip_html`) turned out
   to be stale — fresh grep confirms `digest.py` has ZERO `fever_triage`
   references. The file is genuinely gone and the warning-removal is correct.
+
 - **B3 — Plan-vs-execution gap on retire-host-scripts**: `apps/ingest/
   gmail_to_atom.py` was already deleted in commit `66477b8` (Phase 4 retire);
   `docs/ARCHITECTURE.md` / `ccir.md` were already clean. The only surviving
   cleanup was `.env.example`'s orphan `FRESHRSS_FEVER_*` vars (no Python
   callers post Phase 5 cutover) — removed with a 9-line comment block citing
   the cutover rationale and commit `1849f2a`.
+
 - **Advisory — `json-log-formatter` not propagated**: 8 of 9 service
   `requirements.txt` files were missing it (the `--no-deps` install in each
   Dockerfile strips the contracts dep). Added `json-log-formatter>=1.1` to
@@ -280,6 +297,7 @@ All BLOCKINGs resolved; all advisories resolved:
   policy in `libs/contracts/pyproject.toml`'s new `# NOTE:` block; removed
   the now-redundant trailing `json-log-formatter` argument from
   `apps/ingest-gmail/Dockerfile`'s `pip install` line.
+
 - **Advisory — `apps/dlq_consumer/requirements.txt` "symmetry" comment**:
   the "kept for symmetry with the dependency-declaration pattern in other
   services" rationale was factually wrong (no other service lists
@@ -296,8 +314,10 @@ no blockers. 07-01-SUMMARY.md written
 - Uvicorn access logs remain plain text; application logs are JSON. Documented
   as a known gap in `docs/ops/logging.md`. (Triage via log-formatter middleware
   when needed.)
+
 - DLQ "bounded depth" is implemented as a consecutive-message threshold, not
   a live queue-depth probe. Documented in the worker docstring.
+
 - Bare `pytest` skips `db_live` tests unless `INFOTRIAGE_TEST_DSN` is set
   (06-05's safety gate, intentional; remember to set the env var before
   exhaustive regression runs).
@@ -307,14 +327,18 @@ no blockers. 07-01-SUMMARY.md written
 - Stage explicit file paths for the milestone commits (do NOT use `git add .`):
   - commit 1 (code) — apps/{dlq_consumer/*,triage/worker.py,...} +
     docker-compose.yml + libs/{contracts/_logging.py,contracts/__init__.py,...}
+
     + libs/ingest_common/trigger.py + ops/Makefile + 8 requirements.txt +
     .env.example cleaner + Dockerfile ingest-gmail cleanup + README.md + 4
     spec/ADR refs + docs/superpowers/spec/... + docs/adr/ADR-008 + 4 new
     tests + tests/baselines/triage_sample_baseline.txt
+
   - commit 2 (planning files) — 07-01-SUMMARY.md (new) + ROADMAP.md checkbox
     flip (already in working tree) + STATE.md close-out (this update).
+
 - DO NOT push (`main` is 17 commits ahead of origin/main already; a push is an
   explicit operator action).
+
 - M1 ship decision: ship M1 foundation now, OR continue straight into Phase 8
   (Entity resolution) per the original ROADMAP pipeline. Either is defensible;
   if going to Phase 8, address backlog 999.3 (cross-language entity linking
@@ -888,8 +912,8 @@ untouched this session, still needs separate investigation.
 
 ## Session
 
-**Last session:** 2026-07-11T20:23:29.221Z
-**Stopped at:** Phase 06 complete incl. gap-closure 06-07 (VAULT_INCLUDE_EMAIL url-scheme fix); clean stop
+**Last session:** 2026-07-22T16:25:50.066Z
+**Stopped at:** context exhaustion at 76% (2026-07-22)
 **Resume file:** .planning/phases/07-ops-cutover/07-01-PLAN.md
 
 ## Performance Metrics

@@ -20,17 +20,17 @@ Grouped by the **intelligence cycle** (ADR-003) so each requirement maps to a st
 |---|---|---|---|
 | C-1 | RSS feeds via FreshRSS subscription management (OPML import supported) | `[LIVE]` | docker-compose.yml, FreshRSS |
 | C-2 | Sites w/o native RSS via rss-bridge at `:3000` (CSS-selector / XPathBridge) | `[LIVE]` | docker-compose.yml |
-| C-3 | Gmail newsletters ingested via `bridge/gmail_to_atom.py` (READ-ONLY IMAP, X-GM-RAW query) and served to FreshRSS at `http://feeds/gmail.xml` | `[SPIKE]` | bridge/ + data/feeds/gmail.xml — written but untested |
+| C-3 | Gmail newsletters ingested via `apps/ingest-gmail/gmail_ingest.py` (READ-ONLY OAuth2/MCP via self-hosted gmail-mcp-server, ADR-008) | `[SPIKE]` | apps/ingest-gmail/ + gmail-mcp-server/ (legacy `bridge/gmail_to_atom.py` retired Phase 4, commit 66477b8; re-tested live in 04-05 with valid OAuth2 flow) |
 | C-4 | Below 1 req / 5 s rate-limit compliance on rate-limited feeds (GDELT) | `[LIVE]` | docker-compose.yml CRON_MIN + README guidance |
 | C-5 | Custom per-feed TTL on heavy feeds | `[LIVE]` | operator-tunable in FreshRSS UI |
 | C-6 | Open GDELT + UCDP GED event-database ingestion | `[TARGET]` | docs/RESEARCH-REPORT.md §6 ("UCDP GED + open GDELT = the free event baseline"); ADR-003 names event DBs but does not endorse the pairing |
 | C-7 | BarentsWatch Live AIS + ArcticInfo APIs (PIR-2) | `[TARGET]` | docs/ARCHITECTURE.md ADR-003 |
 | C-8 | Telegram via Telethon (account-bound, sanitized path) | `[TARGET]` | docs/RESEARCH-REPORT.md §7 |
-| C-9 | YouTube channels via yt-dlp + mlx-whisper transcription | `[SPIKE]` | apps/ingest/yt_to_atom.py (implemented — XML-gen + escaping verified); runtime pending `yt-dlp` + a transcribe backend — docs/RESEARCH-REPORT.md §9 |
+| C-9 | YouTube channels via yt-dlp + faster-whisper transcription | `[SPIKE]` | apps/ingest-youtube/youtube_ingest.py (implemented — XML-gen + escaping verified); local transcription opt-in via `INFOTRIAGE_YOUTUBE_TRANSCRIBE=1` (Phase 11 Wave 5, commit ef8540b) — docs/RESEARCH-REPORT.md §9 |
 | C-10 | Instagram / Facebook ingestion | `[OUT]` | docs/RESEARCH-REPORT.md — hostile to automation |
 | C-11 | ACLED event DB | `[GATED]` | EULA §7 bars training/developing AI on content; conflict with ADR-004 |
 | C-12 | X / Twitter ingestion | `[GATED]` | "skip for now or self-host Nitter as separate spike — fragile" |
-| C-13 | **Multi-mailbox IMAP ingestion** (Outlook / Fastmail / ProtonMail / custom-domain); one runner, per-account provider dispatch (Gmail → `X-GM-RAW`; everything else → standard IMAP SEARCH) | `[SPIKE]` | apps/ingest/imap_to_atom.py (implemented — XML-gen + escaping verified); runtime pending creds per mailbox |
+| C-13 | **Multi-protocol mail ingestion** (IMAP for Outlook / Fastmail / ProtonMail / custom-domain + IMAP X-GM-RAW for Gmail + POP3 via UIDL for legacy ISP boxes); one runner, per-mailbox `protocol` dispatch | `[LIVE]` | apps/ingest-imap/imap_ingest.py (POP3 dispatch added 2026-07-22; IMAP + POP3 read-only); runtime pending per-mailbox creds in `MAILBOXES` JSON |
 | C-14 | **Sites-via-rss-bridge** operational notes for Norwegian defense / policy sites without native RSS (Forsvarets forum, FFI, NUPI, UTSYN, High North News). Manual workflow via rss-bridge web UI; optional CLI driver deferred >5 sites | `[LIVE]` (notes) | bridge/RSS_BRIDGE_NOTES.md; cross-ref `opml/feeds.opml` no-native-RSS block |
 
 ## Processing
@@ -40,7 +40,7 @@ Grouped by the **intelligence cycle** (ADR-003) so each requirement maps to a st
 | P-1 | Local qwen3.6 scoring on title + source + 500-char summary, returning `{ccir, cnr, score, why}` JSON | `[LIVE]` | score/triage_score.py |
 | P-2 | Bucket derivation: `keep` if ccir≠none AND (cnr=`I` OR score≥7); `maybe` if ccir≠none AND lower; `skip` if ccir=none | `[LIVE]` | score/triage_score.py |
 | P-3 | JSON parse extracts `{…}` substring and strips code fences | `[SPIKE]` | brittle to model formatting changes — fall back is `uleselig modell-svar` |
-| P-4 | HTML stripping from Fever items (basic regex, loss of structure tolerated) | `[LIVE]` | score/fever_triage.py |
+| P-4 | HTML stripping from IMAP/POP3 message bodies (basic regex, loss of structure tolerated) | `[LIVE]` | apps/ingest-imap/imap_ingest.py::body_text (Fever HUD retired Phase 5; HTML strip moved to ingest worker) |
 | P-5 | Multilingual embeddings (NO/EN/RU) via local bge-m3 or mE5-large | `[GATED]` | docs/RESEARCH-REPORT.md §8 — model choice (Q5) |
 | P-6 | Long-doc chunking for embedding (both mE5 and bge-m3 weaken on long inputs) | `[TARGET]` | docs/RESEARCH-REPORT.md §8 |
 | P-7 | Cross-language semantic dedup (replaces keyword-overlap clustering) | `[TARGET]` | docs/ARCHITECTURE.md Phase 2 |
@@ -73,7 +73,7 @@ Grouped by the **intelligence cycle** (ADR-003) so each requirement maps to a st
 | ID | Statement | Status | Source |
 |---|---|---|---|
 | DI-1 | FreshRSS reader UI for keepers (without leaving the inbox) | `[LIVE]` | FreshRSS web UI `:8088` |
-| DI-2 | Fever auto-mark-read of skip bucket keeps unread list clean | `[SPIKE]` | score/fever_triage.py --max — import surface **fixed 2026-06-23** via `PROFILE = CCIR` alias in `triage_score.py`; runtime smoke against FreshRSS+oMLX still pending before `[LIVE]` |
+| DI-2 | Score-driven keeper selection routed through triage → verdict.ready → brief → Obsidian vault (legacy FreshRSS Fever auto-mark-read feature retired post Phase 5 cutover) | `[OUT]` | commit 1849f2a (Fever auto-mark-read retired); superseded by Phase 6 brief app (apps/brief/) — SAB markdown + Obsidian vault projection |
 | DI-3 | `verdicts.jsonl` append-only trail | `[LIVE]` | data/verdicts.jsonl |
 | DI-4 | CNR 🚩 elevated at the top of `brief.md` and `cluster.md` | `[LIVE]` | score/digest.py |
 | DI-5 | Push notifications on CAT I (Signal / ntfy / similar) | `[TARGET]` | docs/ARCHITECTURE.md open Q |
@@ -95,7 +95,7 @@ Grouped by the **intelligence cycle** (ADR-003) so each requirement maps to a st
 | NF-1 | All LLM stages use **local qwen3.6** (DGX Spark vLLM (primary); oMLX :8000/v1 (fallback)) — hard rule, ADR-004 | `[LIVE]` | score/triage_score.py llm() env contract |
 | NF-2 | No paid services, no cloud LLM, no SaaS | `[LIVE]` | docker-compose + .env contract |
 | NF-3 | One query surface in target state — Postgres with `InfoTriage.*` schema, pgvector | `[TARGET]` | ADR-001 |
-| NF-4 | Read-only against all source systems (Gmail IMAP `readonly=True`) | `[LIVE]` | bridge/gmail_to_atom.py |
+| NF-4 | Read-only against all source systems (IMAP `readonly=True`; POP3 RETR-only — no DELE/EXPUNGE; Gmail read-only via MCP `readonly+metadata` scope) | `[LIVE]` | apps/ingest-imap/imap_ingest.py + apps/ingest-gmail/gmail_ingest.py (per the host read-only posture, ADR-004 / NF-4) |
 | NF-5 | Operator-tunable CCIR profile; the Python prompt never re-defines the taxonomy | `[LIVE]` | score/triage_score.py CCIR_PATH |
 | NF-6 | `.env` is external / gitignored, never committed | `[LIVE]` | .gitignore |
 | NF-7 | Docker stack reachable port-mapping (`:8088`, `:3000`) on localhost | `[LIVE]` | docker-compose.yml |

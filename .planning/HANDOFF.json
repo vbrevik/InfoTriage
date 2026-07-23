@@ -1,46 +1,134 @@
 {
   "version": "1.0",
-  "timestamp": "2026-07-13T00:00:00Z",
-  "phase": "08-entity-resolution",
-  "phase_name": "Entity resolution",
-  "phase_dir": ".planning/phases/08-entity-resolution",
-  "previous_phase": "07-ops-cutover",
-  "previous_phase_dir": ".planning/phases/07-ops-cutover",
-  "plan": 2,
+  "timestamp": "2026-07-22T17:30:00Z",
+  "phase": "12-cnr-alerting-dissemination",
+  "phase_name": "CNR alerting / dissemination",
+  "phase_dir": ".planning/phases/12-cnr-alerting-dissemination",
+  "previous_phase": "11-socmint",
+  "previous_phase_dir": ".planning/phases/11-socmint",
+  "plan": 0,
   "task": 1,
   "total_tasks": 1,
-  "status": "completed",
-  "phase_8_closeout": {
+  "status": "not_started",
+  "context_summary": "M1 ship-gate closed (Phase 7, 2026-07-12). M2 in flight: Phase 8 entity resolution (closed 2026-07-13), Phase 9 RAG recall (closed 2026-07-21), Phase 10 Wiki-LLM Waves 1-4 (closed 2026-07-21; 10-01-SUMMARY.md on disk), Phase 11 SOCMINT + Arctic Waves 1-6 (closed 2026-07-22 per 11-01-SUMMARY.md). Phase 12 (CNR alerting / dissemination) is next and ready to plan. Forensic housekeeping audit (STATE/HANDOFF/PROJECT/ROADMAP-999.4/REQUIREMENTS-paths/999.{3,4}-archive) committed today as a single chore.",
+  "phase_11_closeout": {
     "status": "completed",
     "verdict": "PASS",
-    "summary": "Phase 8 (Entity resolution) closed 2026-07-13. Waves 1-6 complete: Store foundation (put_entity/get_entity/link_entity/get_entity_links/get_all_entities), LLM-based NER in apps/triage/entities.py, triage worker integration with timeout guard, vault projection (row-based and store-backed Entity Graph.md), mE5-large threshold re-validation at T*=0.92, and contract/regression tests. Production code now ships LINK_THRESHOLD=0.92 in apps/triage/entities.py and libs/store/src/store/_postgres.py::find_similar_entity. The store-backed Entity Graph.md displays language-tagged aliases (e.g. 'NATO (en), НАТО (ru)') and renders entity type/language consistently with the row-based graph.",
-    "completed_tasks": [
-      {"id": 1, "name": "08-01 store foundation", "status": "done", "commit": "9a1b8c3"},
-      {"id": 2, "name": "08-02 Waves 2-6 — LLM NER, worker integration, vault projection, entity graph, threshold validation, tests", "status": "done", "commit": "2f80c7e"}
+    "summary": "Phase 11 (SOCMINT + Arctic) closed 2026-07-22. Waves 1-6 complete: ADR-014 SOCMINT legal/ToS, discipline + Admiralty reliability provenance schema, MCP adapters for Telegram (Telethon) + BarentsWatch (AIS), on-demand translation (Phase 999.1 closed via Wave 4), YouTube local faster-whisper transcript (Wave 5). ACLED gate keeps unlicensed data out. Full pytest suite 518 passed / 61 skipped (default); integration suite 579/0/0.",
+    "completed_waves": [
+      {"id": 1, "name": "Doctrine & Schema Foundation (ADR-014 + discipline/reliability fields)", "status": "done"},
+      {"id": 2, "name": "Validation, ACLED gate, compose wiring", "status": "done"},
+      {"id": 3, "name": "MCP adapters — Telegram + BarentsWatch", "status": "done"},
+      {"id": 4, "name": "Translation on Demand (Phase 999.1 closure)", "status": "done"},
+      {"id": 5, "name": "Advanced Media — YouTube faster-whisper transcription", "status": "done"},
+      {"id": 6, "name": "Closeout — 11-01-SUMMARY.md written, phase marked complete", "status": "done"}
     ]
+  },
+  "phase_99x_state": {
+    "999.1": {"status": "CLOSED 2026-07-22 (shipped as Phase 11 Wave 4)", "archived_dir": ".planning/phases/_archived/999.1-translation-on-demand-per-item-ru-de-es-to-no-en/"},
+    "999.2": {"status": "BACKLOG with carry-forward rationale", "rationale": "Dedup threshold calibration on larger corpus — same-day R2 spike was too narrow. Open into the first M2 phase that runs controlled off-topic-vs-same-event evaluation."},
+    "999.3": {"status": "CLOSED 2026-07-12 (mE5-large threshold re-validated at T*=0.92; live --corpus-from-postgres GO at T*=0.92)", "now_archived_to": ".planning/phases/_archived/999.3-entity-resolution-cross-language-coverage-and-mE5-large-re-validation/"},
+    "999.4": {"status": "CLOSED 2026-07-22 (shipped as Phase 10 Wave 4 — verify_language_coverage() in libs/contracts/_verify.py)", "now_archived_to": ".planning/phases/_archived/999.4-cross-language-synthesis-verification-for-wiki-llm/"}
   },
   "blockers": [],
   "async_jobs": [],
   "human_actions_pending": [
-    "Operator decision: continue straight into Phase 9 (RAG recall)."
+    "Operator decision: begin Phase 12 planning (CNR alerting / dissemination). The next GSD dispatch is /gsd-discuss-phase 12 to surface scope and constraints, then /gsd-plan-phase 12 to lock success criteria and waves.",
+    "Operator decision: push the housekeeping chore commit to origin/main when ready (project rule keeps push as an explicit operator action)."
   ],
   "decisions": [
-    {"decision": "LINK_THRESHOLD = 0.92 for entity-level mE5-large linking", "rationale": "Real mE5-large vector re-validation (backlog 999.3) recommended 0.92 via conservative overmerge==0 fallback; 0.85 was the old R3 bge-m3-misparse value and is no longer used.", "phase": "08"},
-    {"decision": "Store.get_all_entities() returns language-tagged aliases", "rationale": "Entity Graph.md projection should show actual aliases (mention + lang) rather than a bare count; alias_count removed as redundant with len(aliases).", "phase": "08"},
-    {"decision": "Row-based and store-backed Entity Graph both render type and language", "rationale": "Consistency between the two graph formats; type/lang are canonical entity attributes.", "phase": "08"},
-    {"decision": "Entity NER in triage worker guarded by asyncio.wait_for timeout", "rationale": "Prevents a hung LLM NER call from blocking verdict.ready publication per ADR-004 R5 prohibition.", "phase": "08"},
-    {"decision": "Cyrillic↔Latin transliteration added to scripts/validate_entity_threshold.py for cross-language corpus validation", "rationale": "Enables --corpus-from-postgres to pair Cyrillic and Latin mentions of the same entity (e.g. NATO / НАТО); live run validated the cross-language bar at T*=0.92 (GO).", "phase": "08"}
+    {
+      "decision": "LINK_THRESHOLD = 0.92 for entity-level mE5-large linking",
+      "rationale": "Real mE5-large vector re-validation (backlog 999.3) recommended 0.92 via conservative overmerge==0 fallback; 0.85 was the old R3 bge-m3-misparse value and is no longer used.",
+      "phase": "08"
+    },
+    {
+      "decision": "Store.get_all_entities() returns language-tagged aliases",
+      "rationale": "Entity Graph.md projection should show actual aliases (mention + lang) rather than a bare count; alias_count removed as redundant with len(aliases).",
+      "phase": "08"
+    },
+    {
+      "decision": "Row-based and store-backed Entity Graph both render type and language",
+      "rationale": "Consistency between the two graph formats; type/lang are canonical entity attributes.",
+      "phase": "08"
+    },
+    {
+      "decision": "Entity NER in triage worker guarded by asyncio.wait_for timeout",
+      "rationale": "Prevents a hung LLM NER call from blocking verdict.ready publication per ADR-004 R5 prohibition.",
+      "phase": "08"
+    },
+    {
+      "decision": "Cyrillic↔Latin transliteration added to scripts/validate_entity_threshold.py for cross-language corpus validation",
+      "rationale": "Enables --corpus-from-postgres to pair Cyrillic and Latin mentions of the same entity (e.g. NATO / НАТО); live run validated the cross-language bar at T*=0.92 (GO).",
+      "phase": "08"
+    }
   ],
-  "uncommitted_files": [],
+  "decisions_recorded_this_audit": [
+    {
+      "decision": "Forensic housekeeping audit closed (2026-07-22)",
+      "rationale": "6 forensic findings from /gsd-progress --forensic + reviewer follow-ups (DI-2 [OUT], 999.4 STATE mention, lost Phase 8 decisions restored, 999.3/999.4 directories archived, Phase 10 10-01-SUMMARY.md tracked) all addressed in a single chore commit. Phase 12 now plans from clean paper.",
+      "phase": "housekeeping"
+    }
+  ],
+  "uncommitted_files_at_audit_time": [
+    {
+      "path": ".env.example",
+      "classification": "feature",
+      "rationale": "Updated MAILBOXES section to document protocol=pop3; belongs to the POP3 + links-view feature commit, not housekeeping.",
+      "owner_commit_recommendation": "feat(ingest-imap): POP3 protocol + chariot-style link view"
+    },
+    {
+      "path": "apps/ingest-imap/imap_ingest.py",
+      "classification": "feature",
+      "rationale": "POP3 dispatch branch (connect_pop3 + _fetch_pop3 + fetch_items protocol switcher).",
+      "owner_commit_recommendation": "feat(ingest-imap): POP3 protocol + chariot-style link view"
+    },
+    {
+      "path": "apps/brief/views.py",
+      "classification": "feature",
+      "rationale": "links view + _OUTBOUND_URL_RE + _has_outbound_links helper.",
+      "owner_commit_recommendation": "feat(ingest-imap): POP3 protocol + chariot-style link view"
+    },
+    {
+      "path": "apps/brief/renderer.py",
+      "classification": "feature",
+      "rationale": "render_links() — flat reading-queue markdown per outbound URL.",
+      "owner_commit_recommendation": "feat(ingest-imap): POP3 protocol + chariot-style link view"
+    },
+    {
+      "path": "apps/brief/vault_writer.py",
+      "classification": "feature",
+      "rationale": "_EMAIL_URL_SCHEMES extended to ('imap://', 'gmail://', 'pop3://') for VAULT_INCLUDE_EMAIL=0 correctness with POP3 rows.",
+      "owner_commit_recommendation": "feat(ingest-imap): POP3 protocol + chariot-style link view"
+    },
+    {
+      "path": "tests/test_ingest_imap_pop3.py",
+      "classification": "feature",
+      "rationale": "POP3 dispatch tests (new file).",
+      "owner_commit_recommendation": "feat(ingest-imap): POP3 protocol + chariot-style link view"
+    },
+    {
+      "path": "tests/test_brief_views_links.py",
+      "classification": "feature",
+      "rationale": "links view tests (new file).",
+      "owner_commit_recommendation": "feat(ingest-imap): POP3 protocol + chariot-style link view"
+    },
+    {
+      "path": "tests/test_brief_renderer_links.py",
+      "classification": "feature",
+      "rationale": "render_links tests (new file).",
+      "owner_commit_recommendation": "feat(ingest-imap): POP3 protocol + chariot-style link view"
+    },
+    {
+      "path": "tests/test_vault_writer.py",
+      "classification": "feature",
+      "rationale": "Added test_pop3_row_excluded_when_email_disabled (one test).",
+      "owner_commit_recommendation": "feat(ingest-imap): POP3 protocol + chariot-style link view"
+    }
+  ],
   "prerequisite_commits": [
-    {"commit": "b109518", "purpose": "test(entities): add mocked _corpus_from_postgres integration test for cross-script pairing"},
-    {"commit": "4fa4ddc", "purpose": "feat(entities): add Cyrillic↔Latin transliteration to entity threshold validator"},
-    {"commit": "9a1b8c3", "purpose": "Phase 8 Waves 5-6 — store-backed entity graph and threshold validation"},
-    {"commit": "0cb0aa8", "purpose": "fix(bus): repair RabbitMQ test hang and topology cleanup"},
-    {"commit": "e4b0b21", "purpose": "feat(entities): display language-tagged aliases in store-backed Entity Graph.md"},
-    {"commit": "2550de8", "purpose": "refactor(store): remove redundant alias_count from get_all_entities API"},
-    {"commit": "2f80c7e", "purpose": "feat(vault): render type and language in row-based Entity Graph"}
+    {"commit": "ef8540b", "purpose": "feat(ingest-youtube): Phase 11 Wave 5 — local faster-whisper transcription"}
   ],
-  "next_action": "Phase 8 is complete. Phase 9 (RAG recall) is ready to execute; 09-PLAN.md and 09-CONTEXT.md exist in .planning/phases/09-rag-recall/. Begin via /gsd-execute-phase 9. Alternatively, push the pending Phase 7/8 commits to origin/main first.",
-  "context_notes": "Phase 8 Waves 1-6 closed. LINK_THRESHOLD=0.92 shipped in apps/triage/entities.py and libs/store/src/store/_postgres.py. Store.get_all_entities() returns sorted language-tagged aliases; alias_count removed from API. vault_writer renders type and language in both row-based and store-backed Entity Graph.md. Triage worker NER call protected by INFOTRIAGE_ENTITY_NER_TIMEOUT (default 15s). Cyrillic↔Latin transliteration added to scripts/validate_entity_threshold.py; live --corpus-from-postgres run GO at T*=0.92. Full pytest suite green: 405 passed, 43 skipped."
+  "next_action": "Phase 11 is closed; Phase 12 (CNR alerting / dissemination) is the only remaining M2 phase and is ready to plan. Begin via /gsd-discuss-phase 12 to surface scope and constraints, then /gsd-plan-phase 12 to lock success criteria and waves. The POP3 + links-view feature work above is parked for its own feature commit.",
+  "context_notes": "All integer phases 0-11 are closed. Phase 99.1, 999.3, 999.4 closed and archived. Phase 999.2 still BACKLOG with rationale carried forward; the carry-forward rationale is still valid (no movement signal since R2 spike) and unrelated to Phase 12. Plan files now live at .planning/phases/{0..11,99.2,12}/; archived at .planning/phases/_archived/{999.1,999.3,999.4}/. Forensic housekeeping audit lays clean paper so Phase 12 starts without stale pointers; feature work (POP3 + link view) is parked separately in the working tree."
 }
