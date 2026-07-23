@@ -568,9 +568,11 @@ services:
     image: infotriage-ntfy:prebaked
     container_name: infotriage-ntfy
     restart: unless-stopped  # per ADR-017 Decision 4: no boot-time bootstrap → silent restart-loop risk is gone
-    # No entrypoint/command override per ADR-018 non-goals: the container just
-    # runs the ntfy image default ENTRYPOINT (`ntfy serve`) against the
-    # pre-baked /etc/ntfy/auth.db.
+    # The ntfy image is ENTRYPOINT ["ntfy"] with NO default CMD, so the `serve`
+    # subcommand must be supplied here (matches ntfy's own compose examples).
+    # This is the only arg — auth/ACL come from the pre-baked /etc/ntfy/auth.db
+    # (ADR-018) plus the NTFY_* env below; no bootstrap script runs.
+    command: ["serve"]
     ports:
       - "127.0.0.1:22070:80"   # ntfy: localhost:22070 → container:80 (local-only per ADR-016)
     environment:

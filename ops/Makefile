@@ -137,7 +137,9 @@ ntfy-up: ## Start the ntfy push channel (pre-bakes the image first if missing)
 	cd $(ROOT_DIR) && $(COMPOSE) up -d --wait ntfy
 
 ntfy-publish-test: ## Smoke-test the pre-baked ACL: producer POST must succeed (reads NTFY_* from .env)
-	@set -a; [ -f $(ROOT_DIR)/.env ] && . $(ROOT_DIR)/.env; set +a; \
+	@set -a; \
+	[ -f $(ROOT_DIR)/.env ] && eval "$$(grep -E '^NTFY_[A-Z_]+=' $(ROOT_DIR)/.env)"; \
+	set +a; \
 	curl -fsS -u "$${NTFY_PRODUCER_USER:-producer}:$${NTFY_PRODUCER_PASSWORD:?NTFY_PRODUCER_PASSWORD not set (.env)}" \
 		-d "InfoTriage ntfy ACL smoke test" \
 		"$${NTFY_BASE_URL:-http://127.0.0.1:22070}/$${NTFY_TOPIC_PREFIX:-cnr-cat-i}-smoke" >/dev/null \

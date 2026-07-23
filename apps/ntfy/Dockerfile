@@ -28,6 +28,16 @@ RUN --mount=type=secret,id=ntfy_producer_password \
     --mount=type=secret,id=ntfy_topic_prefix \
     set -eu; \
     mkdir -p /etc/ntfy; \
+    # ntfy 2.26.x will NOT create the auth DB from `ntfy user add` — it errors
+    # "auth-file does not exist; please start the server at least once". The
+    # SQLite schema is only created by the server. So start `ntfy serve` just
+    # long enough to initialise $NTFY_AUTH_FILE, kill it, then seed against the
+    # created DB. (This is the rock the sealed-bind-mount attempt kept hitting.)
+    ntfy serve --cache-file /tmp/cache.db >/tmp/ntfy-serve.log 2>&1 & \
+    SRV=$!; \
+    for _ in $(seq 1 50); do [ -f "$NTFY_AUTH_FILE" ] && break; sleep 0.2; done; \
+    kill "$SRV" 2>/dev/null || true; wait "$SRV" 2>/dev/null || true; \
+    test -f "$NTFY_AUTH_FILE" || { echo "FATAL: $NTFY_AUTH_FILE not created"; cat /tmp/ntfy-serve.log; exit 1; }; \
     TOPIC="$(cat /run/secrets/ntfy_topic_prefix)"; \
     NTFY_PASSWORD="$(cat /run/secrets/ntfy_producer_password)" \
         ntfy user add producer; \

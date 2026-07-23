@@ -156,18 +156,14 @@ def test_ntfy_prebaked_users_via_docker_exec() -> None:
     against the RUNNING container, so it holds for any substrate that places a
     populated auth.db at /etc/ntfy/auth.db (it also passed under the archived
     sealed-bind-mount attempt).
+
+    `ntfy user list` reads the auth-file location from the server config /
+    NTFY_AUTH_FILE env inside the container (it is an alias for `ntfy access`);
+    it does NOT accept an --auth-file flag in ntfy 2.26.x, so we rely on the
+    container's own NTFY_AUTH_FILE env (set in docker-compose.yml).
     """
     r = subprocess.run(
-        [
-            "docker",
-            "exec",
-            "infotriage-ntfy",
-            "ntfy",
-            "user",
-            "list",
-            "--auth-file",
-            "/etc/ntfy/auth.db",
-        ],
+        ["docker", "exec", "infotriage-ntfy", "ntfy", "user", "list"],
         capture_output=True,
         text=True,
         timeout=15,
@@ -177,11 +173,11 @@ def test_ntfy_prebaked_users_via_docker_exec() -> None:
     out = r.stdout + r.stderr
     assert r.returncode == 0, f"`ntfy user list` failed inside container: {out!r}"
     assert "producer" in out, (
-        f"pre-baked auth.db lacks `producer` user — re-run `make ntfy-build` "
+        "pre-baked auth.db lacks `producer` user — re-run `make ntfy-build` "
         f"(ntfy user list output: {out!r})"
     )
     assert "reader" in out, (
-        f"pre-baked auth.db lacks `reader` user — re-run `make ntfy-build` "
+        "pre-baked auth.db lacks `reader` user — re-run `make ntfy-build` "
         f"(ntfy user list output: {out!r})"
     )
 
