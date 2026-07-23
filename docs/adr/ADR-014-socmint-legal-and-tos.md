@@ -87,7 +87,7 @@ any future SOCMINT/Arctic integrations.
 
 ## 4. Cross-cutting constraints
 
-- **Local-only LLM / transcription (ADR-004).** Translation and transcription
+- **Local-only LLM / transcription (ADR-016).** Translation and transcription
   of SOCMINT or Arctic data must run on the local Qwen36/Whisper stack. Cloud
   translation or transcription APIs are prohibited.
 - **Discipline + reliability tags.** Every Phase 11 adapter must populate the
@@ -127,4 +127,4 @@ any future SOCMINT/Arctic integrations.
 - ACLED license gate is tested by unit tests before the adapter can be used.
 
 **Related notes.** See `.planning/phases/11-socmint/11-PLAN.md` for the Phase 11
-execution plan and ADR-004 for the local-only LLM constraint.
+execution plan and ADR-016 for the local-only LLM constraint.

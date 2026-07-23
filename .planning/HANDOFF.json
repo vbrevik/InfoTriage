@@ -28,7 +28,7 @@
       },
       {
         "id": 3,
-        "name": "MCP adapters — Telegram + BarentsWatch",
+        "name": "MCP adapters \u2014 Telegram + BarentsWatch",
         "status": "done"
       },
       {
@@ -38,12 +38,12 @@
       },
       {
         "id": 5,
-        "name": "Advanced Media — YouTube faster-whisper transcription",
+        "name": "Advanced Media \u2014 YouTube faster-whisper transcription",
         "status": "done"
       },
       {
         "id": 6,
-        "name": "Closeout — 11-01-SUMMARY.md written, phase marked complete",
+        "name": "Closeout \u2014 11-01-SUMMARY.md written, phase marked complete",
         "status": "done"
       }
     ]
@@ -55,14 +55,14 @@
     },
     "999.2": {
       "status": "BACKLOG with carry-forward rationale",
-      "rationale": "Dedup threshold calibration on larger corpus — same-day R2 spike was too narrow. Open into the first M2 phase that runs controlled off-topic-vs-same-event evaluation."
+      "rationale": "Dedup threshold calibration on larger corpus \u2014 same-day R2 spike was too narrow. Open into the first M2 phase that runs controlled off-topic-vs-same-event evaluation."
     },
     "999.3": {
       "status": "CLOSED 2026-07-12 (mE5-large threshold re-validated at T*=0.92; live --corpus-from-postgres GO at T*=0.92)",
       "now_archived_to": ".planning/phases/_archived/999.3-entity-resolution-cross-language-coverage-and-mE5-large-re-validation/"
     },
     "999.4": {
-      "status": "CLOSED 2026-07-22 (shipped as Phase 10 Wave 4 — verify_language_coverage() in libs/contracts/_verify.py)",
+      "status": "CLOSED 2026-07-22 (shipped as Phase 10 Wave 4 \u2014 verify_language_coverage() in libs/contracts/_verify.py)",
       "now_archived_to": ".planning/phases/_archived/999.4-cross-language-synthesis-verification-for-wiki-llm/"
     }
   },
@@ -94,8 +94,8 @@
       "phase": "08"
     },
     {
-      "decision": "Cyrillic↔Latin transliteration added to scripts/validate_entity_threshold.py for cross-language corpus validation",
-      "rationale": "Enables --corpus-from-postgres to pair Cyrillic and Latin mentions of the same entity (e.g. NATO / НАТО); live run validated the cross-language bar at T*=0.92 (GO).",
+      "decision": "Cyrillic\u2194Latin transliteration added to scripts/validate_entity_threshold.py for cross-language corpus validation",
+      "rationale": "Enables --corpus-from-postgres to pair Cyrillic and Latin mentions of the same entity (e.g. NATO / \u041d\u0410\u0422\u041e); live run validated the cross-language bar at T*=0.92 (GO).",
       "phase": "08"
     }
   ],
@@ -128,7 +128,7 @@
     {
       "path": "apps/brief/renderer.py",
       "classification": "feature",
-      "rationale": "render_links() — flat reading-queue markdown per outbound URL.",
+      "rationale": "render_links() \u2014 flat reading-queue markdown per outbound URL.",
       "owner_commit_recommendation": "feat(ingest-imap): POP3 protocol + chariot-style link view"
     },
     {
@@ -165,7 +165,7 @@
   "prerequisite_commits": [
     {
       "commit": "ef8540b",
-      "purpose": "feat(ingest-youtube): Phase 11 Wave 5 — local faster-whisper transcription"
+      "purpose": "feat(ingest-youtube): Phase 11 Wave 5 \u2014 local faster-whisper transcription"
     }
   ],
   "next_action": "Phase 11 is closed; Phase 12 (CNR alerting / dissemination) is the only remaining M2 phase and is ready to plan. Begin via /gsd-discuss-phase 12 to surface scope and constraints, then /gsd-plan-phase 12 to lock success criteria and waves. The POP3 + links-view feature work above is parked for its own feature commit.",
@@ -173,6 +173,78 @@
   "phase_13_ingest_body_wiring": {
     "originates_from": "libs/store/sql/009-articles-body.sql",
     "status": "open",
-    "note": "apps/ingest-{gmail,imap,youtube,telegram,barentswatch,acled,obsidian} currently UPSERT only body_ref. To populate the new body TEXT column, each ingest service needs a parallel write in PostgresStore.put_item. Until then production articles.body stays NULL and the link view reads summary-only."
+    "note": "apps/ingest-{gmail,imap,youtube,telegram,barentswatch,acled,obsidian} currently UPSERT only body_ref. To populate the new body TEXT column, each ingest service needs a parallel write in PostgresStore.put_item. Until then production articles.body stays NULL and the link view reads summary-only.",
+    "sub_wave_integration": true,
+    "bundled_in_phase_12": true,
+    "sub_wave_failure_rollback": "link-view-reverts-to-summary-only"
+  },
+  "phase_12_phase_13_depend": {
+    "update_audit": {
+      "updated_on": "2026-07-23",
+      "updated_by": "operator",
+      "update_source": "Phase 12 discuss Turn-1"
+    },
+    "verdict": "INTEGRATED-SUB-WAVE",
+    "dependency_class": "lock-step",
+    "ordering_when_discussed": "INTEGRATED",
+    "alert_payload_body_dependency": false,
+    "link_view_body_dependency": true,
+    "verified_on": "2026-07-23",
+    "verified_by": "post-ADR-015 ordering-validation pass (gsd-progress --next dispatch; phase_12_phase_13_depend ask)",
+    "evidence": {
+      "alert_payload_inputs": [
+        "enrichment.cnr",
+        "enrichment.why",
+        "enrichment.pmseii",
+        "enrichment.created_at",
+        "summary"
+      ],
+      "alert_payload_does_not_read": [
+        "articles.body"
+      ],
+      "link_view_inputs_via_render_links": [
+        "title",
+        "summary",
+        "body"
+      ],
+      "link_view_does_read_body": true,
+      "sql_evidence": [
+        "apps/brief/main.py::_ENRICHMENT_SQL fetches a.body (extended in feat(schema) commit 3f36dcf)",
+        "apps/brief/consumer.py::_SELECT fetches e.item_id, e.ccir, e.cnr, e.score, e.bucket, e.why, e.pmesii, e.tessoc, a.title, a.summary, a.body, a.source, a.url, a.ts",
+        "apps/brief/renderer.py::render_links haystack = ' '.join(title, summary, body) -> URL extraction via _OUTBOUND_URL_RE",
+        "apps/brief/views.py::_has_outbound_links reads row.get('body', '')",
+        "apps/triage/triage_score.py scores over TITLE + SUMMARY fields only; never reads body as a scoring input (per Phase 999.2 R2 spec: `title + summary[:512]` only)"
+      ]
+    },
+    "do_not_flip_ordering_rationale": "Phase 12 alerting has no structural dependency on Phase 13. The alert payload (per ADR-015 Decision 3) derives from enrichment row fields + summary only; the deep_link targets Obsidian vault, NOT the link view. Body is neither read nor propagated into the push payload. Phase 12 ships in summary-only mode without any atomic rollback risk.",
+    "soft_dependency_detail": "The link view (apps/brief/views.py?view=links) goes through render_links() which reads body. Until Phase 13 wires body population by apps/ingest-*, all body fields are NULL on production rows, so the link view's URL extraction is summary-only and under-extracts outbound URLs (the entire reason feat(schema) added the articles.body TEXT column in the first place).",
+    "operational_impact": "CAT I hits are rare (~1-5/day typical); each CAT I alert independently fires and the operator's primary action after a CAT I alert is the Obsidian deep-link (containing the article body in full once Phase 13 lands, currently the article title + summary). The link view is a downstream reading-queue surface the operator visits AFTER reading the alert item, so degraded link-view URL coverage is recovered (not lost) when the operator reads via Obsidian directly.",
+    "do_flip_ordering_if": "The operator flags the link view as a CRITICAL CAT I downstream surface (i.e. the operator's CAT I workflow is `ntfy -> link view` rather than `ntfy -> Obsidian note`). If so, ADR-016 to flip ordering lands at discuss-phase Turn-2 and Phase 13 ships before Phase 12.",
+    "discuss_phase_ask_turn_1": "Surface the link-view-degraded-UX trade-off to the operator explicitly. Acceptable default: parallel with link view summary-only during Phase 12 stage-1 deployments, Phase 13 wiring lifts body population for full URL extraction later. Operator confirms the CW I workflow (`ntfy -> Obsidian` vs. `ntfy -> link view`) to drive the flip decision."
+  },
+  "adr_004_resolved": {
+    "resolution": "superseded_by_adr_016",
+    "status": "Accepted",
+    "unlocks_adr_015": true,
+    "enforced_invariants": [
+      "local-llm-only",
+      "read-only-ingest"
+    ],
+    "timestamp": "2026-07-23",
+    "path_to_adr": "docs/adr/ADR-016-airgap-and-safety-doctrine.md",
+    "historical_note": "ADR-004 was never committed to docs/adr/ (git ls-files, deletion log, fsck, reflog, log --grep ADR-004 all return zero hits); the operative stance was cross-referenced as 'ADR-004' across ROADMAP/STATE/ARCHITECTURE/ADR-014/docker-compose/llm-router; ADR-016 codifies it.",
+    "cites_audit_trail": [
+      "ROADMAP.md overview",
+      "ARCHITECTURE.md \u00a7188",
+      "ADR-014 \u00a7Cross-Cutting",
+      "llm-router.py",
+      "docker-compose.yml"
+    ],
+    "migration_pending_at_time_of_resolution": [
+      "docs/adr/ADR-014-socmint-legal-and-tos.md",
+      "docs/adr/ADR-015-cnr-alerting-channels-and-payload.md"
+    ],
+    "migration_pending": [],
+    "migration_status": "completed_2026-07-23_in-place_rename_applied"
   }
 }
