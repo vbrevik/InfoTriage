@@ -1,0 +1,54 @@
+# Sealed config file for the ntfy push channel (Phase 12 sub-wave (a)).
+#
+# Bind-mounted read-only into the infotriage-ntfy container at /etc/ntfy/server.yml
+# (see docker-compose.yml `ntfy:` `volumes:` — `./configs/ntfy-sealed/server.yml:/etc/ntfy/server.yml:ro`).
+#
+# Per ADR-017 addendum: this file replaces the in-container CLI bootstrap that
+# was the source of 9+ iterations of debugging fragility. Once seeded by
+# `make ntfy-seed`, ntfy starts with the ACL configuration below WITHOUT running
+# `ntfy user add` / `ntfy access` at every container start.
+#
+# Per ADR-016 airgap-and-safety-doctrine: no outbound connectivity; auth is
+# file-backed only; per-user message cache stays in /var/cache/ntfy (writeable).
+
+# ── Server identity ──────────────────────────────────────────────────────────
+base-url: "http://127.0.0.1:22070"
+# Bind only to localhost (ADR-016 §local-first). All egress via reverse proxy.
+listen-http: ":80"
+
+# ── Auth backend (sealed auth.db bound read-only at /etc/ntfy/auth.db) ──────
+# Path MUST match the docker-compose.yml `ntfy:` `volumes:` bind. Audit 2026-07-23
+# flagged a prior mismatch (server.yml pointed at /etc/ntfy-sealed/auth.db but
+# the bind mount was /etc/ntfy/auth.db). Aligned here so ntfy finds the correct
+# sealed file. Per ADR-015 §Open Items 3 + ADR-017 Decision 1: deny-all requires
+# a user grant; without the producer/reader grants in auth.db, NOTHING can publish.
+auth-file: "/etc/ntfy/auth.db"
+auth-default-access: "deny-all"
+
+# ── Per-user stats DB (writeable; bound at /var/cache/ntfy) ──────────────────
+# This is the only writable ntfy-backed DB. Per-user tier / last-seen / quota
+# counters. Cannot be sealed (ntfy increments on every interaction).
+user-db: "/var/cache/ntfy/user.db"
+
+# ── Message cache DB (writeable; bound at /var/cache/ntfy) ───────────────────
+# Cached messages for the web UI. Acceptable to lose on restart (history
+# surface is the canonical store in infotriage.articles, per Phase 8 design).
+cache-db: "/var/cache/ntfy/cache.db"
+cache-startup-queries: |
+  CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    topic TEXT NOT NULL,
+    message TEXT NOT NULL,
+    title TEXT,
+    priority INTEGER DEFAULT 3,
+    tags TEXT,
+    click TEXT,
+    icon TEXT,
+    published INT,
+    received INT NOT NULL
+  );
+
+# ── Subscription / topic controls ───────────────────────────────────────────
+# ntfy ACL is topic-pattern based. We scope producer/reader to the alerting
+# topic prefix (default: cnr-cat-i*); all other topics stay deny-all.
+# Topic globs live in auth.db (sealed), not here.

@@ -1,0 +1,3 @@
+# Keep this directory tracked. `make ntfy-seed` populates {server.yml, auth.db}
+# here; both are gitignored (auth.db contains bcrypt hashes, never commit).
+# Idempotent: re-run `make ntfy-seed -- --force` to regenerate.

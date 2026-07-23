@@ -43,3 +43,8 @@ Original default restored. Risk of silent restart-loop on bootstrap regression a
 ## Backlog
 
 - **999.x follow-up**: pre-release ADR-018 covers `:2.27.0+` pin + commit-time secret scanner + bounded `on-failure:2` restart.
+
+
+## Implementation substrate
+
+The 4 LOCKED decisions above are PRESERVED by ADR-018 (Dockerfile pre-bake architecture, 2026-07-23). ADR-018 collapses the implementation substrate from the prior sealed-bind-mount attempt (commit 5c52056 + ADR-017 addendum) into 1 custom Dockerfile + 1 compose change, replacing the host-side prep script + custom-named config + env-var overrides. See `docs/adr/ADR-018-phase-12-dockerfile-buildkit-secrets.md` for the implementation substrate.

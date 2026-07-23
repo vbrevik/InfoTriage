@@ -15,7 +15,7 @@ ROOT_DIR := $(abspath $(OPS_DIR)/..)
 SCRIPTS_DIR := $(ROOT_DIR)/scripts
 SERVICES := freshrss rssbridge feeds postgres rabbitmq ingest-imap ingest-youtube ingest-gmail ingest-obsidian triage brief scheduler opml-health dlq-consumer
 
-.PHONY: help up down logs status restart shell seed backfill replay test-safe test-full clean
+.PHONY: help up down logs status restart shell seed backfill replay test-safe test-full clean ntfy-build ntfy-up ntfy-publish-test
 
 help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -120,6 +120,28 @@ test-dlq-depth: ## Run only the DLQ depth-probe regression test
 
 test-dsn-smoke: ## Run only the INFOTRIAGE_TEST_DSN shell-smoke regression test
 	cd $(OPS_DIR)/.. && python -m pytest tests/test_check_test_dsn.py -q
+
+# ── Phase 12 sub-wave (a): ntfy push channel (ADR-018 Dockerfile pre-bake) ──
+# ntfy-seed / ntfy-bootstrap: RETIRED. The sealed-bind-mount attempt (host-side
+# scripts/seed_ntfy_sealed.py + configs/ntfy-sealed/) is archived with a
+# tombstone at docs/planning/_archived/phase-12-sealed-bind-mount-attempt/.
+# ADR-018 replaces it: auth.db is pre-baked into the image via BuildKit secrets.
+
+ntfy-build: ## Pre-bake ntfy auth.db image via BuildKit secrets (ADR-018; reads NTFY_* from .env)
+	cd $(ROOT_DIR) && $(COMPOSE) build ntfy
+
+ntfy-up: ## Start the ntfy push channel (pre-bakes the image first if missing)
+	@if ! docker image inspect infotriage-ntfy:prebaked >/dev/null 2>&1; then \
+		$(MAKE) -f $(OPS_MAKEFILE) ntfy-build; \
+	fi
+	cd $(ROOT_DIR) && $(COMPOSE) up -d --wait ntfy
+
+ntfy-publish-test: ## Smoke-test the pre-baked ACL: producer POST must succeed (reads NTFY_* from .env)
+	@set -a; [ -f $(ROOT_DIR)/.env ] && . $(ROOT_DIR)/.env; set +a; \
+	curl -fsS -u "$${NTFY_PRODUCER_USER:-producer}:$${NTFY_PRODUCER_PASSWORD:?NTFY_PRODUCER_PASSWORD not set (.env)}" \
+		-d "InfoTriage ntfy ACL smoke test" \
+		"$${NTFY_BASE_URL:-http://127.0.0.1:22070}/$${NTFY_TOPIC_PREFIX:-cnr-cat-i}-smoke" >/dev/null \
+	&& echo "ntfy-publish-test: OK (producer write accepted)"
 
 clean: ## Stop and wipe all data (dangerous)
 	$(COMPOSE) down -v
