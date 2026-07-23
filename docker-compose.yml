@@ -545,6 +545,47 @@ services:
         condition: service_healthy
     networks: [infotriage]
 
+  # ── Phase 12 sub-wave (a): ntfy push channel ────────────────────────────────────
+  # ntfy-sh/ntfy: single CAT I 🚩 push channel per ADR-015 Decision 2.
+  # Local-only port per ADR-016 (matches the 127.0.0.1:HOST_PORT:CONTAINER_PORT
+  # convention used by every other InfoTriage service). If operator needs
+  # external-phone access (Android/iOS push receivers), swap to "80:80" and
+  # firewall separately. ACL: deny-all + topic-level bearer tokens for
+  # cnr-cat-i (operator-only) per ADR-015 §Open Items 3.
+  ntfy:
+    image: binwiederhier/ntfy:latest  # per ADR-017 Decision 2: ship on :latest (dev-acceptable); re-pin to binwiederhier/ntfy:2.27.0+ when published (pre-release blocker per ADR-018)
+    container_name: infotriage-ntfy
+    restart: unless-stopped  # per ADR-017 Decision 4: no boot-time bootstrap → silent restart-loop risk is gone
+    # Phase 12 sub-wave (a) ACL bootstrap: KILLED. Replaced by sealed bind-mount
+    # per ADR-017 addendum (2026-07-23). The 9-round-doomed in-container shell
+    # bootstrap that lived here is gone. ACL now lives at configs/ntfy-sealed/
+    # on the host (one-time prep via `make ntfy-seed` → scripts/seed_ntfy_sealed.py).
+    # ntfy image default ENTRYPOINT (`ntfy serve`) is used as-is.
+    ports:
+      - "127.0.0.1:22070:80"   # ntfy: localhost:22070 → container:80 (local-only per ADR-016)
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Point ntfy at the sealed config file (default lookup is /etc/ntfy/config.yml;
+      # we keep our file named `server.yml` so the name matches ntfy upstream docs).
+      NTFY_CONFIG_FILE: /etc/ntfy/server.yml
+    volumes:
+      # Per ADR-017 addendum: sealed artifact pattern (mirrors dlq-consumer +
+      # the rest of the docker-compose.yml sealed-bundle approach). RO on
+      # credentials/config; RW on the message cache + per-user-stats DB
+      # (ntfy needs to update those at request time).
+      - ./configs/ntfy-sealed/server.yml:/etc/ntfy/server.yml:ro
+      - ./configs/ntfy-sealed/auth.db:/etc/ntfy/auth.db:ro
+      - ./data/ntfy-cache:/var/cache/ntfy:rw
+    healthcheck:
+      # ntfy root returns 200 (default landing), 401 (deny-all active + no auth —
+      # ntfy's documented behavior with auth-default-access=deny-all), or 403
+      # (deny-all on a specific topic). Any 2xx/4xx response means the server is up.
+      test: ["CMD-SHELL", "wget --spider -S http://localhost:80/ 2>&1 | grep -qE 'HTTP/[0-9.]+ (200|401|403)'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s  # No bootstrap path → fast start
+    networks: [infotriage]
 networks:
   infotriage:
     name: infotriage
