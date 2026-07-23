@@ -7,7 +7,42 @@ and BEFORE rendering. They do not change the LLM scorer; they are output lenses.
 Enrichment row dict keys expected:
   item_id, ccir, cnr, score, bucket, why, pmesii, tessoc, title, summary, source, url
 """
-from typing import Callable
+import re
+from typing import Callable  # Article-link heuristic.
+
+#   `https?://[^\s<>\"']+(?:\([^\s<>\"']*\)[^\s<>\"']*)*`
+# — initial URL body (greedy, no whitespace / < / > / " / '), followed by
+# zero-or-more balanced single-level parentheses so Wikipedia-style paths
+# like `https://en.wikipedia.org/wiki/Foo_(bar)` round-trip whole. The
+# `(?:...)` non-capturing group keeps `re.findall` returning whole URLs
+# rather than URL + paren-segments; one nesting depth is enough for the
+# common disambiguation patterns (Foo_(bar), Foo_(disambiguation)) without
+# dragging in a fully-recursive grammar.
+#
+# Behavior shift vs the previous regex: URL bodies may now contain `[`/`]`
+# (previous char class excluded `]` as Markdown-anchor noise); the same path
+# with in-bracket content now round-trips. `)` is NOT in the excluded set
+# here — balanced parens are folded into the URL body via `(?:...)*`. The
+# trailing punctuation cleanup in `apps.brief.renderer.render_links()`
+# compensates by stripping a trailing `)` only when the paren balance is
+# negative (prose-tail `).` rather than a path-closing `Foo_(bar)`).
+_OUTBOUND_URL_RE = re.compile(r"https?://[^\s<>\"']+(?:\([^\s<>\"']*\)[^\s<>\"']*)*")
+
+
+def _has_outbound_links(row: dict) -> bool:
+    """Return True if the row carries at least one http/https URL anywhere.
+
+    Searches title + summary + body ('body' is optional on some row shapes —
+    a truthy "" is fine and skipped). mailto:, ftp:, tel:, and bare-text
+    URLs without a scheme are not considered article links.
+    """
+    parts = [
+        row.get("title") or "",
+        row.get("summary") or "",
+        row.get("body") or "",
+    ]
+    haystack = " ".join(parts)
+    return bool(_OUTBOUND_URL_RE.search(haystack))
 
 
 # CCIR codes included in the Common Operational Picture (friendly / operational).
@@ -119,5 +154,18 @@ def filter_rows(
     if view == "crp":
         params = crp_params or {}
         return [r for r in rows if _matches_crp(r, params)]
+    if view == "links":
+        # 'links' deliberately bypasses the CCIR scorer: the user-facing value
+        # of this view is "show me [emails | items] with URLs to read". An
+        # optional min_score from crp_params is honored so callers can dial
+        # down the noise to "only show me high-scoring email links".
+        kept = [r for r in rows if _has_outbound_links(r)]
+        if crp_params and "min_score" in crp_params:
+            try:
+                threshold = int(crp_params["min_score"])
+                kept = [r for r in kept if (r.get("score", 0) or 0) >= threshold]
+            except (TypeError, ValueError):
+                pass  # malformed threshold — ignore, return full kept set
+        return kept
 
-    raise ValueError(f"unknown view: {view!r} (expected cop, cip, crp)")
+    raise ValueError(f"unknown view: {view!r} (expected cop, cip, crp, links)")

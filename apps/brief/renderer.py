@@ -28,6 +28,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "triage"))
 from digest import CCIR_ORDER  # noqa: E402
 from apps.brief._i18n import _maybe_translate  # noqa: E402
 from apps.brief.clustering import cluster_items_in_memory, EnrichedItem  # noqa: E402
+from apps.brief.views import _OUTBOUND_URL_RE  # noqa: E402
 from contracts import TranslationCache  # noqa: E402
 
 # LLM import for BLUF synthesis
@@ -53,6 +54,29 @@ _CNR_PRIORITY = {
 
 # _maybe_translate is imported from apps.brief._i18n so the same helper is
 # shared with vault_writer.py.
+
+
+def _strip_url_trailing_punct(url: str) -> str:
+    """Strip sentence punctuation from a URL while preserving balanced parens.
+
+    Email clients routinely append sentence punctuation (``.`` / ``,`` /
+    ``;`` / ``:`` / ``!`` / ``?``) to URLs mid-sentence ("…read the full
+    story at https://example.com/1."), so we strip those universally.
+
+    A trailing ``)`` is special: when it closes a balanced group inside the
+    URL itself (e.g. Wikipedia disambiguation pages such as
+    ``https://en.wikipedia.org/wiki/Foo_(bar)``), it's part of the URL and
+    MUST be preserved. When the URL has no matching ``(`` anywhere, the
+    trailing ``)`` is unbalanced (e.g. a stranded closing paren from a
+    sentence like "see https://example.com/)") and should be stripped.
+
+    We iterate from the end, dropping one character at a time. This
+    collapses multi-char tails like ``.)`` / ``))`` / ``.!?`` cleanly while
+    keeping balanced groups (``Foo_(bar).`` -> ``Foo_(bar)``).
+    """
+    while url and (url[-1] in ".,;:!?" or (url[-1] == ")" and "(" not in url)):
+        url = url[:-1]
+    return url
 
 
 def _parse_ccir_display(title_map: dict[str, str], ccir: Optional[str]) -> str:
@@ -268,6 +292,62 @@ def render_brief(
                 f"- {r.get('title', '')}  _[{r.get('score', 0)}]_  [les]({r.get('url', '')})"
             )
         lines.append("")
+
+    return "\n".join(lines)
+
+
+def render_links(
+    rows: list[dict],
+    *,
+    cache: "TranslationCache | None" = None,
+) -> str:
+    """Produce flat markdown list of articles to read.
+
+    Each row contributes one entry per http/https URL found in its
+    title / summary / body so the user sees every outbound article
+    individually. The 'links' view is a personal reading queue — it does
+    not honor CCIR; rows that lack an outbound URL are still rendered as a
+    labeled entry so the user can see they were inspected and what item it
+    was.
+    """
+    sorted_rows = sorted(rows, key=lambda r: -(r.get("score", 0) or 0))
+
+    lines: list[str] = [
+        "# InfoTriage · links",
+        f"\n{len(rows)} items with article links\n",
+    ]
+
+    if not sorted_rows:
+        return "\n".join(lines)
+
+    for r in sorted_rows:
+        title = _maybe_translate(r.get("title", ""), r, cache=cache)
+        source = r.get("source", "")
+        score = r.get("score", 0)
+        haystack = " ".join(
+            p
+            for p in (
+                r.get("title", "") or "",
+                r.get("summary", "") or "",
+                r.get("body", "") or "",
+            )
+            if p
+        )
+        # rstrip common trailing punctuation that email clients append to URLs
+        # mid-sentence ("…read the full story at https://example.com/1.)").
+        # rstrip common trailing punctuation that email clients append
+        # to URLs mid-sentence, but preserve balanced parens that are
+        # genuinely part of the URL (e.g. Wikipedia disambiguation
+        # pages like .../wiki/Foo_(bar)). See _strip_url_trailing_punct
+        # for the exact balanced-paren rule.
+        urls = [
+            _strip_url_trailing_punct(u) for u in _OUTBOUND_URL_RE.findall(haystack)
+        ]
+        if not urls:
+            lines.append(f"- **[{score}] {title}** — (no outbound URL) _{source}_")
+            continue
+        for u in urls:
+            lines.append(f"- **[{score}] {title}** — [{u}]({u}) _{source}_")
 
     return "\n".join(lines)
 

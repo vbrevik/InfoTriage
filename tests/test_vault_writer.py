@@ -239,6 +239,30 @@ def test_gmail_row_excluded_when_email_disabled(temp_vault, monkeypatch):
     assert "Gmail Item" not in (temp_vault / "obsidian-sab.md").read_text()
 
 
+def test_pop3_row_excluded_when_email_disabled(temp_vault, monkeypatch):
+    """POP3-sourced rows (produced by the new apps/ingest-imap POP3 branch,
+    url='pop3://...') must be excluded from the vault when
+    VAULT_INCLUDE_EMAIL=0 — mirrors the imap:// + gmail:// behavior."""
+    monkeypatch.setenv("VAULT_INCLUDE_EMAIL", "0")
+    rows = [
+        {
+            "item_id": "pop3-1",
+            "title": "POP3 Item",
+            "summary": "Summary",
+            "source": "pop3-newsletter",
+            "url": "pop3://pop.example.com/uid-A",
+            "ccir": "PIR-1",
+            "score": 9,
+            "cnr": "I",
+        }
+    ]
+
+    write_vault_digest(rows, temp_vault)
+
+    assert not (temp_vault / "pop3-1.md").exists()
+    assert "POP3 Item" not in (temp_vault / "obsidian-sab.md").read_text()
+
+
 def test_imap_row_excluded_when_email_disabled(temp_vault, monkeypatch):
     """Production imap rows (source=<mailbox name>, url='imap://...') must be
     excluded from the vault when VAULT_INCLUDE_EMAIL=0."""

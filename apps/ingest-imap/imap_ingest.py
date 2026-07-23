@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""imap_ingest.py — multi-mailbox IMAP adapter for InfoTriage.
+"""imap_ingest.py — multi-protocol mail adapter for InfoTriage.
 
-READ-ONLY: connects to configured IMAP mailboxes, fetches recent messages, and
-emits each message as an Item to Postgres + the event bus via ingest_common.
-No Atom file is written — email is triage-only, not projected to FreshRSS (SPEC R1).
+READ-ONLY: connects to configured IMAP or POP3 mailboxes, fetches recent
+messages, and emits each message as an Item to Postgres + the event bus via
+ingest_common. No Atom file is written — email is triage-only, not projected
+to FreshRSS (SPEC R1).
 
-Fetch functions (load_mailboxes, infer_provider, connect, search_ids, dec,
-body_text, fetch_entries) are faithful ports from apps/ingest/imap_to_atom.py.
-The write_atom / OUT_DIR / Atom output path is intentionally absent — email is
-triage-only, not projected to FreshRSS (SPEC R1).
+The original implementation was IMAP-only; POP3 was added as a parallel
+branch behind the per-mailbox ``protocol`` field so a single adapter can
+fetch both IMAP (Gmail / Outlook / Fastmail / ProtonMail / custom IMAP)
+and POP3 (e.g. rs-pop / Hover / older ISP mailboxes).
 
 Env vars consumed:
     MAILBOXES            — JSON array of mailbox specs (or .mailboxes.json fallback)
@@ -18,10 +19,17 @@ Env vars consumed:
 
 Each mailbox spec:
     {"name": str, "host": str, "user": str, "password": str,
-     "query": str, "provider": str}
+     "query": str, "provider": str, "protocol": str}
 
-  provider in {"gmail", "imap"}. Gmail uses X-GM-RAW (proprietary search);
-  standard IMAP SEARCH (RFC 3501) for all others.
+  protocol in {"imap", "pop3"} — defaults to "imap" for backward compat.
+  provider in {"gmail", "imap"} — kept for IMAP X-GM-RAW vs standard SEARCH
+  routing; ignored when protocol is "pop3".
+
+POP3 has no folders, no server-side search, and no read-state sync. We keep
+the last ``max_recent`` (default 60) messages and use the server-allocated
+UIDL as the per-message unique key. The Item.id = sha256(source_type + NUL
++ url + NUL + title) is therefore stable across polls for the same UIDL,
+giving us idempotent ingest without a UIDL store (R6).
 """
 import email
 import imaplib
@@ -72,6 +80,20 @@ def connect(host: str, user: str, pw: str) -> imaplib.IMAP4_SSL:
     imap = imaplib.IMAP4_SSL(host)
     imap.login(user, pw)
     return imap
+
+
+def connect_pop3(host: str, user: str, pw: str):
+    """Open an SSL POP3 connection, send USER + PASS, return the live poplib object.
+
+    Imported lazily so deployments that only ever use IMAP don't pay the
+    poplib import on cold start. Tests monkeypatch this symbol.
+    """
+    import poplib  # stdlib; deferred import keeps IMAP-only start cheap
+
+    pop = poplib.POP3_SSL(host)
+    pop.user(user)
+    pop.pass_(pw)
+    return pop
 
 
 def _imap_date(query: str) -> str:
@@ -145,12 +167,13 @@ def fetch_entries(imap, ids: list, max_recent: int = 60) -> list[tuple]:
     return [entry for entry in (_parse(mid) for mid in ids[-max_recent:]) if entry]
 
 
-def fetch_items(mailbox: dict) -> list[Item]:
-    """Connect to a single mailbox read-only and return a list of Item objects.
+# ---------------------------------------------------------------------------
+# Fetch dispatch — IMAP and POP3 branches
+# ---------------------------------------------------------------------------
 
-    No Atom file is written (SPEC R1, email is triage-only).
-    Read-only posture: imap.select("INBOX", readonly=True); no STORE/EXPUNGE/COPY/APPEND.
-    """
+
+def _fetch_imap(mailbox: dict) -> list[Item]:
+    """IMAP branch — original behavior, unchanged downstream of connect()."""
     host = mailbox["host"]
     user = mailbox["user"]
     pw = mailbox["password"]
@@ -175,6 +198,109 @@ def fetch_items(mailbox: dict) -> list[Item]:
         )
         for subject, from_, snippet, message_id in entries
     ]
+
+
+def _fetch_pop3(mailbox: dict, max_recent: int = 60) -> list[Item]:
+    """POP3 branch — UIDL provides stable per-message dedup URLs.
+
+    POP3's ``TOP i N`` could fetch headers + first N body lines (cheaper) but
+    we use ``RETR i`` for the full message because email body text is short
+    and the existing ``email.message_from_bytes`` path is what the IMAP
+    branch already exercises. UIDL uniqueness makes the resulting Item.id
+    idempotent across polls.
+    """
+    import poplib  # local import to avoid pulling poplib on IMAP-only runs
+
+    host = mailbox["host"]
+    user = mailbox["user"]
+    pw = mailbox["password"]
+    max_recent = int(mailbox.get("max_recent", max_recent))
+
+    pop = connect_pop3(host, user, pw)
+    try:
+        # UIDL → {idx: uidl} dict. UIDLs are stable across sessions, so the
+        # same physical message yields the same Item.url on every poll —
+        # downstream Item.id (sha256 of source_type + url + title) dedups
+        # naturally through ingest_common.persist_and_publish (R6).
+        resp, _octets, listings = pop.uidl()
+        if isinstance(resp, bytes) and resp.startswith(b"-ERR"):
+            # Some servers temporarily reject UIDL. Fall back to ordinal-only.
+            uidls = {}
+        else:
+            uidls = {}
+            for line in listings:
+                parts = line.decode("utf-8", "replace").split()
+                if len(parts) < 2:
+                    continue
+                try:
+                    idx = int(parts[0])
+                except ValueError:
+                    continue
+                uidls[idx] = parts[1]
+
+        resp, total_list = pop.stat()
+        # Bail loudly on a negative response — a transient POP3 outage must
+        # NOT crash the whole ingest run; the consumer nacks to DLQ for retry.
+        if isinstance(resp, bytes) and resp.startswith(b"-ERR"):
+            return []
+        count = int(total_list[0])
+        if count == 0:
+            return []
+        # POP3 indexes grow as messages arrive; the most-recent max_recent live
+        # at the tail. Newer-only fetch keeps bandwidth bounded even on small
+        # accounts and matches the IMAP "last 60" semantics.
+        start = max(1, count - max_recent + 1)
+
+        entries: list[tuple] = []
+        for idx in range(start, count + 1):
+            uidl = uidls.get(idx, str(idx))
+            # poplib.retr returns (resp, lines, octets); lines are bytes
+            # without trailing CRLF. Reassemble with CRLF so RFC 822 parsers
+            # accept it.
+            resp, lines, _ = pop.retr(idx)
+            raw = b"\r\n".join(lines)
+            msg = email.message_from_bytes(raw)
+            subject = dec(msg.get("subject")) or "(no subject)"
+            from_ = dec(msg.get("from")) or "(unknown sender)"
+            snippet = " ".join(body_text(msg).split())[:500]
+            # Prefer Message-ID; fall back to UIDL+idx for messages without it.
+            message_id = msg.get("Message-ID") or f"<pop3-{uidl}-{idx}@local>"
+            entries.append((subject, from_, snippet, uidl, message_id))
+    finally:
+        try:
+            pop.quit()
+        except poplib.error_proto:
+            # Some servers reject QUIT when torn down mid-session; safe to ignore.
+            pass
+
+    return [
+        Item(
+            source=mailbox["name"],
+            source_type="pop3",
+            url=f"pop3://{host}/{uidl}",
+            title=subject or "(no subject)",
+            ts=datetime.now(tz=timezone.utc),
+            lang="und",
+            summary=snippet[:500],
+        )
+        for subject, from_, snippet, uidl, message_id in entries
+    ]
+
+
+def fetch_items(mailbox: dict) -> list[Item]:
+    """Connect to a single mailbox read-only and return a list of Item objects.
+
+    Dispatches to IMAP or POP3 based on ``mailbox['protocol']`` (defaulting
+    to "imap" for back-compat with existing MAILBOXES JSON specs). No Atom
+    file is written (SPEC R1, email is triage-only).
+    Read-only posture: imap.select("INBOX", readonly=True); POP3 RETR only,
+    never DELE.
+    """
+    protocol = (mailbox.get("protocol") or "imap").lower()
+    if protocol == "pop3":
+        return _fetch_pop3(mailbox)
+    # "" or "imap" or any other value falls through to IMAP (back-compat).
+    return _fetch_imap(mailbox)
 
 
 async def ingest() -> None:

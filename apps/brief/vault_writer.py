@@ -21,9 +21,11 @@ from apps.brief._i18n import _maybe_translate
 ENTITY_GRAPH_ACTIVE_LIMIT = 500
 
 # Production email adapters signal email via the row's url scheme, not source:
-# gmail rows carry url=gmail://..., imap rows carry url=imap://... while their
-# source field holds the adapter/mailbox name (e.g. "gmail" or "Telegraph Ukraine").
-_EMAIL_URL_SCHEMES = ("imap://", "gmail://")
+# gmail rows carry url=gmail://..., imap rows carry url=imap://...,
+# pop3 rows carry url=pop3://... while their source field holds the
+# adapter/mailbox name (e.g. "gmail" or "Telegraph Ukraine" or any POP3 name).
+# Keep this list in sync with apps/ingest-imap/imap_ingest.py URL builders.
+_EMAIL_URL_SCHEMES = ("imap://", "gmail://", "pop3://")
 
 
 def extract_entities(text: str, known_topics: Optional[list[str]] = None) -> list[str]:
