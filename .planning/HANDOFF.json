@@ -16,19 +16,55 @@
     "verdict": "PASS",
     "summary": "Phase 11 (SOCMINT + Arctic) closed 2026-07-22. Waves 1-6 complete: ADR-014 SOCMINT legal/ToS, discipline + Admiralty reliability provenance schema, MCP adapters for Telegram (Telethon) + BarentsWatch (AIS), on-demand translation (Phase 999.1 closed via Wave 4), YouTube local faster-whisper transcript (Wave 5). ACLED gate keeps unlicensed data out. Full pytest suite 518 passed / 61 skipped (default); integration suite 579/0/0.",
     "completed_waves": [
-      {"id": 1, "name": "Doctrine & Schema Foundation (ADR-014 + discipline/reliability fields)", "status": "done"},
-      {"id": 2, "name": "Validation, ACLED gate, compose wiring", "status": "done"},
-      {"id": 3, "name": "MCP adapters — Telegram + BarentsWatch", "status": "done"},
-      {"id": 4, "name": "Translation on Demand (Phase 999.1 closure)", "status": "done"},
-      {"id": 5, "name": "Advanced Media — YouTube faster-whisper transcription", "status": "done"},
-      {"id": 6, "name": "Closeout — 11-01-SUMMARY.md written, phase marked complete", "status": "done"}
+      {
+        "id": 1,
+        "name": "Doctrine & Schema Foundation (ADR-014 + discipline/reliability fields)",
+        "status": "done"
+      },
+      {
+        "id": 2,
+        "name": "Validation, ACLED gate, compose wiring",
+        "status": "done"
+      },
+      {
+        "id": 3,
+        "name": "MCP adapters — Telegram + BarentsWatch",
+        "status": "done"
+      },
+      {
+        "id": 4,
+        "name": "Translation on Demand (Phase 999.1 closure)",
+        "status": "done"
+      },
+      {
+        "id": 5,
+        "name": "Advanced Media — YouTube faster-whisper transcription",
+        "status": "done"
+      },
+      {
+        "id": 6,
+        "name": "Closeout — 11-01-SUMMARY.md written, phase marked complete",
+        "status": "done"
+      }
     ]
   },
   "phase_99x_state": {
-    "999.1": {"status": "CLOSED 2026-07-22 (shipped as Phase 11 Wave 4)", "archived_dir": ".planning/phases/_archived/999.1-translation-on-demand-per-item-ru-de-es-to-no-en/"},
-    "999.2": {"status": "BACKLOG with carry-forward rationale", "rationale": "Dedup threshold calibration on larger corpus — same-day R2 spike was too narrow. Open into the first M2 phase that runs controlled off-topic-vs-same-event evaluation."},
-    "999.3": {"status": "CLOSED 2026-07-12 (mE5-large threshold re-validated at T*=0.92; live --corpus-from-postgres GO at T*=0.92)", "now_archived_to": ".planning/phases/_archived/999.3-entity-resolution-cross-language-coverage-and-mE5-large-re-validation/"},
-    "999.4": {"status": "CLOSED 2026-07-22 (shipped as Phase 10 Wave 4 — verify_language_coverage() in libs/contracts/_verify.py)", "now_archived_to": ".planning/phases/_archived/999.4-cross-language-synthesis-verification-for-wiki-llm/"}
+    "999.1": {
+      "status": "CLOSED 2026-07-22 (shipped as Phase 11 Wave 4)",
+      "archived_dir": ".planning/phases/_archived/999.1-translation-on-demand-per-item-ru-de-es-to-no-en/"
+    },
+    "999.2": {
+      "status": "BACKLOG with carry-forward rationale",
+      "rationale": "Dedup threshold calibration on larger corpus — same-day R2 spike was too narrow. Open into the first M2 phase that runs controlled off-topic-vs-same-event evaluation."
+    },
+    "999.3": {
+      "status": "CLOSED 2026-07-12 (mE5-large threshold re-validated at T*=0.92; live --corpus-from-postgres GO at T*=0.92)",
+      "now_archived_to": ".planning/phases/_archived/999.3-entity-resolution-cross-language-coverage-and-mE5-large-re-validation/"
+    },
+    "999.4": {
+      "status": "CLOSED 2026-07-22 (shipped as Phase 10 Wave 4 — verify_language_coverage() in libs/contracts/_verify.py)",
+      "now_archived_to": ".planning/phases/_archived/999.4-cross-language-synthesis-verification-for-wiki-llm/"
+    }
   },
   "blockers": [],
   "async_jobs": [],
@@ -127,8 +163,16 @@
     }
   ],
   "prerequisite_commits": [
-    {"commit": "ef8540b", "purpose": "feat(ingest-youtube): Phase 11 Wave 5 — local faster-whisper transcription"}
+    {
+      "commit": "ef8540b",
+      "purpose": "feat(ingest-youtube): Phase 11 Wave 5 — local faster-whisper transcription"
+    }
   ],
   "next_action": "Phase 11 is closed; Phase 12 (CNR alerting / dissemination) is the only remaining M2 phase and is ready to plan. Begin via /gsd-discuss-phase 12 to surface scope and constraints, then /gsd-plan-phase 12 to lock success criteria and waves. The POP3 + links-view feature work above is parked for its own feature commit.",
-  "context_notes": "All integer phases 0-11 are closed. Phase 99.1, 999.3, 999.4 closed and archived. Phase 999.2 still BACKLOG with rationale carried forward; the carry-forward rationale is still valid (no movement signal since R2 spike) and unrelated to Phase 12. Plan files now live at .planning/phases/{0..11,99.2,12}/; archived at .planning/phases/_archived/{999.1,999.3,999.4}/. Forensic housekeeping audit lays clean paper so Phase 12 starts without stale pointers; feature work (POP3 + link view) is parked separately in the working tree."
+  "context_notes": "All integer phases 0-11 are closed. Phase 99.1, 999.3, 999.4 closed and archived. Phase 999.2 still BACKLOG with rationale carried forward; the carry-forward rationale is still valid (no movement signal since R2 spike) and unrelated to Phase 12. Plan files now live at .planning/phases/{0..11,99.2,12}/; archived at .planning/phases/_archived/{999.1,999.3,999.4}/. Forensic housekeeping audit lays clean paper so Phase 12 starts without stale pointers; feature work (POP3 + link view) is parked separately in the working tree.",
+  "phase_13_ingest_body_wiring": {
+    "originates_from": "libs/store/sql/009-articles-body.sql",
+    "status": "open",
+    "note": "apps/ingest-{gmail,imap,youtube,telegram,barentswatch,acled,obsidian} currently UPSERT only body_ref. To populate the new body TEXT column, each ingest service needs a parallel write in PostgresStore.put_item. Until then production articles.body stays NULL and the link view reads summary-only."
+  }
 }

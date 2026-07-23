@@ -1,0 +1,38 @@
+-- 009-articles-body.sql — denormalized TEXT body on articles (link view input)
+--
+-- ## Why
+-- apps/brief/renderer.py::render_links() concatenates title + summary + body
+-- into a haystack and extracts outbound URLs. ingest caps summary around 500
+-- chars, so URLs that live deeper in the email body were silently dropped from
+-- the link surface.
+--
+-- ## Idempotency
+-- ADD COLUMN IF NOT EXISTS is metadata-only in PG 11+ and matches the rest of
+-- the init_schema() chain against re-runs (unlike ADD CONSTRAINT).
+--
+-- ## Coexistence with body_ref
+-- body_ref (existing) is a hash pointer into the blob store; body (new) is
+-- denormalized full text. A future Phase will backfill body from blobs and
+-- drop body_ref + the blob store. Do NOT remove body_ref yet — the hot-path
+-- lookups still rely on it.
+--
+-- ## Current ingest gap
+-- apps/ingest-{gmail,imap,youtube,telegram,barentswatch,acled,obsidian}
+-- currently UPSERT body_ref (blob hash) only. To populate this column,
+-- those services need a parallel `body TEXT` write in their
+-- PostgresStore.put_item INSERT statements. Until that lands,
+-- production `articles.body` stays NULL and the link view reads
+-- summary-only — same as before this migration. Track as a Phase
+-- follow-up under `phase_13_ingest_body_wiring` in HANDOFF.json.
+--
+-- ## Wire-format WARNING
+-- a.body inflates the verdict.ready + /sab wire-format — typical
+-- 5–10× for most email/news bodies (2–20 KB); tail up to ~50× for
+-- long-form journalism and ~100× for HTML-heavy marketing emails.
+-- If /sab HTML latency or RabbitMQ heap pressure become painful,
+-- split into a hot-path SELECT (no a.body) and a cold-path
+-- rows_for_links lookup; THIS migration is the prerequisite for
+-- that optimization, not the optimization itself.
+
+ALTER TABLE infotriage.articles
+    ADD COLUMN IF NOT EXISTS body TEXT;

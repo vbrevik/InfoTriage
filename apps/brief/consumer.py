@@ -33,6 +33,11 @@ log = logging.getLogger(__name__)
 # Same env + default as main.py — consumer writes where the HTTP server serves (D-03)
 DATA_DIR = Path(os.environ.get("INFOTRIAGE_DIGESTS_DIR", "data/digests"))
 
+# Module-level SQL constant (mirrors main.py::_ENRICHMENT_SQL). Hoisting from
+# inside process_verdict enables static SQL-grammar regression tests and
+# avoids re-building the constant string per verdict.ready message.
+_SELECT = "SELECT e.item_id, e.ccir, e.cnr, e.score, e.bucket, e.why, e.pmesii, e.tessoc, a.title, a.summary, a.body, a.source, a.url, a.ts, emb.embedding FROM infotriage.enrichment e JOIN infotriage.articles a ON a.id = e.item_id LEFT JOIN infotriage.embeddings emb ON emb.item_id = e.item_id "
+
 
 # ---------------------------------------------------------------------------
 # process_verdict — core async handler (R1-R5)
@@ -56,17 +61,6 @@ async def process_verdict(
     R5: Publishes SabPublished with topic BLUFs and item refs
     """
     # Fetch enrichment row from Postgres.
-    # title/summary/source/url live on infotriage.articles — enrichment holds
-    # only scoring columns (005-stubs + 006-enrichment), hence the JOIN.
-    # LEFT JOIN embeddings to get pgvector data for clustering.
-    _SELECT = (
-        "SELECT e.item_id, e.ccir, e.cnr, e.score, e.bucket, e.why, e.pmesii, e.tessoc, "
-        "a.title, a.summary, a.source, a.url, a.ts, "
-        "emb.embedding "
-        "FROM infotriage.enrichment e "
-        "JOIN infotriage.articles a ON a.id = e.item_id "
-        "LEFT JOIN infotriage.embeddings emb ON emb.item_id = e.item_id "
-    )
 
     def _fetch():  # plain def — runs inside asyncio.to_thread
         with store.cursor() as cur:

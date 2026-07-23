@@ -73,7 +73,7 @@ def _default_cutoff() -> datetime.datetime:
 
 _ENRICHMENT_SQL = (
     "SELECT e.item_id, e.ccir, e.cnr, e.score, e.bucket, e.why, e.pmesii, e.tessoc, "
-    "a.title, a.summary, a.source, a.url, "
+    "a.title, a.summary, a.body, a.source, a.url, "
     "emb.embedding "
     "FROM infotriage.enrichment e "
     "JOIN infotriage.articles a ON a.id = e.item_id "
