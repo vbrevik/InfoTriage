@@ -96,6 +96,15 @@ class H(BaseHTTPRequestHandler):
                 b["max_tokens"] = max(
                     int(body.get("max_tokens", 400) or 400), SPARK_MIN_MAXTOK
                 )
+                # Qwen3.6 is a thinking model. For InfoTriage's bounded JSON
+                # classification we do NOT want chain-of-thought: it burns 25-30s
+                # and thousands of tokens per call (blowing the entity-NER budget)
+                # for no quality gain on a fixed-schema task. Disabling thinking
+                # drops latency to ~5s with clean JSON (finish_reason=stop). The
+                # <think>-strip below stays as a belt-and-suspenders fallback.
+                kw = dict(b.get("chat_template_kwargs") or {})
+                kw.setdefault("enable_thinking", False)
+                b["chat_template_kwargs"] = kw
                 code, out = fwd(SPARK, "/chat/completions", b, 600)
                 try:  # strip <think> from returned content
                     d = json.loads(out)
