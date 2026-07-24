@@ -1,7 +1,7 @@
 ---
 phase: 08
 slug: entity-resolution
-status: approved
+status: validated
 nyquist_compliant: true
 wave_0_complete: true
 created: 2026-07-13
@@ -19,7 +19,7 @@ created: 2026-07-13
 |----------|-------|
 | **Framework** | pytest 8.x |
 | **Config file** | `pyproject.toml` (`[tool.pytest.ini_options]`) |
-| **Quick run command** | `pytest tests/test_triage_entities.py tests/test_store_entities.py tests/test_triage_worker.py tests/test_vault_writer.py tests/test_brief_consumer.py tests/test_validate_entity_threshold.py -q` |
+| **Quick run command** | `pytest tests/test_entities.py tests/test_triage_entities.py tests/test_store_entities.py tests/test_triage_worker.py tests/test_vault_writer.py tests/test_brief_consumer.py tests/test_validate_entity_threshold.py -q` |
 | **Full suite command** | `pytest tests/ -q` |
 | **Estimated runtime** | ~30 seconds (inmemory); ~60 seconds with db_live |
 
@@ -45,6 +45,11 @@ created: 2026-07-13
 | 08-01-05 | 01 | 3 | R5 Triage worker integration | T-08-04 | Entity resolution failure does not block verdict.ready | unit | `pytest tests/test_triage_worker.py -q` | ✅ | ✅ green |
 | 08-01-06 | 01 | 4 | R6 Obsidian projection | T-08-02 | Postgres remains system of record; vault is projection only | unit | `pytest tests/test_vault_writer.py tests/test_brief_consumer.py -q` | ✅ | ✅ green |
 | 08-01-07 | 01 | 5 | mE5-large threshold re-validation | — | Threshold documented and validated on cross-language corpus | integration | `pytest tests/test_validate_entity_threshold.py -q` | ✅ | ✅ green |
+| 08-02-01 | 02 | 2 | R1 NER (LLM-based, qwen36) | T-08-01 | LLM parse failure/malformed JSON returns empty list, never crashes | unit | `pytest tests/test_entities.py::TestParseEntities tests/test_entities.py::TestExtractEntities -q` | ✅ | ✅ green |
+| 08-02-02 | 02 | 2 | R2/R3 Embedding + linking (LINK_THRESHOLD=0.92) | T-08-02, T-08-03 | Exact match takes precedence over similarity; embedding failure returns None, never blocks | unit | `pytest tests/test_entities.py::TestNormalizeName tests/test_entities.py::TestEmbedEntityName tests/test_entities.py::TestResolveEntities -q` | ✅ | ✅ green |
+| 08-02-03 | 02 | 5 | R4 get_all_entities (store protocol) | T-08-02 | Aggregates aliases + link_count per canonical entity; empty store returns [] | contract | `pytest tests/test_store_entities.py::test_get_all_entities_aggregates_aliases_and_links tests/test_store_entities.py::test_get_all_entities_empty -q` | ✅ | ✅ green |
+| 08-02-04 | 02 | 5 | R6 Entity Graph.md generation | T-08-02 | write_entity_graph/write_entity_graph_from_store produce Entity Graph.md with type/lang/alias/link-count; empty-store case handled | unit | `pytest tests/test_vault_writer.py -k entity_graph -q` | ✅ | ✅ green |
+| 08-02-05 | 02 | 5 | LINK_THRESHOLD adopted at validated value | 999.3-VERDICT.md | `apps/triage/entities.py:LINK_THRESHOLD == 0.92` matches the validated recommendation | integration | `pytest tests/test_validate_entity_threshold.py -q` (verdict) + code inspection | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -54,6 +59,7 @@ created: 2026-07-13
 
 Existing infrastructure covers all phase requirements.
 
+- [x] `tests/test_entities.py` — unit tests for LLM-based (qwen36) NER, parsing, embedding, and linking (Wave 2, added 2026-07-20)
 - [x] `tests/test_triage_entities.py` — unit tests for `apps/triage/entities.py`
 - [x] `tests/test_store_entities.py` — contract tests for Store entity methods
 - [x] `tests/test_triage_worker.py` — regression tests for worker integration
@@ -78,4 +84,42 @@ All phase behaviors have automated verification.
 - [x] Feedback latency < 60s
 - [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** approved 2026-07-13
+**Approval:** approved 2026-07-13; re-validated 2026-07-24 (see audit below)
+
+---
+
+## Validation Audit 2026-07-24
+
+The original approval (2026-07-13) covered only Wave 1 (08-01-SUMMARY.md). Wave
+2-6 (08-02-SUMMARY.md: LLM-based NER via qwen36, `get_all_entities()`,
+Entity Graph.md generation, LINK_THRESHOLD re-validated to 0.92) landed
+2026-07-20 and was never mapped in this file despite `nyquist_compliant: true`
+remaining set — a documentation-accuracy gap, not a test gap: all Wave 2-6
+functionality already had real, passing tests (`tests/test_entities.py`,
+targeted `test_store_entities.py`/`test_vault_writer.py` cases), they were
+just absent from the Per-Task Verification Map above.
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 5 (undocumented map rows for Wave 2-6; no missing/failing tests) |
+| Resolved | 5 (map rows 08-02-01..05 added above, cross-checked against live code — `LINK_THRESHOLD == 0.92` confirmed in `apps/triage/entities.py`) |
+| Escalated | 0 |
+
+Full Phase 8 test set re-run at audit time: `pytest tests/test_entities.py
+tests/test_triage_entities.py tests/test_store_entities.py
+tests/test_triage_worker.py tests/test_vault_writer.py
+tests/test_brief_consumer.py tests/test_validate_entity_threshold.py -q` →
+**105 passed, 15 skipped** (db_live-gated), 0 failed.
+
+**Separately observed during this audit (not a Nyquist gap — flagging for
+awareness):** live production data shows entity extraction and cross-language
+linking both working mechanically (535 entities, 1127 links; NATO/Russland/Iran
+present), but the top-ranked entities by link count are dominated by non-
+substantive noise (GitHub, CI workflow names, the operator's own name, email-
+platform senders) rather than geopolitical actors, and a spot query for
+same-`name_norm`-different-`lang` entity pairs returned zero rows — i.e. no
+observed cross-language merges in the current live corpus, despite that being
+Phase 8's core validated capability (999.3, T*=0.92). This is a live-data/
+product-quality observation for a future `/gsd-verify-work 8` UAT session
+(one is already in progress, paused at Test 1/5), not a test-coverage gap —
+no VALIDATION.md action taken.
