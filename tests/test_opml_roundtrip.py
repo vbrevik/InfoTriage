@@ -12,9 +12,12 @@ import xml.etree.ElementTree as ET
 OPML = os.path.join(os.path.dirname(__file__), "..", "apps", "opml", "feeds.opml")
 
 EXPECTED_TOP_OUTLINES = (
-    12  # Norske aviser, Offentlig Norge, ... , NewsAPI.org, Sport VM 2026 (SIR-2)
+    11  # Norske aviser, Offentlig Norge, ... , NewsAPI.org, Midtøsten & US-Iran (SIR-1)
+    # Sport VM 2026 (SIR-2) group removed 2026-07-24 — SIR-2 retired (final played),
+    # ccir_sync regenerated feeds.opml's CCIR groups without it.
 )
-EXPECTED_RSS_FEEDS = 70  # total type="rss" outlines (verified 2026-06-24)
+EXPECTED_RSS_FEEDS = 66  # total type="rss" outlines (updated 2026-07-24: -4 for the
+# removed Sport VM 2026 group's BBC/ESPN/Reuters/Google feeds)
 
 
 def _parse(path):

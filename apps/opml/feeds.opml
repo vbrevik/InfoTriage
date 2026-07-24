@@ -134,12 +134,6 @@
       <outline type="rss" text="FDD · Long War Journal" title="FDD · Long War Journal" xmlUrl="https://www.longwarjournal.org/feed" htmlUrl="https://www.longwarjournal.org/"/>
       <outline type="rss" text="US State Dept ⚠️" title="US State Dept ⚠️" xmlUrl="https://www.state.gov/rss-feed/department-press-bureau/department-of-state/feed" htmlUrl="https://www.state.gov/"/>
     </outline>
-    <outline text="Sport — VM 2026 (SIR-2)" title="Sport — VM 2026 (SIR-2)">
-      <outline type="rss" text="BBC Sport Football" title="BBC Sport Football" xmlUrl="https://feeds.bbci.co.uk/sport/football/rss.xml" htmlUrl="https://www.bbc.com/sport/football"/>
-      <outline type="rss" text="ESPN FC ⚠️" title="ESPN FC ⚠️" xmlUrl="https://www.espn.com/espn/rss/soccer/news" htmlUrl="https://www.espn.com/soccer/"/>
-      <outline type="rss" text="Reuters Sports ⚠️" title="Reuters Sports ⚠️" xmlUrl="https://www.reutersagency.com/feed/?best-topics=sports&amp;post_type=best" htmlUrl="https://www.reutersagency.com/"/>
-      <outline type="rss" text="Google News · WC2026" title="Google News · WC2026" xmlUrl="https://news.google.com/rss/search?q=FIFA+World+Cup+2026&amp;hl=en" htmlUrl="https://news.google.com/search?q=FIFA+World+Cup+2026"/>
-    </outline>
     <!-- ccir:end -->
     <!-- ===== NO native RSS (404) — build with rss-bridge (CSS-selector scrape) =====
     

@@ -176,6 +176,11 @@ CCIR: list[CCIRSpec] = [
                 "https://news.google.com/search?q=FIFA+World+Cup+2026",
             ),
         ),
+        # Retired 2026-07-24: VM 2026 final has been played. SIR requirements
+        # are time-bounded per ccir.md ("oppheves ved endt hendelse") — kept
+        # in the registry (definition + examples + feeds preserved) for
+        # history and one-flag re-activation if a future World Cup reopens it.
+        active=False,
     ),
     CCIRSpec(
         id="SIR-3",
@@ -187,6 +192,10 @@ CCIR: list[CCIRSpec] = [
         cop=True,
         pmesii=("Political", "Military"),
         tessoc=("Terror", "Subversion"),
+        # Retired 2026-07-24: summit concluded. SIR requirements are
+        # time-bounded per ccir.md ("oppheves ved endt hendelse") — kept in
+        # the registry for history / re-activation.
+        active=False,
     ),
     CCIRSpec(
         id="FFIR-1",

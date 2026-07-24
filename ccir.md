@@ -78,7 +78,8 @@ hardkodet parser mot denne filen. Edit freely — add/remove/retune.
   Tidsavgrenset: aktiv så lenge den diplomatiske/militære spenningskurven er skarp.
   Kildegruppe: Crisis Group, Al-Monitor, FDD Long War Journal, US State Dept.
   `PMESII: Military, Political, Economic` · `TESSOC: Terror, Sabotage, Espionage`
-- **SIR-2 Sport — VM 2026 (FIFA)** — sikkerhets- og geopolitisk dimensjon ved
+- ~~**SIR-2 Sport — VM 2026 (FIFA)**~~ **RETIRED 2026-07-24** (finalen er spilt;
+  `active=False` i registeret, `libs/contracts/src/contracts/ccir.py`) — sikkerhets- og geopolitisk dimensjon ved
   Fotball-VM 2026 (vertsnasjoner USA/Canada/Mexico): kritisk infrastruktur, protester
   /boikott, politisk ladede kamper (Iran, Saudi-Arabia), terrortrusler, store
   kontroverser. **Carve-out-intent**: VM 2026-hits med sikkerhets-/politisk
@@ -93,7 +94,8 @@ hardkodet parser mot denne filen. Edit freely — add/remove/retune.
   scorer-promptens regel + eksempler i `triage_score.py:score_item`. Kildegruppe:
   BBC Sport Football, ESPN FC, Reuters Sports, Google News WC2026.
   `PMESII: Political, Social, Infrastructure` · `TESSOC: Terror, Organized Crime, Subversion`
-- **SIR-3 NATO-toppmøtet i Ankara (Tyrkia)** — alt om toppmøtet: agenda, vedtak
+- ~~**SIR-3 NATO-toppmøtet i Ankara (Tyrkia)**~~ **RETIRED 2026-07-24** (toppmøtet
+  er avsluttet; `active=False` i registeret) — alt om toppmøtet: agenda, vedtak
   og kommunikeer; deltakelse/fravær av stats- og regjeringssjefer; Tyrkias
   vertskapsrolle og posisjonering (Sverige/Finland-relasjoner, S-400/F-35,
   Bosporos/Svartehavet); sikkerhetsopplegg, protester eller trusler rundt

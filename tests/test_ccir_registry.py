@@ -16,8 +16,9 @@ from contracts.ccir import (
 
 
 def test_registry_active_ccirs_in_order():
-    # 12 migrated requirements + FFIR-4 (frontier AI/LLM landscape, added
-    # 2026-07-24 to split frontier-model news from own-local-capability FFIR-3).
+    # SIR-2 (WC2026) and SIR-3 (Ankara summit) retired 2026-07-24 — both
+    # events concluded. Still present in CCIR (see test_retired_specs_*
+    # below), just excluded from active_specs().
     assert [c.id for c in active_specs()] == [
         "PIR-1",
         "PIR-2",
@@ -26,13 +27,20 @@ def test_registry_active_ccirs_in_order():
         "PIR-5",
         "PIR-6",
         "SIR-1",
-        "SIR-2",
-        "SIR-3",
         "FFIR-1",
         "FFIR-2",
         "FFIR-3",
         "FFIR-4",
     ]
+
+
+def test_retired_specs_still_present_but_inactive():
+    """Retirement is active=False, not deletion — history + re-activation."""
+    all_ids = {c.id for c in CCIR}
+    assert {"SIR-2", "SIR-3"} <= all_ids
+    active_ids = {c.id for c in active_specs()}
+    assert "SIR-2" not in active_ids
+    assert "SIR-3" not in active_ids
 
 
 def test_every_spec_has_required_fields():
@@ -43,7 +51,7 @@ def test_every_spec_has_required_fields():
         assert isinstance(c.tessoc, tuple) and c.tessoc
 
 
-def test_ccir_order_matches_legacy_literal():
+def test_ccir_order_matches_current_active_set():
     assert CCIR_ORDER == [
         ("PIR-1", "Russland / Ukraina"),
         ("PIR-2", "Nordområdene & Arktis"),
@@ -52,8 +60,6 @@ def test_ccir_order_matches_legacy_literal():
         ("PIR-5", "Stormaktsrivalisering"),
         ("PIR-6", "OSINT & etterforskning"),
         ("SIR-1", "Midtøsten & US-Iran"),
-        ("SIR-2", "Sport — VM 2026 (FIFA)"),
-        ("SIR-3", "NATO-toppmøtet i Ankara"),
         ("FFIR-1", "Norsk forsvar & sikkerhetspolitikk"),
         ("FFIR-2", "Norsk politikk & samfunn"),
         ("FFIR-3", "Egen teknologikapabilitet"),
@@ -61,27 +67,28 @@ def test_ccir_order_matches_legacy_literal():
     ]
 
 
-def test_cop_ccir_matches_legacy_set():
-    assert COP_CCIR == {
-        "FFIR-1",
-        "FFIR-2",
-        "FFIR-3",
-        "FFIR-4",
-        "PIR-3",
-        "SIR-2",
-        "SIR-3",
-    }
+def test_cop_ccir_matches_current_active_set():
+    # SIR-2/SIR-3 were COP but are retired, so they drop out of COP_CCIR too.
+    assert COP_CCIR == {"FFIR-1", "FFIR-2", "FFIR-3", "FFIR-4", "PIR-3"}
 
 
 def test_scorer_block_lists_active_ids_and_examples():
     block = build_scorer_block()
-    for cid in ["PIR-1", "SIR-2", "SIR-3", "FFIR-3"]:
+    for cid in ["PIR-1", "SIR-1", "FFIR-3", "FFIR-4"]:
         assert cid in block
     assert "Bellingcat identifies Russian officer" in block  # worked example
 
 
-def test_scorer_enum_includes_sir3_regression():
-    # SIR-3 was absent from the legacy enum (drift bug); registry restores it.
+def test_scorer_block_excludes_retired_ids():
+    block = build_scorer_block()
     enum = active_ccir_enum()
-    assert "SIR-3" in enum
+    for cid in ["SIR-2", "SIR-3"]:
+        assert cid not in enum
+    assert "VM 2026" not in block
+    assert "Ankara" not in block
+
+
+def test_scorer_enum_well_formed():
+    enum = active_ccir_enum()
+    assert "PIR-1" in enum
     assert enum.endswith("| none")
