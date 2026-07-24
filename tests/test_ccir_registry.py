@@ -15,7 +15,9 @@ from contracts.ccir import (
 )
 
 
-def test_registry_has_twelve_active_ccirs_in_order():
+def test_registry_active_ccirs_in_order():
+    # 12 migrated requirements + FFIR-4 (frontier AI/LLM landscape, added
+    # 2026-07-24 to split frontier-model news from own-local-capability FFIR-3).
     assert [c.id for c in active_specs()] == [
         "PIR-1",
         "PIR-2",
@@ -29,6 +31,7 @@ def test_registry_has_twelve_active_ccirs_in_order():
         "FFIR-1",
         "FFIR-2",
         "FFIR-3",
+        "FFIR-4",
     ]
 
 
@@ -54,11 +57,20 @@ def test_ccir_order_matches_legacy_literal():
         ("FFIR-1", "Norsk forsvar & sikkerhetspolitikk"),
         ("FFIR-2", "Norsk politikk & samfunn"),
         ("FFIR-3", "Egen teknologikapabilitet"),
+        ("FFIR-4", "Frontier AI & LLM-landskap"),
     ]
 
 
 def test_cop_ccir_matches_legacy_set():
-    assert COP_CCIR == {"FFIR-1", "FFIR-2", "FFIR-3", "PIR-3", "SIR-2", "SIR-3"}
+    assert COP_CCIR == {
+        "FFIR-1",
+        "FFIR-2",
+        "FFIR-3",
+        "FFIR-4",
+        "PIR-3",
+        "SIR-2",
+        "SIR-3",
+    }
 
 
 def test_scorer_block_lists_active_ids_and_examples():

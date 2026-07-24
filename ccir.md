@@ -60,6 +60,15 @@ hardkodet parser mot denne filen. Edit freely — add/remove/retune.
     «hva kan *jeg* kjøre lokalt». Hvis vinklingen er geopolitisk (f.eks.
     Kinas chip-exports, USAs eksportkontroll), faller saken tilbake til PIR-5.
   `PMESII: Information` · `TESSOC: Espionage, Sabotage`
+- **FFIR-4 Frontier AI & LLM-landskap** — det *eksterne* frontier-AI-landskapet:
+  modellslipp og -nyheter (Kimi, GPT, Gemini, Claude, Qwen, Llama, DeepSeek,
+  Mistral), open-source-modeller, benchmarks/leaderboards, agent-rammeverk og
+  AI-lab-utvikling. **Skille mot FFIR-3**: FFIR-3 er *egen lokal kjøring* på
+  egen maskin (oMLX, MLX, Ollama, LM Studio, vLLM, egen DGX Spark/GB10); FFIR-4
+  er *hva frontier-labbene slipper* — også når modellen er open-source og *kan*
+  kjøres lokalt: selve slippet/benchmarken er FFIR-4, det å kjøre den selv er
+  FFIR-3.
+  `PMESII: Information` · `TESSOC: Espionage`
 
 ## SIR — Specific Intelligence Requirements (tidsavgrenset, oppheves ved endt hendelse)
 

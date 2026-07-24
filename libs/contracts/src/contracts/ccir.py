@@ -208,12 +208,27 @@ CCIR: list[CCIRSpec] = [
         id="FFIR-3",
         title="Egen teknologikapabilitet",
         scorer_line=(
-            "lokale LLM-er (Mac/Qwen/MLX/Ollama), AI-agenter, DFIR, Rust, homelab, "
-            "NVIDIA-stack (DGX Spark / GB10 Grace Blackwell / CUDA-versjoner)"
+            "lokal LLM-kjøring på egen maskin — oMLX, MLX (alle varianter), Ollama, "
+            "LM Studio, vLLM og liknende runtimes, kvantisering, AI-agenter/verktøy, "
+            "DFIR, Rust, homelab og selvhostet tooling (f.eks. ngrok-tunnel), egen "
+            "NVIDIA-stack (DGX Spark / GB10 Grace Blackwell / CUDA). Spark = egen boks → FFIR-3"
         ),
         cop=True,
         pmesii=("Information",),
         tessoc=("Espionage", "Sabotage"),
+    ),
+    CCIRSpec(
+        id="FFIR-4",
+        title="Frontier AI & LLM-landskap",
+        scorer_line=(
+            "det EKSTERNE frontier-AI-landskapet — modellslipp og -nyheter "
+            "(Kimi, GPT, Gemini, Claude, Qwen, Llama, DeepSeek, Mistral), "
+            "open-source-modeller, benchmarks/leaderboards, agent-rammeverk, "
+            "AI-lab-utvikling (til forskjell fra FFIR-3: egen lokal kjøring)"
+        ),
+        cop=True,
+        pmesii=("Information",),
+        tessoc=("Espionage",),
     ),
 ]
 
@@ -285,6 +300,24 @@ WORKED_EXAMPLES: list[Example] = [
         "NATO-toppmøte, forsvarsbudsjetter",
     ),
     Example(
+        "Kimi K3 open-source model tops coding benchmarks, rattles US AI stocks",
+        "FFIR-4",
+        "II",
+        "Information",
+        "none",
+        6,
+        "Frontier open-source-modell, benchmark-gjennombrudd",
+    ),
+    Example(
+        "Running LM Studio with a 70B model on a 64GB Mac",
+        "FFIR-3",
+        "II",
+        "Information",
+        "none",
+        5,
+        "Egen lokal AI-kjøring (LM Studio / Mac)",
+    ),
+    Example(
         "Sony releases new PlayStation update",
         "none",
         "none",
@@ -313,6 +346,10 @@ DISAMBIGUATION: list[tuple[tuple[str, ...], str]] = [
     (
         ("FFIR-3", "PIR-4"),
         "FFIR-3 vs PIR-4: cybersecurity of Norwegian critical infra → PIR-4. Building your own local LLM / DFIR lab / homelab → FFIR-3.",
+    ),
+    (
+        ("FFIR-3", "FFIR-4"),
+        "FFIR-3 vs FFIR-4: RUNNING or building AI on your OWN machine — oMLX, MLX, Ollama, LM Studio, vLLM, your own Spark/GB10 box, local agents, quantization → FFIR-3. NEWS about the EXTERNAL frontier landscape — model releases (Kimi K3, GPT, Gemini, Claude, Qwen, Llama, DeepSeek, Mistral), benchmarks/leaderboards, open-source drops, AI-lab developments → FFIR-4. A frontier open-source model you could ALSO run locally is FFIR-4 when the item is about the release/benchmark, FFIR-3 when it is about you running it.",
     ),
     (
         ("SIR-2",),
