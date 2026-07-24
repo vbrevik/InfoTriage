@@ -78,3 +78,59 @@ def test_ccir_order_titles_are_nonempty():
         if not title or not title.strip()
     ]
     assert not bad, f"CCIR_ORDER entries with empty/whitespace titles: {bad}"
+
+
+# ── Registry sync guards (single source of truth = contracts.ccir) ───────────
+
+_FEEDS_OPML = os.path.join(
+    os.path.dirname(__file__), "..", "apps", "opml", "feeds.opml"
+)
+_PMESII_RE = re.compile(r"`PMESII:\s*([^`]+)`")
+_TESSOC_RE = re.compile(r"`TESSOC:\s*([^`]+)`")
+
+
+def _ccir_md_trailers():
+    """Parse ccir.md per-requirement `PMESII: …` · `TESSOC: …` trailers.
+
+    Returns {id: (pmesii_tuple, tessoc_tuple)}.
+    """
+    text = open(CCIR_MD, encoding="utf-8").read()
+    blocks = re.split(r"(?m)(?=^- \*\*[A-Z]{3,4}-\d+)", text)
+    out = {}
+    for b in blocks:
+        m = re.match(r"- \*\*([A-Z]{3,4}-\d+)", b)
+        if not m:
+            continue
+        pm, te = _PMESII_RE.search(b), _TESSOC_RE.search(b)
+        if pm and te:
+            out[m.group(1)] = (
+                tuple(x.strip() for x in pm.group(1).split(",")),
+                tuple(x.strip() for x in te.group(1).split(",")),
+            )
+    return out
+
+
+def test_registry_pmesii_tessoc_match_ccir_md():
+    """Each active spec's pmesii/tessoc tuples equal ccir.md's trailers."""
+    from contracts.ccir import active_specs
+
+    trailers = _ccir_md_trailers()
+    mismatches = []
+    for c in active_specs():
+        expected = trailers.get(c.id)
+        if expected != (c.pmesii, c.tessoc):
+            mismatches.append((c.id, (c.pmesii, c.tessoc), expected))
+    assert not mismatches, "registry ↔ ccir.md PMESII/TESSOC drift: " + "; ".join(
+        f"{cid}: registry={r} ccir.md={m}" for cid, r, m in mismatches
+    )
+
+
+def test_feeds_opml_ccir_groups_in_sync():
+    """The generated CCIR feed groups match apps/opml/feeds.opml. Run
+    `make ccir-sync` if this fails."""
+    from contracts.ccir import render_feeds_opml_groups
+
+    on_disk = open(_FEEDS_OPML, encoding="utf-8").read()
+    assert (
+        render_feeds_opml_groups() in on_disk
+    ), "feeds.opml CCIR groups drifted from the registry — run `make ccir-sync`"

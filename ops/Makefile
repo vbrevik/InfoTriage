@@ -15,7 +15,7 @@ ROOT_DIR := $(abspath $(OPS_DIR)/..)
 SCRIPTS_DIR := $(ROOT_DIR)/scripts
 SERVICES := freshrss rssbridge feeds postgres rabbitmq ingest-imap ingest-youtube ingest-gmail ingest-obsidian triage brief scheduler opml-health dlq-consumer
 
-.PHONY: help up down logs status restart shell seed backfill replay test-safe test-full clean ntfy-build ntfy-up ntfy-publish-test
+.PHONY: help up down logs status restart shell seed backfill replay test-safe test-full clean ntfy-build ntfy-up ntfy-publish-test ccir-sync
 
 help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -144,6 +144,9 @@ ntfy-publish-test: ## Smoke-test the pre-baked ACL: producer POST must succeed (
 		-d "InfoTriage ntfy ACL smoke test" \
 		"$${NTFY_BASE_URL:-http://127.0.0.1:22070}/$${NTFY_TOPIC_PREFIX:-cnr-cat-i}-smoke" >/dev/null \
 	&& echo "ntfy-publish-test: OK (producer write accepted)"
+
+ccir-sync: ## Regenerate CCIR-owned feeds.opml groups from the registry (contracts.ccir)
+	cd $(ROOT_DIR) && python scripts/ccir_sync.py
 
 clean: ## Stop and wipe all data (dangerous)
 	$(COMPOSE) down -v
