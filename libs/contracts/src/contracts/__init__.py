@@ -60,6 +60,8 @@ __all__ = [
     "CCIR_ORDER",
     "COP_CCIR",
     "build_scorer_block",
+    "build_quickref",
+    "build_examples_and_guide",
     "active_ccir_enum",
     "render_feeds_opml_groups",
 ]
@@ -71,6 +73,8 @@ from .ccir import (  # noqa: E402
     CCIR_ORDER,
     COP_CCIR,
     build_scorer_block,
+    build_quickref,
+    build_examples_and_guide,
     active_ccir_enum,
     render_feeds_opml_groups,
 )

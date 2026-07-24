@@ -14,8 +14,13 @@ Env (or .env): LLM_BASE_URL, LLM_API_KEY, LLM_MODEL.
 """
 import json, os, sys, argparse, logging, urllib.request, urllib.error
 
-# The triage brain lives in ccir.md (Commander's Critical Information Requirements).
-# Edit that file to retune — not this code.
+from contracts.ccir import build_quickref, build_examples_and_guide, active_ccir_enum
+
+# The CCIR taxonomy lives in the registry (libs/contracts/.../ccir.py): the
+# scorer's quick-reference, JSON enum, disambiguation guide, and worked examples
+# all derive from it (add/edit/retire a requirement there — one place). ccir.md
+# holds the human-facing analytical prose and is still inlined verbatim into the
+# prompt below for the model's full context.
 CCIR_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "ccir.md")
 
 log = logging.getLogger(__name__)
@@ -61,24 +66,18 @@ def llm(messages, max_tokens=400):
 
 def score_item(it):
     ccir = load_ccir()
+    # CCIR-specific prompt sections derive from the single-source registry
+    # (contracts.ccir). The PMESII/TESSOC framework prose below is not
+    # CCIR-specific and stays inline. `enum` is the JSON-schema CCIR enum.
+    quickref = build_quickref()
+    examples_and_guide = build_examples_and_guide()
+    enum = active_ccir_enum()
     prompt = f"""You are an intelligence analyst triaging news against the commander's
 CCIR below. Decide which single CCIR (if any) this item answers, and its CNR level.
 
 {ccir}
 
-Tier quick-reference (full descriptions in ccir.md above):
-- PIR-1 Russland/Ukraina — krig, frontlinjer, våpenstøtte, sanksjoner
-- PIR-2 Nordområdene & Arktis — Svalbard, ubåter, GIUK-gap, nordlig sjørute
-- PIR-3 NATO & europeisk sikkerhet — toppmøter, styrkeoppbygging, østflanken
-- PIR-4 Hybrid- & cybertrusler — sabotasje, påvirkning, cyberangrep + infrastrukturpostur (kabler, energinett, LNG, nordlig sjørute, arktisk logistikk, GIUK)
-- PIR-5 Stormaktsrivalisering — Kina, USAs vendinger med strategisk vekt for Europa/Norden
-- PIR-6 OSINT & etterforskning — krigsforbrytelser, sanksjonsomgåelse, aktør-identifisering (Bellingcat, OCCRP)
-- FFIR-1 Norsk forsvar & sikkerhetspolitikk — Stortinget, Forsvaret, beredskap, E-tjenesten
-- FFIR-2 Norsk politikk & samfunn — strategisk/nasjonal betydning
-- FFIR-3 Egen teknologikapabilitet — lokale LLM-er (Mac/Qwen/MLX/Ollama), AI-agenter, DFIR, Rust, homelab, NVIDIA-stack (DGX Spark / GB10 Grace Blackwell / CUDA-versjoner)
-- SIR-1 Midtøsten & US-Iran — IRGC, proxyer, atomprogram, sanksjonspress (tidsavgrenset)
-- SIR-2 Sport — VM 2026 (FIFA) — sikkerhets-/geopolitisk dimensjon; CARVE-OUT løfter over CNR-Routine
-- "none" if the item answers no CCIR at all.
+{quickref}
 
 PMESII operational environment domain (choose the ONE primary domain this item falls under):
 - Political: Power structures and diplomacy; treaties, government policy, elections, sanctions as policy instrument.
@@ -97,33 +96,10 @@ TESSOC threat actor (UK/NATO counterintelligence framework, JDP 2-00 — choose 
 - Organized Crime: Criminal networks, trafficking, money laundering, racketeering, corruption.
 - "none" if ccir is "none".
 
-Disambiguation guide — when an item could match multiple tiers:
-- PIR-5 vs SIR-1: if the core subject is Iran, IRGC, or Middle East escalation → SIR-1. If the item is about great-power dynamics (US-China, US global posture) where the Middle East is only context → PIR-5.
-- PIR-1 vs PIR-6: if the item is an OSINT investigation (identifying actors, tracing networks, sanctions evasion) about Russia/Ukraine → PIR-6. Straight war reporting, battlefield updates, or policy announcements → PIR-1.
-- PIR-6 vs SIR-2: if the item is an investigation into sports corruption/fraud in FIFA context → PIR-6. If it is about security, protests, boycotts, or geopolitical tensions around VM 2026 specifically → SIR-2.
-- FFIR-3 vs PIR-4: cybersecurity of Norwegian critical infra → PIR-4. Building your own local LLM / DFIR lab / homelab → FFIR-3.
-- Sport (general) vs SIR-2: regular sport coverage with no security/political angle → "none". VM 2026 security, protests, boycott, terrortrussel, or political controversy → SIR-2.
-
-Worked examples:
-1. "Bellingcat identifies Russian officer behind Bucha massacre using phone metadata"
-   → {{"ccir": "PIR-6", "cnr": "II", "pmesii": "Information", "tessoc": "Espionage", "score": 8, "why": "OSINT-identifisering av krigsforbryter"}}
-2. "OCCRP: Shell companies helped oligarchs evade EU sanctions"
-   → {{"ccir": "PIR-6", "cnr": "II", "pmesii": "Economic", "tessoc": "Organized Crime", "score": 7, "why": "Sanksjonsomgåelse via skallselskaper"}}
-3. "IRGC-linked militia launches rockets at US base in Syria"
-   → {{"ccir": "SIR-1", "cnr": "I", "pmesii": "Military", "tessoc": "Terror", "score": 9, "why": "IRGC-proxy angriper amerikansk base"}}
-4. "Iran enriches uranium to 84% — IAEA report"
-   → {{"ccir": "SIR-1", "cnr": "I", "pmesii": "Military", "tessoc": "Espionage", "score": 9, "why": "Atomprogram-oppgradering, høy beredskap"}}
-5. "FIFA confirms World Cup 2026 will use expanded 48-team format"
-   → {{"ccir": "SIR-2", "cnr": "II", "pmesii": "Social", "tessoc": "none", "score": 5, "why": "VM 2026 format-oppdatering"}}
-6. "Threat of mass protests at US World Cup venues over immigration policy"
-   → {{"ccir": "SIR-2", "cnr": "II", "pmesii": "Social", "tessoc": "Terror", "score": 7, "why": "Protest-trussel mot VM-arenaer"}}
-7. "NATO summit agrees 2% GDP defence spending floor"
-   → {{"ccir": "PIR-3", "cnr": "II", "pmesii": "Political", "tessoc": "none", "score": 7, "why": "NATO-toppmøte, forsvarsbudsjetter"}}
-8. "Sony releases new PlayStation update"
-   → {{"ccir": "none", "cnr": "none", "pmesii": "none", "tessoc": "none", "score": 0, "why": "Forbrukerteknologi, ingen CCIR"}}
+{examples_and_guide}
 
 Return ONLY JSON:
-{{"ccir": "<PIR-1 | PIR-2 | PIR-3 | PIR-4 | PIR-5 | PIR-6 | FFIR-1 | FFIR-2 | FFIR-3 | SIR-1 | SIR-2 | none>", "cnr": "<I | II | none>", "pmesii": "<Political | Military | Economic | Social | Information | Infrastructure | none>", "tessoc": "<Terror | Espionage | Subversion | Sabotage | Organized Crime | none>",
+{{"ccir": "<{enum}>", "cnr": "<I | II | none>", "pmesii": "<Political | Military | Economic | Social | Information | Infrastructure | none>", "tessoc": "<Terror | Espionage | Subversion | Sabotage | Organized Crime | none>",
   "score": 0-10, "why": "<=12 words, in Norwegian>"}}
 Rules:
 - ccir = the ONE requirement it best answers, or "none" if it answers none.

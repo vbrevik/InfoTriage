@@ -344,33 +344,48 @@ def active_ccir_enum() -> str:
     return " | ".join(c.id for c in active_specs()) + " | none"
 
 
-def build_scorer_block() -> str:
-    """Render the CCIR-specific sections of the scorer prompt: the tier
-    quick-reference, the disambiguation guide, and the worked examples. The
-    PMESII/TESSOC framework prose is not CCIR-specific and stays in
-    triage_score.py."""
-    ids = {c.id for c in active_specs()}
-
+def build_quickref() -> str:
+    """The 'Tier quick-reference' block of the scorer prompt (active CCIRs)."""
     lines = ["Tier quick-reference (full descriptions in ccir.md above):"]
     for c in active_specs():
         lines.append(f"- {c.id} {c.title} — {c.scorer_line}")
     lines.append('- "none" if the item answers no CCIR at all.')
+    return "\n".join(lines)
+
+
+def build_examples_and_guide() -> str:
+    """The disambiguation guide + worked examples of the scorer prompt.
+
+    Returns FINAL text with single braces (`{"ccir": …}`) because callers
+    interpolate this as a plain variable into an f-string — the content is NOT
+    re-processed for f-string escapes, so the braces must already be single.
+    A line/example drops out when any CCIR it references is inactive.
+    """
+    ids = {c.id for c in active_specs()}
 
     disamb = [d for involved, d in DISAMBIGUATION if all(i in ids for i in involved)]
-    guide = ["", "Disambiguation guide — when an item could match multiple tiers:"]
+    guide = ["Disambiguation guide — when an item could match multiple tiers:"]
     guide += [f"- {d}" for d in disamb]
 
     examples = [e for e in WORKED_EXAMPLES if e.ccir == "none" or e.ccir in ids]
     ex_lines = ["", "Worked examples:"]
     for n, e in enumerate(examples, 1):
         payload = (
-            f'{{{{"ccir": "{e.ccir}", "cnr": "{e.cnr}", "pmesii": "{e.pmesii}", '
-            f'"tessoc": "{e.tessoc}", "score": {e.score}, "why": "{e.why}"}}}}'
+            f'{{"ccir": "{e.ccir}", "cnr": "{e.cnr}", "pmesii": "{e.pmesii}", '
+            f'"tessoc": "{e.tessoc}", "score": {e.score}, "why": "{e.why}"}}'
         )
         ex_lines.append(f'{n}. "{e.title}"')
         ex_lines.append(f"   → {payload}")
 
-    return "\n".join(lines + guide + ex_lines)
+    return "\n".join(guide + ex_lines)
+
+
+def build_scorer_block() -> str:
+    """Convenience aggregate of the CCIR-specific prompt sections (quick-ref +
+    guide + examples). triage_score.py interpolates the two halves separately to
+    keep the PMESII/TESSOC framework prose between them, but tests and any
+    single-block consumer can use this."""
+    return build_quickref() + "\n\n" + build_examples_and_guide()
 
 
 def render_feeds_opml_groups() -> str:
