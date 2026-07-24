@@ -284,6 +284,45 @@ def test_clean_for_embedding_differentiates_previously_colliding_summaries():
     assert _clean_for_embedding(kimi_summary) != _clean_for_embedding(skills_summary)
 
 
+def test_dedup_threshold_defaults_to_090(store, bus, monkeypatch):
+    """process_item must call find_near_duplicate with threshold=0.90 by default.
+
+    2026-07-24: even after _clean_for_embedding, two DISTINCT short
+    tech-newsletter headlines (a real Kimi K3 article vs an unrelated AI
+    article) measured 0.8447 cosine similarity through the live mE5-large
+    embedder — just above the old 0.84 threshold, so they still false-dedup'd
+    pre-LLM. Bumped to 0.90 as an interim fix (real recalibration is backlog
+    Phase 999.2). INFOTRIAGE_DEDUP_THRESHOLD overrides for tuning."""
+    monkeypatch.delenv("INFOTRIAGE_DEDUP_THRESHOLD", raising=False)
+    captured = {}
+    orig = store.find_near_duplicate
+
+    def spy(vector, **kwargs):
+        captured.update(kwargs)
+        return orig(vector, **kwargs)
+
+    store.find_near_duplicate = spy
+    item = _item("Threshold check")
+    store.put_item(item)
+
+    def score(it):
+        return {
+            **it,
+            "ccir": "none",
+            "cnr": "none",
+            "score": 0,
+            "bucket": "skip",
+            "why": "stub",
+            "pmesii": "none",
+            "tessoc": "none",
+        }
+
+    asyncio.run(
+        process_item(item.id, store, bus, embed=lambda text: VEC_A, score=score)
+    )
+    assert captured.get("threshold") == 0.90
+
+
 def test_dedup_skip(store, bus):
     """A near-duplicate embedding skips the LLM, marks bucket=skip, why mentions 'duplicate'."""
     store.put_embedding("existing-item", VEC_A)

@@ -43,23 +43,46 @@ _HTML_TAG_RE = re.compile(r"<[^>]+>")
 _URL_RE = re.compile(r"https?://\S+")
 _WS_RE = re.compile(r"\s+")
 
+# Known per-platform email-template phrases (beehiiv, Medium digests, generic
+# transactional-email footers). These are static label/nav text emitted
+# verbatim in EVERY newsletter from the platform — stripping the URL alone
+# (above) leaves them behind, and at a 512-char budget they still dominate
+# short article titles, collapsing topically-unrelated newsletters into false
+# near-duplicates purely on shared chrome (2026-07-24: three separate Kimi K3
+# articles still collided post-URL-strip on "View image: ... Follow image
+# link: ..." / "Stories for Vidar Brevik @vbrevik ... ·Member ..."). Brittle
+# by nature (new platforms need new phrases); revisit if false-dedup returns.
+_BOILERPLATE_PHRASES = (
+    "View image:",
+    "Follow image link:",
+    "View in browser",
+    "Stories for Vidar Brevik @vbrevik",
+    "·Member",
+    "Today's highlights",
+    "Please use an email client supporting HTML email",
+)
+_BOILERPLATE_RE = re.compile(
+    "|".join(re.escape(p) for p in _BOILERPLATE_PHRASES), re.IGNORECASE
+)
+
 
 def _clean_for_embedding(text: str) -> str:
-    """Strip HTML tags and URLs before embedding.
+    """Strip HTML tags, URLs, and known newsletter-template chrome before embedding.
 
     Newsletter/tracking chrome (beehiiv image URLs, Medium digest nav links,
-    raw undecoded HTML email bodies) otherwise dominates the first 512 chars
-    of many email-sourced summaries. Since that chrome is near-identical
-    across unrelated emails from the same platform, embedding it collapses
-    topically-distinct articles into false near-duplicates (cosine
-    similarity > the 0.84 dedup threshold) before the LLM scorer ever sees
-    them — e.g. three separate Kimi K3 articles chained as "duplicates" of
-    an unrelated "Claude Code Skills" article, purely on shared Medium
-    boilerplate. Stripping tags/URLs before truncation keeps the 512-char
-    budget on actual content instead of chrome.
+    raw undecoded HTML email bodies, per-platform template label text)
+    otherwise dominates the first 512 chars of many email-sourced summaries.
+    Since that chrome is near-identical across unrelated emails from the same
+    platform, embedding it collapses topically-distinct articles into false
+    near-duplicates (cosine similarity > the 0.84 dedup threshold) before the
+    LLM scorer ever sees them — e.g. three separate Kimi K3 articles chained
+    as "duplicates" of an unrelated "Claude Code Skills" article, purely on
+    shared Medium/beehiiv boilerplate. Stripping tags/URLs/known chrome
+    phrases before truncation keeps the 512-char budget on actual content.
     """
     text = _HTML_TAG_RE.sub(" ", text)
     text = _URL_RE.sub(" ", text)
+    text = _BOILERPLATE_RE.sub(" ", text)
     return _WS_RE.sub(" ", text).strip()
 
 
@@ -183,7 +206,19 @@ async def process_item(
 
     # Dedup + score only for items that pass the pre-filter.
     if pre_filter_passes:
-        dup = await asyncio.to_thread(store.find_near_duplicate, vec)
+        # Bumped 0.84 -> 0.90 (2026-07-24, interim): even after
+        # _clean_for_embedding, short structurally-similar tech-newsletter
+        # headlines (e.g. distinct Kimi K3 articles vs an unrelated AI
+        # article) measured 0.8447 cosine similarity — just above the old
+        # 0.84 threshold, so still false-dedup'd pre-LLM. 0.84 is the
+        # spike-validated (Phase 00 R2) value; this raise trades some
+        # missed real near-duplicates for fewer false collapses until the
+        # full backlog Phase 999.2 recalibration (larger corpus, genuinely
+        # off-topic controls) revisits it properly.
+        _dedup_threshold = float(os.environ.get("INFOTRIAGE_DEDUP_THRESHOLD", "0.90"))
+        dup = await asyncio.to_thread(
+            store.find_near_duplicate, vec, threshold=_dedup_threshold
+        )
         if dup:
             fields = {
                 "ccir": "none",
