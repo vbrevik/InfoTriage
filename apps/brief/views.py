@@ -46,7 +46,9 @@ def _has_outbound_links(row: dict) -> bool:
 
 
 # CCIR codes included in the Common Operational Picture (friendly / operational).
-_COP_CCIR = {"FFIR-1", "FFIR-2", "FFIR-3", "PIR-3", "SIR-2", "SIR-3"}
+# Derived from the single-source registry (was a hardcoded set).
+from contracts.ccir import COP_CCIR as _COP_CCIR  # noqa: E402
+
 _COP_PMESII = {"Political", "Military", "Infrastructure"}
 
 # PMESII domains included in the Common Intelligence Picture (adversary / threat).

@@ -25,45 +25,10 @@ STOP = set(
     "i og å en et er på til av for som med det den de har om mot ved".split()
 )
 
-# CCIR display order + titles (must match the ids the model emits from ccir.md)
-CCIR_ORDER = [
-    ("PIR-1", "Russland / Ukraina"),
-    ("PIR-2", "Nordområdene & Arktis"),
-    ("PIR-3", "NATO & europeisk sikkerhet"),
-    ("PIR-4", "Hybrid- & cybertrusler"),
-    ("PIR-5", "Stormaktsrivalisering"),
-    ("PIR-6", "OSINT & etterforskning"),
-    ("SIR-1", "Midtøsten & US-Iran"),
-    ("SIR-2", "Sport — VM 2026 (FIFA)"),
-    ("SIR-3", "NATO-toppmøtet i Ankara"),
-    ("FFIR-1", "Norsk forsvar & sikkerhetspolitikk"),
-    ("FFIR-2", "Norsk politikk & samfunn"),
-    ("FFIR-3", "Egen teknologikapabilitet"),
-]
-
-# CCIR_ORDER ↔ ccir.md sync guard (see .planning/codebase/CONCERNS.md DRIFT-1).
-# Renderer order must equal the count of `- **CODE**` top-level CCIR bullets in ccir.md;
-# otherwise the digest silently drops new (or stale) IDs. Explicit raise (not bare
-# `assert`) so the guard survives `python3 -O`.
-_ccir_md_ids = set(
-    re.findall(
-        r"^\s*-\s+\*\*([A-Z]{3,4}-\d+)\b",
-        open(os.path.join(ROOT, "ccir.md"), encoding="utf-8").read(),
-        re.MULTILINE,
-    )
-)
-_order_ids = {cid for cid, _ in CCIR_ORDER}
-_missing_in_ccir = _order_ids - _ccir_md_ids
-_missing_in_order = _ccir_md_ids - _order_ids
-if _missing_in_ccir or _missing_in_order:
-    parts = []
-    if _missing_in_ccir:
-        parts.append(f"in CCIR_ORDER but not in ccir.md: {sorted(_missing_in_ccir)}")
-    if _missing_in_order:
-        parts.append(f"in ccir.md but not in CCIR_ORDER: {sorted(_missing_in_order)}")
-    raise AssertionError(
-        f"CCIR drift detected — {'; '.join(parts)}. Fix both to match."
-    )
+# CCIR display order + titles now derive from the single-source registry.
+# The old CCIR_ORDER↔ccir.md drift guard is superseded by
+# tests/test_ccir_registry_sync.py (registry ↔ ccir.md consistency).
+from contracts.ccir import CCIR_ORDER  # noqa: E402
 
 
 def oslo_now():
