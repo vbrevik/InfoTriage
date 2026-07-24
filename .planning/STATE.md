@@ -2,14 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 12 sub-wave (a) ADR-018 pivot COMMITTED on disk (2026-07-23 forensic closeout); ship (b)+(c)+(d) on new foundation
-stopped_at: Forensic audit closeout — pivot substrate completed+committed (1afb1ea), POP3+links feature committed (908fba8); ready for /gsd-execute-phase 12 (2026-07-23)
-last_updated: "2026-07-23T19:00:00.000Z"
+status: CCIR registry shipped + real dedup-collapse bug fixed (2026-07-24); full-corpus re-score in progress; Phase 12 (b)(c)(d) still not started
+stopped_at: Full re-score running in background after dedup fix (3e5b7cf) — verify CCIR distribution + Kimi K3/FFIR-4 outcome before trusting SAB; 12 commits unpushed (2026-07-24)
+last_updated: "2026-07-24T13:10:00.000Z"
 progress:
   total_phases: 13
   # completed = verification passed (phases 00-07). Phases 08-11 are executed
-  # but carry verification_status: missing — counted as debt, not complete
-  # (corrected 2026-07-23 forensic audit; was inflated to 12).
+  # but carry verification_status: missing — counted as debt, not complete.
   completed_phases: 8
   total_plans: 54
   completed_plans: 53
@@ -19,6 +18,100 @@ progress:
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-07-24 — CCIR registry shipped; root-caused a real dedup-collapse bug (87% of corpus silently zeroed)
+
+### Just-completed
+
+- **Operational fixes to get real (non-test) data flowing:** brought RabbitMQ back up
+  (was down); fixed `ops/llm-router.py` — the Spark chat branch had thinking left ON,
+  so every triage LLM call spent 25-30s on an empty `<think>` block and timed out
+  (`chat_template_kwargs: {enable_thinking: false}` → clean JSON in ~5s); fixed the
+  ADR-018 ntfy pre-bake, which was only half-landed from the prior session (Dockerfile
+  couldn't build — no `--mount=type=secret`, wrong `ntfy access` arg order; compose had
+  no `command: serve`, so the image has NO default CMD and crash-looped). Live-validated:
+  `make ntfy-build && make ntfy-up && make ntfy-publish-test` all pass.
+- **CCIR registry shipped** (`libs/contracts/src/contracts/ccir.py`, 6 commits
+  62ee64b..472e4d3) — collapses the 8 scattered CCIR-definition sites (scorer prompt,
+  two duplicated `CCIR_ORDER` literals = DRIFT-1, `COP_CCIR` set, `ccir.md` prose,
+  `feeds.opml` SIR groups) into one dataclass registry. `CCIR_ORDER`/`COP_CCIR`/the
+  scorer prompt block are runtime-derived (cannot drift); `feeds.opml` CCIR groups are
+  generated via `make ccir-sync`; `ccir.md` stays hand-authored but is consistency-guarded
+  by `tests/test_ccir_sync.py` (PMESII/TESSOC trailer + id-set parity). Design doc at
+  `docs/superpowers/specs/2026-07-24-ccir-registry-design.md`, plan at
+  `docs/superpowers/plans/2026-07-24-ccir-registry.md`.
+  - Fixed a real pre-existing drift bug as a side effect: SIR-3 was missing from the
+    scorer's JSON enum AND quick-reference — the scorer could never emit SIR-3 even
+    though it was in `CCIR_ORDER`/`ccir.md`. Now present.
+  - Added **FFIR-4 "Frontier AI & LLM-landskap"**, split from FFIR-3, per operator
+    request: FFIR-3 = own local AI (oMLX, MLX, Ollama, LM Studio, vLLM, own Spark/GB10,
+    homelab incl. ngrok); FFIR-4 = external frontier landscape (Kimi, GPT, Gemini,
+    Claude, Qwen, Llama, DeepSeek releases/benchmarks). First real dogfood of the
+    registry's "add/retire a requirement = one edit" design goal.
+  - WC2026/SIR-2 retirement (`active=False`) was scoped for this work but NOT executed
+    — deliberately deferred so it wouldn't collide with the in-flight re-scores. Still
+    open; one-line flag flip + `make ccir-sync` when ready.
+- **Root-caused and fixed the actual reason local scoring looked broken** (commit
+  `3e5b7cf`) — NOT a scorer/taxonomy problem, a **dedup false-collapse bug**. The
+  near-dup embed text (`title + summary[:512]`) was dominated by newsletter/tracking
+  chrome for email sources: beehiiv image-URL soup (hover) and Medium digest nav links /
+  raw undecoded HTML bodies (gmail). That near-identical chrome collapsed topically
+  unrelated articles into false near-duplicates above the 0.84 cosine threshold —
+  **measured 359/414 enrichments (87%) dedup-zeroed** in one full-corpus run, e.g. three
+  separate Kimi K3 articles chained as "duplicate of" an unrelated "Claude Code Skills"
+  article. `_clean_for_embedding()` strips HTML tags + URLs before the 512-char
+  truncation. Scope: only the text sent to the embedder changed — stored article
+  summary/title and SAB rendering are untouched. 2 new regression tests
+  (`test_triage_worker.py`); `tests/test_ccir_registry.py` + `test_ccir_sync.py` +
+  `test_triage_worker.py` all green.
+- **Enabled YouTube transcription** (`INFOTRIAGE_YOUTUBE_TRANSCRIBE=1`,
+  `INFOTRIAGE_WHISPER_MODEL=large-v3-turbo` — bumped from `tiny`→`base`→`large-v3-turbo`
+  per operator steer; multilingual, ~8x turbo speed vs `large-v3`). Partially applied —
+  some NATO/Bellingcat/NVIDIA/Karpathy videos still carry the old "(transcription
+  disabled)" stub summary and need a re-ingest pass.
+- **117 hover emails flagged `\Seen`** on the live INBOX — one-time cleanup per operator
+  request, not an automated behavior. 109 of the 226 ingested hover articles were
+  already moved/deleted from INBOX (not touched).
+- **Forensic audit fix:** `.planning/phases/06-brief-app/deferred-items.md`'s
+  `status: resolved` annotations from the prior session never actually worked —
+  `gsd-tools audit-uat`'s field parser does strict-equality on the whole line after
+  `status:`, so `status: resolved — folded into...` never matched bare `resolved`.
+  Split into `status: resolved` + a separate `note:` field; `audit-uat` now reports 0
+  unresolved items (was 3).
+- **Corrected two operational mistakes surfaced by this session's own forensic audit:**
+  the CCIR registry implementation plan was written but never committed (caught after 6
+  dependent commits already existed); a full-corpus re-score was silently losing
+  messages because the worker holds a long-lived Postgres connection with no reconnect
+  logic — a bulk `DELETE FROM enrichment/embeddings` from another session broke that
+  connection and every in-flight item was acked-and-lost with zero error surfaced.
+  Worked around operationally (restart triage before republishing); the missing
+  DB-reconnect logic itself is still a real gap, not fixed.
+
+### Watch out for
+
+- **Worker has no Postgres reconnect logic** (`apps/triage/worker.py:process_item` →
+  `store.get_item`). Any DB connection blip silently acks-and-drops in-flight messages
+  with no DLQ, no error surfaced beyond a log line. Bit this session twice. Real fix:
+  either reconnect-on-`OperationalError` in the store, or nack-and-requeue instead of
+  acking on that specific exception class.
+- Do not trust the SAB or any CCIR distribution number until the in-progress full
+  re-score (started after `3e5b7cf`) settles — check `q.triage` depth in RabbitMQ mgmt
+  and `SELECT count(*) FROM infotriage.enrichment`.
+
+### Next
+
+- **Verify the re-score settled clean**: FFIR-4 catching frontier-AI items (Kimi K3
+  etc.), dedup-hit rate back to a sane fraction (spot-checked mid-run: genuine
+  transactional-email duplicates, not cross-topic collisions — looks correct).
+- **WC2026/SIR-2 retirement** (deferred from this session): `active=False` in
+  `libs/contracts/src/contracts/ccir.py`, `make ccir-sync`, update the OPML
+  group-count test assertions, full suite green.
+- **Re-run YouTube ingest** for the channels still carrying transcription-disabled
+  stub summaries, now that `large-v3-turbo` is live.
+- **Push decision**: 12 commits ahead of `origin/main` (unchanged posture — explicit
+  operator action per project rule).
+- Phase 12 sub-waves (b)+(c)+(d) — still not started, per
+  `HANDOFF.json#phase_12_subwave_a_final_architecture.ship_next`.
 
 ## Session: 2026-07-23 (evening) — Forensic audit closeout: pivot completed on disk + committed
 
