@@ -54,4 +54,23 @@ __all__ = [
     "require_acled_license",
     "DisciplineRequired",
     "AcledLicenseMissing",
+    "CCIR",
+    "CCIRSpec",
+    "active_specs",
+    "CCIR_ORDER",
+    "COP_CCIR",
+    "build_scorer_block",
+    "active_ccir_enum",
+    "render_feeds_opml_groups",
 ]
+
+from .ccir import (  # noqa: E402
+    CCIR,
+    CCIRSpec,
+    active_specs,
+    CCIR_ORDER,
+    COP_CCIR,
+    build_scorer_block,
+    active_ccir_enum,
+    render_feeds_opml_groups,
+)
