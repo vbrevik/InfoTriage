@@ -18,7 +18,7 @@ import pytest
 
 from contracts import Item
 from store import InMemoryStore
-from worker import on_message, process_item
+from worker import _clean_for_embedding, on_message, process_item
 
 # ---------------------------------------------------------------------------
 # Fixtures + helpers
@@ -252,6 +252,36 @@ def test_score_clamped(store, bus):
     enrichment_low = store.get_enrichment(item_low.id)
     assert enrichment_low["score"] == 0
     assert bus.published[1]["payload"]["score"] == 0
+
+
+def test_clean_for_embedding_strips_html_and_urls():
+    """Newsletter/tracking chrome (HTML tags, beehiiv/medium URLs) must not
+    dominate the embed text, or unrelated newsletter emails collapse into
+    false near-duplicates on shared boilerplate (2026-07-24 regression:
+    three distinct Kimi K3 articles chained as 'duplicate of' an unrelated
+    'Claude Code Skills' article, purely via shared beehiiv image-URL text)."""
+    raw = (
+        "View image: (https://media.beehiiv.com/cdn-cgi/image/fit=scale-down"
+        "/uploads/asset/file/abc123.png?t=1782957943) <b>Caption</b> text here"
+    )
+    cleaned = _clean_for_embedding(raw)
+    assert "beehiiv.com" not in cleaned
+    assert "<b>" not in cleaned and "</b>" not in cleaned
+    assert "Caption text here" in cleaned
+
+
+def test_clean_for_embedding_differentiates_previously_colliding_summaries():
+    """Two unrelated articles whose raw summaries share only boilerplate URLs
+    must no longer be textually identical after cleaning."""
+    kimi_summary = (
+        "View image: (https://media.beehiiv.com/cdn-cgi/image/fit=scale-down"
+        "/uploads/asset/file/kimi.png?t=1) Kimi K3 tops open-source benchmarks"
+    )
+    skills_summary = (
+        "View image: (https://media.beehiiv.com/cdn-cgi/image/fit=scale-down"
+        "/uploads/asset/file/skills.png?t=1) Claude Code Skills explained"
+    )
+    assert _clean_for_embedding(kimi_summary) != _clean_for_embedding(skills_summary)
 
 
 def test_dedup_skip(store, bus):

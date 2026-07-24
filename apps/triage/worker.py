@@ -17,6 +17,7 @@ import datetime
 import json
 import logging
 import os
+import re
 import urllib.request
 from pathlib import Path
 
@@ -37,6 +38,29 @@ HEALTH_PORT = 22030
 # ---------------------------------------------------------------------------
 # Embedding call (mirrors triage_score.llm() exactly — same env vars, ADR-004)
 # ---------------------------------------------------------------------------
+
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+_URL_RE = re.compile(r"https?://\S+")
+_WS_RE = re.compile(r"\s+")
+
+
+def _clean_for_embedding(text: str) -> str:
+    """Strip HTML tags and URLs before embedding.
+
+    Newsletter/tracking chrome (beehiiv image URLs, Medium digest nav links,
+    raw undecoded HTML email bodies) otherwise dominates the first 512 chars
+    of many email-sourced summaries. Since that chrome is near-identical
+    across unrelated emails from the same platform, embedding it collapses
+    topically-distinct articles into false near-duplicates (cosine
+    similarity > the 0.84 dedup threshold) before the LLM scorer ever sees
+    them — e.g. three separate Kimi K3 articles chained as "duplicates" of
+    an unrelated "Claude Code Skills" article, purely on shared Medium
+    boilerplate. Stripping tags/URLs before truncation keeps the 512-char
+    budget on actual content instead of chrome.
+    """
+    text = _HTML_TAG_RE.sub(" ", text)
+    text = _URL_RE.sub(" ", text)
+    return _WS_RE.sub(" ", text).strip()
 
 
 def get_embedding(text: str) -> list[float]:
@@ -118,7 +142,7 @@ async def process_item(
         )
         return
 
-    text = item.title + " " + (item.summary or "")[:512]
+    text = item.title + " " + _clean_for_embedding(item.summary or "")[:512]
     vec = cast(list[float], await asyncio.to_thread(embed, text))
 
     # Phase 9: CCIR pre-filter — skip clearly off-topic items before dedup/score.
