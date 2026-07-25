@@ -169,8 +169,21 @@ async def process_item(
     vec = cast(list[float], await asyncio.to_thread(embed, text))
 
     # Phase 9: CCIR pre-filter — skip clearly off-topic items before dedup/score.
+    # The prior 0.50 default was picked at design time with zero corpus
+    # calibration and never once skipped an item in production (zero
+    # pre_filter_skip audit rows ever, 1254+ PASS / 0 SKIP as of 2026-07-24).
+    # 2026-07-25 measurement over 423 live items (mE5-large, 13 CCIR topic
+    # vectors) found the ENTIRE corpus — genuine signal and structural junk
+    # alike — clustered in 0.743-0.848 with the two interleaving (lowest
+    # genuine CCIR match 0.7452 sits below junk at 0.7485): no safe cut point
+    # exists in that band today. 0.70 is an evidence-anchored floor strictly
+    # below every observed similarity, so it does not change filtering
+    # behavior today and cannot drop real signal. A functional recalibration
+    # (larger corpus + synthetic negative controls, or relative/rank-based
+    # scoring instead of an absolute cosine cutoff) is tracked as backlog
+    # phase 999.2 and is out of scope here.
     _prefilter_threshold = float(
-        os.environ.get("INFOTRIAGE_PREFILTER_THRESHOLD", "0.50")
+        os.environ.get("INFOTRIAGE_PREFILTER_THRESHOLD", "0.70")
     )
     ccir_lookup_failed = False
     best_ccir: dict | None = None

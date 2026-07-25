@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime
+import math
 import os
 from typing import Callable
 
@@ -15,6 +16,11 @@ from worker import process_item
 
 
 VEC = [1.0, 0.0]
+
+
+def _ccir_vector_at_cosine(c: float) -> list[float]:
+    """Build a 2-D CCIR vector whose cosine similarity against VEC is exactly c."""
+    return [c, math.sqrt(1.0 - c * c)]
 
 
 class FakeBus:
@@ -272,3 +278,58 @@ def test_prefilter_entity_resolution_still_runs(store, bus):
 
     links = store.get_entity_links(item.id)
     assert any(l["name"] == "NATO" for l in links)
+
+
+def test_prefilter_default_threshold_skips_below_070(store, bus, monkeypatch):
+    """Default threshold (env unset) skips an item whose best CCIR cosine is 0.69.
+
+    This FAILS against the old 0.50 default (0.69 >= 0.50 passes the gate) —
+    that failing-first property pins the new 0.70 default behaviorally.
+    """
+    monkeypatch.delenv("INFOTRIAGE_PREFILTER_THRESHOLD", raising=False)
+    item = _item()
+    store.put_item(item)
+    store.put_ccir_vector("PIR-2", _ccir_vector_at_cosine(0.69))
+
+    score_calls = []
+
+    def score(it):
+        score_calls.append(it)
+        return {**it, "why": "should not run"}
+
+    asyncio.run(process_item(item.id, store, bus, embed=lambda text: VEC, score=score))
+
+    assert score_calls == []
+    enrichment = store.get_enrichment(item.id)
+    assert enrichment["bucket"] == "skip"
+    assert "pre-filter" in enrichment["why"]
+    assert len(store._audit) == 1
+    assert store._audit[0]["op"] == "pre_filter_skip"
+
+
+def test_prefilter_default_threshold_passes_at_071(store, bus, monkeypatch):
+    """Default threshold (env unset) passes an item whose best CCIR cosine is 0.71."""
+    monkeypatch.delenv("INFOTRIAGE_PREFILTER_THRESHOLD", raising=False)
+    item = _item()
+    store.put_item(item)
+    store.put_ccir_vector("PIR-2", _ccir_vector_at_cosine(0.71))
+
+    score_calls = []
+
+    def score(it):
+        score_calls.append(it)
+        return {
+            **it,
+            "ccir": "PIR-2",
+            "cnr": "II",
+            "score": 7,
+            "bucket": "keep",
+            "why": "llm scored",
+            "pmesii": "Military",
+            "tessoc": "Espionage",
+        }
+
+    asyncio.run(process_item(item.id, store, bus, embed=lambda text: VEC, score=score))
+
+    assert len(score_calls) == 1
+    assert len(store._audit) == 0
