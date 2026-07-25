@@ -327,7 +327,7 @@ def test_get_active_entities_stats_and_since_filter(store):
 
     entity_id = store.put_entity("NATO", "nato", "en", "ORG", None)
     store.link_entity(entity_id, item1.id, "NATO", "en")
-    store.link_entity(entity_id, item2.id, "NATO", "en")
+    store.link_entity(entity_id, item2.id, "НАТО", "ru")
 
     active = store.get_active_entities()
     assert len(active) == 1
@@ -337,12 +337,14 @@ def test_get_active_entities_stats_and_since_filter(store):
     assert active[0]["first_seen"] == past
     assert active[0]["last_seen"] == now
     assert set(active[0]["ccirs"]) == {"PIR-1", "PIR-2"}
+    assert active[0]["aliases"] == ["NATO (en)", "НАТО (ru)"]
 
     active_since = store.get_active_entities(since=now - datetime.timedelta(days=1))
     assert len(active_since) == 1
     assert active_since[0]["link_count"] == 1
     assert active_since[0]["first_seen"] == now
     assert active_since[0]["ccirs"] == ["PIR-2"]
+    assert active_since[0]["aliases"] == ["НАТО (ru)"]
 
 
 def test_get_active_entities_empty(store):

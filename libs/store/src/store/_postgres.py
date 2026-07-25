@@ -666,7 +666,9 @@ class PostgresStore:
                 MIN(a.ts) AS first_seen,
                 MAX(a.ts) AS last_seen,
                 COUNT(DISTINCT a.id) AS link_count,
-                ARRAY_AGG(DISTINCT en.ccir) FILTER (WHERE en.ccir IS NOT NULL) AS ccirs
+                ARRAY_AGG(DISTINCT en.ccir) FILTER (WHERE en.ccir IS NOT NULL) AS ccirs,
+                ARRAY_AGG(DISTINCT el.mention || ' (' || el.lang || ')')
+                FILTER (WHERE el.mention IS NOT NULL AND el.lang IS NOT NULL) AS aliases
             FROM infotriage.entities e
             JOIN infotriage.entity_links el ON el.entity_id = e.id
             JOIN infotriage.articles a ON a.id = el.item_id
@@ -690,6 +692,7 @@ class PostgresStore:
                 "last_seen": r["last_seen"],
                 "link_count": r["link_count"],
                 "ccirs": sorted(r["ccirs"]) if r["ccirs"] else [],
+                "aliases": sorted(r["aliases"]) if r["aliases"] else [],
             }
             for r in rows
         ]

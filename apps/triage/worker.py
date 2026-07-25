@@ -284,7 +284,14 @@ async def process_item(
     # pipeline indefinitely (ADR-004, R5 prohibition).
     _ENTITY_NER_TIMEOUT = float(os.environ.get("INFOTRIAGE_ENTITY_NER_TIMEOUT", "15"))
     try:
-        entity_text = item.title + " " + (item.summary or "")
+        # Same rationale as the embed-text cleanup above (2026-07-24): raw
+        # newsletter/tracking chrome fed straight into NER produces junk
+        # "entities" — ad-tech domains (adnuntius.com), newsletter sender
+        # domains (cw.no), CI notification noise (GitHub, "Black" workflow
+        # name) — that dominate the entity graph by volume and, worse, get
+        # wikilinked as substring matches INSIDE real URLs in the rendered
+        # vault note body, corrupting them (e.g. "https://www.[[cw.no]]/...").
+        entity_text = item.title + " " + _clean_for_embedding(item.summary or "")
         await asyncio.wait_for(
             resolve_entities_async(
                 item_id, entity_text, item.lang or "en", store, embed, ner_chat

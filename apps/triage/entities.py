@@ -9,6 +9,7 @@ embedding endpoint (same threshold logic as before).
 Public API:
     extract_entities(text: str, lang: str, chat_fn) -> list[dict]
     normalize_name(name: str) -> str
+    is_noise_entity(name: str) -> bool
     embed_entity_name(name: str, lang: str, embed_fn) -> list[float] | None
     resolve_entities(item_id, text, lang, store, embed_fn, chat_fn) -> None
     resolve_entities_async(item_id, text, lang, store, embed_fn, chat_fn) -> None
@@ -18,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 from typing import cast
 
@@ -32,6 +34,46 @@ LINK_THRESHOLD = 0.92
 
 # Entity types the model may assign; anything else is coerced to MISC.
 _ALLOWED_TYPES = {"PER", "ORG", "LOC", "GPE", "MISC"}
+
+# Entities that are structural noise rather than defense/geopolitics/tech
+# signal: CI/platform chrome leaking in from GitHub Actions / linter-run
+# notification emails ("GitHub", "Black"), newsletter/digest platform names
+# ("Medium"), and the operator's own name/handle (self-mentions in commit
+# notifications and newsletter signatures). Matched against normalize_name(),
+# so casing/punctuation don't matter. Extend without a code change via
+# INFOTRIAGE_ENTITY_DENYLIST (comma-separated names).
+_DEFAULT_NOISE_NAMES = frozenset(
+    {"github", "github actions", "black", "medium", "vidar", "vidar brevik", "vbrevik"}
+)
+
+# Bare sender/ad-tech domains extracted as ORG/MISC entities (e.g.
+# "adnuntius.com", "cw.no", "gmktec.com") are never real signal. Matched on the
+# raw name BEFORE normalize_name() strips the '.', since the domain shape is
+# only visible while the dot is present.
+_DOMAIN_NAME_RE = re.compile(r"^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$")
+
+
+def _noise_denylist() -> frozenset[str]:
+    # Run defaults through normalize_name() too (not just env extras) so
+    # denylist membership is checked in the same normalized space it's tested
+    # against — normalize_name's possessive-strip is a blunt rstrip("'s") that
+    # also singularizes trailing-s words (e.g. "actions" -> "action"), so a
+    # hand-typed default must be normalized identically to still match.
+    extra = os.environ.get("INFOTRIAGE_ENTITY_DENYLIST", "")
+    extra_names = {normalize_name(n) for n in extra.split(",") if n.strip()}
+    return frozenset(normalize_name(n) for n in _DEFAULT_NOISE_NAMES) | extra_names
+
+
+def is_noise_entity(name: str) -> bool:
+    """True if a raw extracted entity name is structural noise, not real signal.
+
+    Checked on the raw (pre-normalize_name) name so the domain-shape check can
+    still see the '.'; then falls back to the normalized-name denylist.
+    """
+    if _DOMAIN_NAME_RE.match((name or "").strip().lower()):
+        return True
+    return normalize_name(name) in _noise_denylist()
+
 
 # Upper bound on prompt text. Titles + summaries are short; this is a safety cap
 # so a pathological body can't blow up the NER call.
@@ -220,7 +262,7 @@ def resolve_entities(
     """
     for entity in extract_entities(text, lang, chat_fn):
         name = entity.get("name")
-        if not name:
+        if not name or is_noise_entity(name):
             continue
         entity_id = _find_or_create_entity(
             name, lang, store, embed_fn, entity.get("type")

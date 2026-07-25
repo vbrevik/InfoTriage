@@ -59,6 +59,9 @@ def _entity_names(item: dict) -> list[str]:
     return [e["name"] for e in item.get("entities", []) if e.get("name")]
 
 
+_URL_SPAN_RE = re.compile(r"https?://\S+")
+
+
 def render_wikilinked(text: str, entities: list[str]) -> str:
     """Replace entities with [[Entity]] wikilinks.
 
@@ -68,14 +71,37 @@ def render_wikilinked(text: str, entities: list[str]) -> str:
 
     Returns:
         Wikilinked text with markdown links
+
+    Never wikilinks inside a URL. An extracted "entity" can be a domain
+    fragment (e.g. "cw.no", "adnuntius.com" — newsletter/ad-tech noise from
+    imperfect NER) that is also a literal substring of a URL elsewhere in the
+    same text; word-boundary matching alone does not protect against this,
+    since "." and "/" are non-word characters, so the naive substitution
+    corrupts the URL (e.g. "https://www.cw.no/x" -> "https://www.[[cw.no]]/x").
+    URL spans are protected from substitution entirely (2026-07-24).
     """
-    result = text
+    # Split on URL spans, keeping them (capturing group) so we can skip them.
+    segments = _URL_SPAN_RE.split(text)
+    urls = _URL_SPAN_RE.findall(text)
+
     # Longest-first so prefix entities ("Ukraine") don't corrupt longer forms
     # ("Ukrainian"); word boundaries + lookarounds skip text already wikilinked.
-    for entity in sorted(entities, key=len, reverse=True):
-        pattern = r"(?<!\[)\b" + re.escape(entity) + r"\b(?!\])"
-        result = re.sub(pattern, f"[[{entity}]]", result)
-    return result
+    sorted_entities = sorted(entities, key=len, reverse=True)
+
+    def _wikilink_segment(segment: str) -> str:
+        for entity in sorted_entities:
+            pattern = r"(?<!\[)\b" + re.escape(entity) + r"\b(?!\])"
+            segment = re.sub(pattern, f"[[{entity}]]", segment)
+        return segment
+
+    # re.split with a capturing pattern interleaves non-matches and matches:
+    # segments[0], urls[0], segments[1], urls[1], ... segments[-1]. Rebuild in
+    # that order, wikilinking only the non-URL segments.
+    parts = [_wikilink_segment(segments[0])]
+    for url, seg in zip(urls, segments[1:]):
+        parts.append(url)
+        parts.append(_wikilink_segment(seg))
+    return "".join(parts)
 
 
 def write_item_obsidian(
@@ -295,9 +321,9 @@ def render_entity_graph_from_store(entities: list[dict]) -> str:
     """Render the Entity Graph note from Store.get_active_entities() rows.
 
     Each row is expected to have: entity_id, name, name_norm, type, lang,
-    first_seen, last_seen, link_count, and ccirs. The note lists active
-    canonical entities ordered by activity (link_count) with their type,
-    language, linked CCIRs, and first/last seen timestamps.
+    first_seen, last_seen, link_count, ccirs, and aliases. The note lists
+    active canonical entities ordered by activity (link_count) with their
+    type, language, aliases, linked CCIRs, and first/last seen timestamps.
     """
     lines = ["# Entity Graph", ""]
     if not entities:
@@ -313,8 +339,10 @@ def render_entity_graph_from_store(entities: list[dict]) -> str:
         ccirs = ", ".join(entity.get("ccirs") or []) or "—"
         first = str(entity.get("first_seen") or "")[:10]
         last = str(entity.get("last_seen") or "")[:10]
+        aliases = entity.get("aliases") or []
         lines.append(f"## {name}")
         lines.append(f"- **Type:** {etype} · **Lang:** {lang}")
+        lines.append(f"- **Aliases:** {', '.join(aliases) if aliases else '—'}")
         lines.append(f"- **Linked items:** {link_count}")
         lines.append(f"- **CCIRs:** {ccirs}")
         lines.append(f"- **Seen:** {first} to {last}")

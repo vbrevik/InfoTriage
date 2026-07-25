@@ -341,9 +341,17 @@ class InMemoryStore:
             if since is not None and item.ts < since:
                 continue
             if entity_id not in stats:
-                stats[entity_id] = {"items": set(), "ccirs": set(), "ts_list": []}
+                stats[entity_id] = {
+                    "items": set(),
+                    "ccirs": set(),
+                    "ts_list": [],
+                    "aliases": set(),
+                }
             stats[entity_id]["items"].add(item_id)
             stats[entity_id]["ts_list"].append(item.ts)
+            mention, mlang = link.get("mention"), link.get("lang")
+            if mention and mlang:
+                stats[entity_id]["aliases"].add(f"{mention} ({mlang})")
             enrichment = self._enrichments.get(item_id)
             if enrichment and enrichment.get("ccir"):
                 stats[entity_id]["ccirs"].add(enrichment["ccir"])
@@ -364,6 +372,7 @@ class InMemoryStore:
                     "last_seen": max(data["ts_list"]),
                     "link_count": len(data["items"]),
                     "ccirs": sorted(data["ccirs"]),
+                    "aliases": sorted(data["aliases"]),
                 }
             )
 

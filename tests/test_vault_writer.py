@@ -489,6 +489,7 @@ def test_write_entity_graph_from_store_uses_store_data(temp_vault):
             "last_seen": datetime(2024, 2, 1, 12, 0, 0, tzinfo=timezone.utc),
             "link_count": 5,
             "ccirs": ["PIR-1"],
+            "aliases": ["NATO (en)", "НАТО (ru)"],
         }
     ]
 
@@ -497,6 +498,7 @@ def test_write_entity_graph_from_store_uses_store_data(temp_vault):
     text = path.read_text(encoding="utf-8")
     assert "## NATO" in text
     assert "**CCIRs:** PIR-1" in text
+    assert "**Aliases:** NATO (en), НАТО (ru)" in text
     assert "**Linked items:** 5" in text
     assert "**Seen:** 2024-01-01 to 2024-02-01" in text
     store.get_active_entities.assert_called_once_with(limit=ENTITY_GRAPH_ACTIVE_LIMIT)

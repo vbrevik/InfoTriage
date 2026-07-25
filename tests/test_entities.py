@@ -19,6 +19,7 @@ from apps.triage.entities import (
     _parse_entities,
     embed_entity_name,
     extract_entities,
+    is_noise_entity,
     normalize_name,
     resolve_entities,
     resolve_entities_async,
@@ -201,6 +202,38 @@ class TestEmbedEntityName:
 # ---------------------------------------------------------------------------
 
 
+class TestIsNoiseEntity:
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "GitHub",
+            "github actions",
+            "Black",
+            "Medium",
+            "Vidar",
+            "Vidar Brevik",
+            "vbrevik",
+        ],
+    )
+    def test_default_denylist_names(self, name):
+        assert is_noise_entity(name) is True
+
+    @pytest.mark.parametrize(
+        "name", ["gmktec.com", "adnuntius.com", "cw.no", "sapsan-sklep.pl"]
+    )
+    def test_bare_domain_names(self, name):
+        assert is_noise_entity(name) is True
+
+    @pytest.mark.parametrize("name", ["NATO", "Putin", "Bellingcat", "Ukraine"])
+    def test_real_entities_not_flagged(self, name):
+        assert is_noise_entity(name) is False
+
+    def test_env_denylist_extends_default(self, monkeypatch):
+        monkeypatch.setenv("INFOTRIAGE_ENTITY_DENYLIST", "Acme Corp")
+        assert is_noise_entity("Acme Corp") is True
+        assert is_noise_entity("GitHub") is True  # default list still applies
+
+
 class TestResolveEntities:
     @pytest.fixture
     def store(self, tmp_path):
@@ -284,6 +317,22 @@ class TestResolveEntities:
         resolve_entities("item-001", "text", "en", store, self._embed, chat)
         links = store.get_entity_links("item-001")
         assert len(links) == 0
+
+    def test_filters_noise_entities(self, store):
+        """resolve_entities drops denylisted/domain-shaped entities before linking."""
+        chat = Mock(
+            return_value=json.dumps(
+                [
+                    {"name": "NATO", "type": "ORG"},
+                    {"name": "GitHub", "type": "ORG"},
+                    {"name": "adnuntius.com", "type": "ORG"},
+                ]
+            )
+        )
+        resolve_entities("item-001", "text", "en", store, self._embed, chat)
+        links = store.get_entity_links("item-001")
+        names = {e["name"] for e in links}
+        assert names == {"NATO"}
 
     def test_exception_swallows_cleanly(self, store):
         """resolve_entities should log but not raise on LLM/embed failures."""

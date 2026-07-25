@@ -229,9 +229,11 @@ class Store(Protocol):
         """Return active canonical entities enriched with activity stats.
 
         Each dict contains: entity_id, name, name_norm, type, lang, first_seen,
-        last_seen, link_count, ccirs. ``ccirs`` is a sorted list of distinct
-        CCIR IDs observed on linked items. ``first_seen``/``last_seen`` come
-        from the linked article timestamps.
+        last_seen, link_count, ccirs, aliases. ``ccirs`` is a sorted list of
+        distinct CCIR IDs observed on linked items. ``aliases`` is a sorted
+        list of ``"{mention} ({lang})"`` strings for every distinct surface
+        mention linked to the entity. ``first_seen``/``last_seen`` come from
+        the linked article timestamps.
 
         Ordered by link_count DESC, then name_norm. If ``since`` is provided,
         only entities with at least one linked article at or after ``since``
