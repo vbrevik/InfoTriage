@@ -23,6 +23,12 @@ progress:
 
 ### Just-completed
 
+- **`INFOTRIAGE_PREFILTER_THRESHOLD` raised 0.50 -> 0.70** — the gate has never
+  skipped an item in production (zero `pre_filter_skip` audit rows ever); the new
+  value is an evidence-anchored floor that does NOT change filtering behavior
+  today. Same class of issue as backlog phase `999.2` (uncalibrated
+  absolute-cosine threshold needing a larger corpus with synthetic negative
+  controls).
 - **Operational fixes to get real (non-test) data flowing:** brought RabbitMQ back up
   (was down); fixed `ops/llm-router.py` — the Spark chat branch had thinking left ON,
   so every triage LLM call spent 25-30s on an empty `<think>` block and timed out
