@@ -256,11 +256,26 @@ def test_prefilter_threshold_above_similarity_skips(store, bus):
             os.environ.pop("INFOTRIAGE_PREFILTER_THRESHOLD", None)
 
 
-def test_prefilter_entity_resolution_still_runs(store, bus):
-    """Pre-filter skip path still runs entity resolution."""
+def test_prefilter_entity_resolution_still_runs(store, bus, monkeypatch):
+    """Pre-filter skip path still runs entity resolution.
+
+    Regression note: this test previously used a CCIR vector identical to the
+    item's embedding (cosine=1.0), which always PASSES the gate — it never
+    actually exercised the skip path despite its name/docstring, even before
+    the 0.50->0.70 threshold change. Fixed to use a cosine below the default
+    threshold so the pre-filter genuinely SKIPs, matching what the test claims
+    to verify.
+    """
+    monkeypatch.delenv("INFOTRIAGE_PREFILTER_THRESHOLD", raising=False)
     item = _item("NATO Summit")
     store.put_item(item)
-    store.put_ccir_vector("PIR-3", VEC)
+    store.put_ccir_vector("PIR-3", _ccir_vector_at_cosine(0.60))
+
+    score_calls = []
+
+    def score(it):
+        score_calls.append(it)
+        return it
 
     def fake_ner_chat(messages, max_tokens=800):
         return '[{"name": "NATO", "type": "ORG"}]'
@@ -271,11 +286,12 @@ def test_prefilter_entity_resolution_still_runs(store, bus):
             store,
             bus,
             embed=lambda text: VEC,
-            score=lambda it: it,
+            score=score,
             ner_chat=fake_ner_chat,
         )
     )
 
+    assert len(score_calls) == 0  # confirms the skip path was actually taken
     links = store.get_entity_links(item.id)
     assert any(l["name"] == "NATO" for l in links)
 
