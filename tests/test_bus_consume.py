@@ -37,14 +37,20 @@ AMQP_URL = "amqp://infotriage:infotriage_rmq@127.0.0.1:22001"
 # cleanup fixture can remove queues/exchanges created here.
 TEST_PREFIX = "test."
 TEST_ROUTING_KEY_TO_QUEUE = {
-    "item.ingested": f"{TEST_PREFIX}q.triage",
-    "verdict.ready": f"{TEST_PREFIX}q.brief",
-    "sab.published": f"{TEST_PREFIX}q.notify",
-    "feed.unhealthy": f"{TEST_PREFIX}q.ops",
+    "item.ingested": [f"{TEST_PREFIX}q.triage"],
+    "verdict.ready": [f"{TEST_PREFIX}q.brief"],
+    "sab.published": [f"{TEST_PREFIX}q.notify"],
+    "feed.unhealthy": [f"{TEST_PREFIX}q.ops"],
 }
 TEST_DLX_NAME = f"{TEST_PREFIX}infotriage.dlx"
 TEST_DLQ_NAME = f"{TEST_PREFIX}infotriage.dlq"
 TEST_DLQ_ROUTING_KEY = f"{TEST_PREFIX}dead"
+
+# Flattened list of every declared test queue name, for cleanup and lookups keyed
+# by queue name (bus._queues is keyed by queue name, not routing key).
+TEST_QUEUE_NAMES = [
+    q_name for q_names in TEST_ROUTING_KEY_TO_QUEUE.values() for q_name in q_names
+]
 
 
 @contextlib.contextmanager
@@ -92,7 +98,7 @@ def _cleanup_test_topology():
             connection = await aio_pika.connect_robust(AMQP_URL)
             channel = await connection.channel()
             assert channel is not None
-            for q_name in list(TEST_ROUTING_KEY_TO_QUEUE.values()) + [TEST_DLQ_NAME]:
+            for q_name in TEST_QUEUE_NAMES + [TEST_DLQ_NAME]:
                 try:
                     queue = await channel.get_queue(q_name)
                     await queue.delete()
@@ -116,7 +122,7 @@ async def _fresh_bus() -> RabbitMQBus:
     bus = RabbitMQBus(amqp_url=AMQP_URL)
     await bus._ensure_connection()
     assert bus._channel is not None
-    for rk, q in bus._queues.items():
+    for q_name, q in bus._queues.items():
         live_q = await bus._channel.get_queue(q.name)
         await live_q.purge()
     return bus
@@ -155,7 +161,7 @@ def test_consume_delivers_message() -> None:
             assert received_payload.get("item_id") == item_id
         finally:
             if consumer_tag is not None:
-                await bus._queues[rk].cancel(consumer_tag)
+                await bus._queues[TEST_ROUTING_KEY_TO_QUEUE[rk][0]].cancel(consumer_tag)
             await bus.close()
 
     with _patched_topology():

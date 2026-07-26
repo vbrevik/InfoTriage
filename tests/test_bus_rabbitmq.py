@@ -42,17 +42,24 @@ AMQP_URL = "amqp://infotriage:infotriage_rmq@127.0.0.1:22001"
 # the running triage/brief containers from consuming messages published by
 # these tests, while still exercising the same _bus_rabbitmq.py code paths.
 TEST_PREFIX = "test."
+# Deliberately single-queue-per-key: this file is the zero-regression guard for the
+# pre-fan-out shape. The wiki fan-out queue is added only in test_bus_consume.py.
 TEST_ROUTING_KEY_TO_QUEUE = {
-    "item.ingested": f"{TEST_PREFIX}q.triage",
-    "verdict.ready": f"{TEST_PREFIX}q.brief",
-    "sab.published": f"{TEST_PREFIX}q.notify",
-    "feed.unhealthy": f"{TEST_PREFIX}q.ops",
+    "item.ingested": [f"{TEST_PREFIX}q.triage"],
+    "verdict.ready": [f"{TEST_PREFIX}q.brief"],
+    "sab.published": [f"{TEST_PREFIX}q.notify"],
+    "feed.unhealthy": [f"{TEST_PREFIX}q.ops"],
 }
 TEST_DLX_NAME = f"{TEST_PREFIX}infotriage.dlx"
 TEST_DLQ_NAME = f"{TEST_PREFIX}infotriage.dlq"
 TEST_DLQ_ROUTING_KEY = f"{TEST_PREFIX}dead"
 
 ROUTING_KEYS = list(TEST_ROUTING_KEY_TO_QUEUE.keys())
+# Flattened list of every declared test queue name, for cleanup and for comparing
+# against bus._queues.keys() (which is keyed by queue name, not routing key).
+TEST_QUEUE_NAMES = [
+    q_name for q_names in TEST_ROUTING_KEY_TO_QUEUE.values() for q_name in q_names
+]
 
 
 @contextlib.contextmanager
@@ -81,7 +88,7 @@ def _cleanup_test_topology():
             channel = await connection.channel()
             assert channel is not None
             # Delete test queues first (queues must be removed before exchanges)
-            for q_name in list(TEST_ROUTING_KEY_TO_QUEUE.values()) + [TEST_DLQ_NAME]:
+            for q_name in TEST_QUEUE_NAMES + [TEST_DLQ_NAME]:
                 try:
                     queue = await channel.get_queue(q_name)
                     await queue.delete()
@@ -126,7 +133,7 @@ async def _fresh_bus() -> RabbitMQBus:
     await bus._ensure_connection()
     assert bus._channel is not None
     # Purge all test-isolated queues for clean test isolation
-    for rk, q in bus._queues.items():
+    for q_name, q in bus._queues.items():
         live_q = await bus._channel.get_queue(q.name)
         await live_q.purge()
     try:
@@ -188,7 +195,7 @@ def test_rabbitmq_available() -> None:
             assert bus._dlx is not None, "DLX not declared"
             assert bus._dlq is not None, "DLQ not declared"
             assert set(bus._queues.keys()) == set(
-                ROUTING_KEYS
+                TEST_QUEUE_NAMES
             ), f"Queue keys mismatch: {set(bus._queues.keys())}"
         finally:
             await bus.close()
@@ -316,7 +323,7 @@ def test_dlq_poison() -> None:
             # Consume from test-isolated q.triage and NACK with requeue=False
             assert bus._channel is not None
             q_triage = await bus._channel.get_queue(
-                TEST_ROUTING_KEY_TO_QUEUE["item.ingested"]
+                TEST_ROUTING_KEY_TO_QUEUE["item.ingested"][0]
             )
             nacked = asyncio.Event()
 

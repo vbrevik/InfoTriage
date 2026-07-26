@@ -10,6 +10,12 @@ Topology (declared in this order — DLX first is mandatory to avoid 406):
     3. infotriage.events (topic, durable) — main event exchange
     4. q.triage / q.brief / q.notify / q.ops (durable) — primary queues, DLX-wired
 
+A routing key may be bound to MORE THAN ONE independently-declared queue, so a single
+published message fans out to every bound queue as its own copy. `verdict.ready` is the
+live example: it is bound to both `q.brief` (apps/brief/consumer.py) and `q.wiki`
+(apps/wiki/wiki_worker.py --mode events), so one verdict.ready event is delivered to
+each service independently instead of the two competing for a single queue.
+
 Usage:
     from contracts import RabbitMQBus
 
@@ -38,12 +44,14 @@ log = logging.getLogger(__name__)
 # Dev-only default DSN — production overrides via INFOTRIAGE_AMQP_DSN
 RABBITMQ_DEFAULT_URL = "amqp://infotriage:infotriage_rmq@127.0.0.1:22001"
 
-# Routing-key → queue name mapping (single source of truth)
-ROUTING_KEY_TO_QUEUE: dict[str, str] = {
-    "item.ingested": "q.triage",
-    "verdict.ready": "q.brief",
-    "sab.published": "q.notify",
-    "feed.unhealthy": "q.ops",
+# Routing-key → list of queue names (single source of truth). Each routing key may
+# fan out to MULTIPLE independently-bound queues; the first entry is the default/
+# primary queue used when consume() is called with no queue_name override.
+ROUTING_KEY_TO_QUEUE: dict[str, list[str]] = {
+    "item.ingested": ["q.triage"],
+    "verdict.ready": ["q.brief", "q.wiki"],
+    "sab.published": ["q.notify"],
+    "feed.unhealthy": ["q.ops"],
 }
 
 # Dead-letter configuration
@@ -71,7 +79,7 @@ class RabbitMQBus:
         self._exchange: aio_pika.abc.AbstractExchange | None = None
         self._dlx: aio_pika.abc.AbstractExchange | None = None
         self._dlq: aio_pika.abc.AbstractQueue | None = None
-        self._queues: dict[str, aio_pika.abc.AbstractQueue] = {}  # routing_key → queue
+        self._queues: dict[str, aio_pika.abc.AbstractQueue] = {}  # queue_name → queue
         self._consumers: list[Any] = []  # active consumer tags for clean shutdown
         self._dedup_lock = asyncio.Lock()
         self._seen: set[tuple[str, str]] = set()
@@ -117,7 +125,10 @@ class RabbitMQBus:
         assert self._connection is not None
         # Open a fresh channel (prior one closed after 406)
         ch = await self._connection.channel()
-        for q_name in [DLQ_NAME] + list(ROUTING_KEY_TO_QUEUE.values()):
+        all_queue_names = [
+            q_name for q_names in ROUTING_KEY_TO_QUEUE.values() for q_name in q_names
+        ]
+        for q_name in [DLQ_NAME] + all_queue_names:
             try:
                 await ch.queue_delete(q_name)
                 log.info("Deleted queue %s for topology rebuild", q_name)
@@ -158,20 +169,23 @@ class RabbitMQBus:
         )
 
         # 4. Primary queues — bound to events exchange, wired to DLX for dead-lettering
-        #    x-dead-letter-routing-key=dead routes nacked messages to infotriage.dlq
+        #    x-dead-letter-routing-key=dead routes nacked messages to infotriage.dlq.
+        #    A routing key may bind SEVERAL independently-declared queues (fan-out);
+        #    self._queues is keyed by queue name (see class docstring / consume()).
         self._queues = {}
-        for rk, q_name in ROUTING_KEY_TO_QUEUE.items():
-            # rk = "item.ingested", q_name = "q.triage", etc.
-            queue = await self._channel.declare_queue(
-                q_name,
-                durable=True,
-                arguments={
-                    "x-dead-letter-exchange": DLX_NAME,
-                    "x-dead-letter-routing-key": DLQ_ROUTING_KEY,  # "dead" for all queues
-                },
-            )
-            await queue.bind(self._exchange, rk)
-            self._queues[rk] = queue
+        for rk, q_names in ROUTING_KEY_TO_QUEUE.items():
+            # rk = "item.ingested", q_names = ["q.triage"], etc.
+            for q_name in q_names:
+                queue = await self._channel.declare_queue(
+                    q_name,
+                    durable=True,
+                    arguments={
+                        "x-dead-letter-exchange": DLX_NAME,
+                        "x-dead-letter-routing-key": DLQ_ROUTING_KEY,  # "dead" for all queues
+                    },
+                )
+                await queue.bind(self._exchange, rk)
+                self._queues[q_name] = queue
 
     async def publish(self, routing_key: str, item_id: str, payload: dict) -> None:
         """Publish payload to routing_key. Idempotent: same (routing_key, item_id) → no-op.
@@ -207,10 +221,11 @@ class RabbitMQBus:
         await self._ensure_connection()
         assert self._channel is not None
 
-        queue_name = ROUTING_KEY_TO_QUEUE.get(routing_key)
-        if not queue_name:
+        q_names = ROUTING_KEY_TO_QUEUE.get(routing_key)
+        if not q_names:
             log.warning("Unknown routing key: %s", routing_key)
             return []
+        queue_name = q_names[0]  # primary queue for this routing key
 
         queue = await self._channel.get_queue(queue_name)
         messages: list[dict] = []
@@ -234,25 +249,46 @@ class RabbitMQBus:
         routing_key: str,
         handler: Callable[[aio_pika.abc.AbstractIncomingMessage], Awaitable[Any]],
         prefetch_count: int = 1,
+        queue_name: str | None = None,
     ) -> str:
-        """Register a persistent consumer on routing_key's queue. Does not block.
+        """Register a persistent consumer on one of routing_key's queues. Does not block.
 
         Reuses the topology declared by _ensure_connection/_declare_topology — does
-        not redeclare exchanges/queues. self._queues is keyed by routing_key (NOT
-        queue name); looking it up by queue name is a bug (see subscribe()'s
-        ROUTING_KEY_TO_QUEUE lookup, which is a different, unrelated mapping).
+        not redeclare exchanges/queues. self._queues is keyed by QUEUE NAME (not
+        routing key) — a routing key may have several independently-bound queues
+        (fan-out), so a queue name is needed to disambiguate which one to attach to.
+
+        With no `queue_name` override, resolves to the FIRST queue declared for
+        `routing_key` (this is the only mechanism preserving existing callers'
+        behavior — do not reorder ROUTING_KEY_TO_QUEUE's list values). Pass
+        `queue_name` to attach to a specific queue bound to that routing key
+        instead (e.g. wiki attaching to "q.wiki" on "verdict.ready" instead of
+        the default "q.brief").
 
         Returns the aio-pika consumer tag so callers can cancel the consumer if
         needed. Active consumers are automatically cancelled when close() is called.
 
-        Raises ValueError if routing_key has no declared queue.
+        Raises ValueError if routing_key has no declared queue, or if queue_name
+        is given but is not one of the queues bound to routing_key.
         """
         await self._ensure_connection()
         assert self._channel is not None
 
-        queue = self._queues.get(routing_key)
-        if queue is None:
+        q_names = ROUTING_KEY_TO_QUEUE.get(routing_key)
+        if not q_names:
             raise ValueError(f"Unknown routing key: {routing_key}")
+
+        if queue_name is None:
+            resolved_queue_name = q_names[0]
+        elif queue_name in q_names:
+            resolved_queue_name = queue_name
+        else:
+            raise ValueError(
+                f"Queue {queue_name!r} is not bound to routing key {routing_key!r} "
+                f"(bound queues: {q_names})"
+            )
+
+        queue = self._queues[resolved_queue_name]
 
         await self._channel.set_qos(prefetch_count=prefetch_count)
         tag = await queue.consume(handler)
