@@ -1,0 +1,19 @@
+# wiki worker third-party runtime dependencies
+# Transitive deps of the local libs (contracts, store) are listed here because
+# those libs are installed with --no-deps in the Dockerfile.
+aio-pika>=9.6
+psycopg[binary]>=3.3
+pgvector>=0.4.2
+# store/__init__.py imports _atom.render_atom at module level, which imports
+# feedgen.feed.FeedGenerator — required even though wiki_worker.py never calls
+# render_atom itself (same pattern as apps/triage, see its requirements.txt).
+feedgen>=0.3.1
+# contracts (pydantic models) and store (yaml-based config) import these at
+# module level too — both already vetted deps.
+pydantic>=2.0
+# generator.py's write_wiki_page() uses PyYAML directly (from_frontmatter/
+# to_frontmatter parsing) in addition to it being a transitive contracts dep.
+PyYAML>=6.0
+# contracts.setup_logging is invoked at module level; json-log-formatter is a
+# contracts runtime dep that's stripped by --no-deps in the Dockerfile.
+json-log-formatter>=1.1
