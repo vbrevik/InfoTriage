@@ -163,7 +163,7 @@ async def run_consumer(
             message, store, vault_path, top_n=top_n, embed=embed, llm=llm
         )
 
-    await bus.consume("verdict.ready", _handler, prefetch_count=1)
+    await bus.consume("verdict.ready", _handler, prefetch_count=1, queue_name="q.wiki")
     await asyncio.Future()  # run forever
 
 
