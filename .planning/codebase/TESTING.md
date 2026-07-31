@@ -5,40 +5,49 @@
 ## Test Framework
 
 **Runner:**
-- `unittest` (Python standard library, built-in)
-- No test framework configuration file (no `pytest.ini`, `setup.cfg`, or similar)
+- `pytest` (configured under `[tool.pytest.ini_options]` in the root `pyproject.toml`)
+  - `pythonpath` points at `libs/{contracts,store,ingest_common}/src` and every `apps/<service>` so tests run from the repo root without `pip install -e` (though `pip install -e libs/contracts libs/store libs/ingest_common` makes type-checking happier).
+  - Markers registered in the same block: `db_live`, `rabbitmq`, `integration` — and ad-hoc `slow` / `asyncio` where used.
+  - 65 test files (counted 2026-07-23); recent baseline **572 passed / 7 skipped / 58 deselected / 0 failed**.
 
 **Run Commands:**
 ```bash
-python3 tests/test_opml_check.py                # Run single test file
-python3 tests/test_*.py                         # Run all test files (shell glob)
-python3 -m unittest discover tests/ -p "test_*.py"  # Discover and run all tests
+# Quick subset (no integration markers) — runs without rabbitmq/Postgres env:
+pytest tests/ -q
+
+# Project defaults — use ops/Makefile targets:
+make test-safe          # DSN smoke (check_test_dsn.sh) → full pytest chain
+make test-full          # full pytest against throwaway Postgres (port 22062)
+make test-integration   # adds RabbitMQ so db_live/rabbitmq/integration don't skip
+
+# Convenience regression targets (operator-facing per bug-fix):
+make test-uvicorn-log   # tests/test_uvicorn_log_config.py
+make test-dlq-depth     # tests/test_dlq_depth_probe.py
+make test-dsn-smoke     # tests/test_check_test_dsn.py
 ```
 
 **Assertion Library:**
-- Standard `unittest.TestCase` assertions: `assertEqual()`, `assertIn()`, `assertNotIn()`, `assertRaises()`
+- pytest's `assert` statement with rich introspection (rewritten at collection time).
+- Existing `unittest.TestCase` subclasses are still discoverable and runnable — pytest supports both. New tests should use plain `assert` + pytest fixtures.
 
 ## Test File Organization
 
 **Location:**
-- All tests in `tests/` directory at project root
-- Tests are sibling to source code modules (`bridge/`, `opml/`, `score/`)
+- All tests in `tests/` directory at the project root.
+- **65 test files** (counted 2026-07-23). Coverage spans `libs/{contracts,store,ingest_common}` + `apps/{triage,brief,wiki,opml_health,dlq_consumer,ingest-*}` + cross-cutting concerns (bus topology, CCIR sync, dedup thresholds).
 
 **Naming:**
-- Test files: `test_*.py` format (e.g., `test_opml_check.py`, `test_bridge_escape.py`)
-- Test classes: `Test<FeatureName>` (e.g., `TestClassify`, `TestLoadOpml`, `TestEscape`)
-- Test methods: `test_<scenario>` (e.g., `test_200_rss_xml_is_live`, `test_ampersand_escaped`)
+- Test files: `test_<feature>.py` (e.g. `test_triage_worker.py`, `test_recall.py`, `test_wiki_generator.py`, `test_ccir_registry.py`, `test_cross_language_synthesis.py`).
+- Test classes: `Test<Behavior>` uppercase prefix (pytest discovery-friendly); not required for plain-`def test_` style.
+- Test methods: `test_<scenario>_<outcome>` (behavior-driven; e.g. `test_atomic_rename_does_not_leave_tmp`).
 
-**Directory Structure:**
-```
-tests/
-├── test_opml_check.py       # opml/_check.py classifier + OPML loader
-├── test_bridge_escape.py    # bridge/_util.py::escape() contract
-├── test_ccir_sync.py        # CCIR markdown synchronization
-├── test_opml_roundtrip.py   # OPML parsing round-trip
-├── test_score_parse.py      # Triage scorer JSON extraction
-└── test_write_bluf.py       # BLUF credential-leak guard
-```
+**Markers (registered in `pyproject.toml` `[tool.pytest.ini_options]`):**
+- `db_live: requires INFOTRIAGE_TEST_DSN pointing at a reachable isolated test Postgres`
+- `rabbitmq: requires RabbitMQ :22001 to be running`
+- `integration: used by the superclaude pytest plugin for integration tests`
+- Plus ad-hoc `@pytest.mark.skipif(...)` for opt-in feature tests (e.g. YouTube transcription gated on `INFOTRIAGE_YOUTUBE_TRANSCRIBE`, DGX Spark routing gated on backend argument).
+
+`poolimport`/`pythonpath` includes `libs/{contracts,store,ingest_common}/src` + every `apps/<service>`, so tests run from the repo root once `libs/*` are installed (`pip install -e libs/contracts libs/store libs/ingest_common`).
 
 ## Test Structure
 

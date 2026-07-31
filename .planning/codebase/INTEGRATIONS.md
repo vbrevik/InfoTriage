@@ -4,56 +4,64 @@
 
 ## APIs & External Services
 
-**Email (IMAP):**
-- Gmail IMAP (`imap.gmail.com:993`) - Read-only newsletter/message ingestion
-  - SDK/Client: Python `imaplib` (stdlib)
-  - Auth: Google app password (not full Gmail API)
-  - Used by: `bridge/gmail_to_atom.py`, `bridge/imap_to_atom.py`
-  - Query language: Gmail X-GM-RAW (native Gmail search syntax)
-  - Output: Atom feed written to `data/feeds/gmail.xml` or `data/feeds/gmail-multi.xml`
+**Email — Gmail via MCP:**
 
-- Multi-Account IMAP (`imap_to_atom.py`)
-  - Providers: Gmail, Outlook, Fastmail, ProtonMail, custom-domain IMAP
-  - Auth: Plaintext IMAP credentials in `.mailboxes.json` (gitignored)
-  - Config: `MAILBOXES` env var (JSON array) or `.mailboxes.json` file
-  - Output: `data/feeds/gmail-multi.xml` (one runner, per-account dispatch)
+- Containerized adapter (`apps/ingest-gmail/`) talks to a Node-side MCP server (`gmail-mcp-server`, `@shinzolabs/gmail-mcp`) over HTTP on the `infotriage` Docker network.
+  - SDK/Client: Python `urllib` (via `make_trigger_app` from `libs/ingest_common`) → MCP server (Node) → Gmail API
+  - Auth: OAuth2 — `python scripts/provision_gmail_oauth.py` writes `GMAIL_OAUTH2_REFRESH_TOKEN` to `.env` once
+  - Used by: `apps/ingest-gmail/gmail_ingest.py` (publishes `item.ingested` on RabbitMQ)
+  - Query language: Gmail search syntax (`GMAIL_QUERY=newer_than:7d`)
+  - Replaces the retired host-side `bridge/gmail_to_atom.py` (ADR-008).
 
-**LLM / AI Scoring:**
-- OpenAI-compatible API endpoint (local)
-  - Default: oMLX on `http://127.0.0.1:8000/v1`
-  - Alternative: Ollama on `http://127.0.0.1:11434/v1`
-  - Auth: Bearer token in header (`Authorization: Bearer {LLM_API_KEY}`)
-  - Endpoint: `/chat/completions` (POST)
-  - Model: Configurable (default: `qwen36-ud-4bit` on oMLX)
-  - Payload: JSON with `model`, `messages`, `temperature`, `max_tokens`
-  - Used by: `score/triage_score.py`, `score/fever_triage.py`, `score/digest.py`, `score/sab_html.py`
-  - Purpose: Scoring items against CCIR (interest profile) and generating digests
-  - Implementation: `score/triage_score.py::llm()` - wraps urllib for compatibility
+**Email — multi-protocol mail (`apps/ingest-imap/`):**
 
-**YouTube (Video Transcription):**
-- YouTube video metadata and audio
-  - SDK/Client: `youtube-transcript-api` (optional, implicit in yt_to_atom.py architecture)
-  - Transcription: `mlx_whisper` (Apple Silicon) or OpenAI `whisper` (fallback)
-  - Config: `YT_CHANNELS` env var (JSON array) or `.yt_channels.json` file
-  - Output: Atom feed `data/feeds/youtube-<slug>.xml`
-  - Used by: `bridge/yt_to_atom.py`
-  - Mode: Optional transcription (can emit stub summaries without transcription for testing)
+- IMAP via stdlib `imaplib` for non-Gmail (Outlook, Fastmail, ProtonMail, custom-domain); POP3 via stdlib `poplib` for servers that don't offer IMAP. Both READ-ONLY.
+  - Auth: `MAILBOXES` env var (JSON array) or `.mailboxes.json` sibling file (gitignored). Plaintext on disk — see Security Considerations.
+  - Output: `Item` rows in `InfoTriage.articles` + `item.ingested` events on RabbitMQ (not Atom files anymore — those go through the triage path now).
+  - ADR-014.
+
+**LLM — local-only (ADR-004):**
+
+- **Intent (per PROJECT.md / ADR-004):** DGX Spark vLLM `qwen 80B` at `http://192.168.10.2:8000/v1` is the primary target when the Spark is on the LAN.
+- **Runtime default (`ops/llm-router.py` + `.env.example`):** oMLX `qwen36-ud-4bit` at `http://127.0.0.1:8000/v1` — works standalone without Spark. To flip to DGX, uncomment the Spark `LLM_BASE_URL` line in `.env.example` and `docker compose up -d --build triage brief wiki` to pick up the new env.
+- **Router:** `ops/llm-router.py` proxies both backends into a single local endpoint at `http://127.0.0.1:8600/v1`. Inside Docker, services reach the host router as `http://host.docker.internal:8600/v1` (compose hardcodes this to avoid `LLM_BASE_URL=127.0.0.1` from `.env` pointing at the container itself).
+  - Auth: Bearer token in `Authorization` header (`LLM_API_KEY`); `EMPTY` for Spark (vLLM), `omlx` for oMLX.
+  - Endpoint: `/chat/completions` (POST); reasoning is suppressed (`chat_template_kwargs: {enable_thinking: false}`) to keep sub-10s responses.
+  - Used by: `apps/triage/worker.py`, `apps/brief/consumer.py`, `apps/wiki/wiki_worker.py`, `apps/triage/recall.py`.
+  - ADR-004 forbids cloud LLMs anywhere in the runtime. Cloud models are only used by this assistant during design.
+
+**Embedder — local-only:**
+
+- **Primary (Mac oMLX):** `intfloat/multilingual-e5-large` (1024-dim, multilingual).
+- **Spark transfer:** `Alibaba-NLP/gte-Qwen2-7B-instruct` (transferred from Mac since Spark has no internet to fetch weights).
+- `EMBED_BASE_URL` + `EMBED_MODEL` select; default `intfloat/multilingual-e5-large`.
+
+**YouTube — containerized (Phase 11 W5 transcription):**
+
+- Containerized adapter (`apps/ingest-youtube/`) pulls channel data + optional local audio transcription.
+  - SDK/Client: `yt-dlp` for metadata + audio extraction; `faster-whisper` (cross-platform, CPU `int8`) for transcription.
+  - Transcription is opt-in: `INFOTRIAGE_YOUTUBE_TRANSCRIBE=1` + `INFOTRIAGE_WHISPER_MODEL=tiny` (runtime default per `.env.example` and compose). Bump to `large-v3-turbo` for multilingual ~8× turbo speed vs `large-v3`. Either choice survives a container rebuild.
+  - Dockerfile installs `ffmpeg` + `libgomp1` per `apps/ingest-youtube/Dockerfile`.
+  - Replaces the retired host-side `bridge/yt_to_atom.py`.
 
 ## Data Storage
 
-**Databases:**
-- FreshRSS (in-container)
-  - Type: SQLite (embedded in `freshrss/freshrss:latest` Docker image)
-  - Path (container): `/var/www/FreshRSS/data`
-  - Path (host): `./data/freshrss/` (Docker volume mount)
-  - Connection: Automatic via FreshRSS ORM
-  - Stores: User accounts, feed subscriptions, articles, read/unread state
+**Stores:**
 
-- rss-bridge
-  - Type: File-based cache (in-container)
-  - Path (container): `/config`
-  - Path (host): `./data/rssbridge/` (Docker volume mount)
-  - Stores: Bridge configurations, cache of generated feeds
+- **Postgres 16 + pgvector** (`postgres` service, image `pgvector/pgvector:pg16`) — canonical InfoTriage store.
+  - Host port: `127.0.0.1:22000:5432` (localhost-only per ADR-016).
+  - DSN: `INFOTRIAGE_PG_DSN=postgresql://infotriage:infotriage_dev@postgres:5432/infotriage` (from `.env`).
+  - Schema: `InfoTriage.*` — articles, enrichment, embeddings, ccir, ccir_vectors, entities, entity_links, audit, plus strata tables.
+  - One Postgres instance; FreshRSS owns its own schema; `InfoTriage.*` owns ours (no fan-out; ADR-004 contract).
+
+- **FreshRSS** (legacy SQLite inside `freshrss/freshrss:latest`) — RSS aggregator + reader UI only.
+  - Path (host): `./data/freshrss/` (volume-mounted).
+  - Schema: `freshrss.*` — user accounts, feed subs, articles, read/unread.
+  - Note: scoring no longer reads the Fever endpoint (fever_triage retired 2026-07-11, Phase 7). FreshRSS's `/api/fever.php` still works for external clients.
+
+- **rss-bridge** cache (`./data/rssbridge/`) — bridge configurations + cache of generated feeds.
+
+- **ntfy cache** (`./data/ntfy-cache/`) — runtime message cache only; credentials live in the pre-baked image layer (ADR-018), not on disk.
 
 **File Storage (Local):**
 - `./data/feeds/` - Generated feed files served by static server
@@ -67,9 +75,12 @@
 - `./data/digests/` - Generated digest files (if created by `score/digest.py`)
 
 **Caching:**
-- FreshRSS internal feed cache (TTL configurable per-feed in UI)
-- rss-bridge local cache in `./data/rssbridge/`
-- No external caching service
+- FreshRSS internal feed cache (TTL configurable per-feed in UI).
+- rss-bridge local cache in `./data/rssbridge/`.
+- ntfy runtime cache in `./data/ntfy-cache/` (writable bind).
+- mE5-large embedding cache (in-process LRU) inside `apps/triage/worker.py`.
+- `faster-whisper` model load cache (process-level, thread-safe) inside `apps/ingest-youtube/youtube_ingest.py`.
+- No external caching service.
 
 ## Authentication & Identity
 
@@ -96,16 +107,20 @@
 
 ## Monitoring & Observability
 
-**Error Tracking:**
-- None (local, no external service)
+**Health aggregator:**
+- `opml-health` service (`:22032`) polls every service's `/health` endpoint on a tick; surfaces aggregate status at `/admin/health`. Backs the `make status` Makefile target.
 
 **Logs:**
-- Stdout/stderr to console and cron logs
-- Triage log: `./data/triage.log` (from cron-scheduled `fever_triage.py`)
-- Docker logs: `docker compose logs <service>`
+- `setup_logging()` from `libs/contracts` emits JSON to stdout and a daily-rotating file under `/data/logs/<service>.log` (with `LOG_LEVEL` env var). Wired into every Compose service. Triage guide: `docs/ops/logging.md`.
 
-**Alerting:**
-- None (local system, no external monitoring)
+**Alerts / DLQ pipeline:**
+- `apps/dlq_consumer/` consumes `infotriage.dlq`; live RabbitMQ-mgmt queue-depth probe (configurable `DLQ_DEPTH_*`); emits `feed.unhealthy` after a consecutive-message threshold; supports `--replay` back to the original routing key.
+
+**CAT-I push channel:**
+- Local `ntfy` (`:22070`) for 🚩 / CNR-I per ADR-015 + ADR-018 (pre-baked Docker image, deny-all ACL default, BuildKit-secrets injection).
+
+**External monitoring:**
+- None (local-only system; the design principles in ADR-004 forbid cloud dependencies in the runtime, and the operator-facing surfaces above are the project's complete observability footprint).
 
 ## CI/CD & Deployment
 
@@ -113,10 +128,16 @@
 - Local macOS machine (no cloud deployment)
 - All services containerized via Docker Compose
 
-**CI Pipeline:**
-- None (local development only)
-- Manual testing: `python3 script.py --sample` or piping JSON to stdin
-- Test suite: `tests/` directory with pytest/unittest (runner not explicitly configured)
+**CI / Quality Gates:**
+
+- None external (no GitHub Actions, no GitLab CI). Local pipeline baked into `ops/Makefile`:
+  - `make test-safe` — `scripts/check_test_dsn.sh` first (refuses a DSN pointing at the prod port), then `make test-full`.
+  - `make test-full` — full pytest suite against a throwaway `infotriage-test` Postgres container on `:22062`.
+  - `make test-integration` — adds RabbitMQ to the test stack so `db_live` / `rabbitmq` / `integration` markers don't skip.
+  - `make test-uvicorn-log`, `make test-dlq-depth`, `make test-dsn-smoke` — per-bug/per-feature regression gates.
+  - `make ccir-sync`, `make ntfy-build`, `make ntfy-up`, `make ntfy-publish-test` — substrate sync / ntfy gating.
+
+- Pre-commit (`.pre-commit-config.yaml`): black + mypy on staged Python files.
 
 ## Environment Configuration
 
@@ -145,24 +166,33 @@
 - None (no webhooks subscribed)
 
 **Outgoing:**
-- Fever API calls from `score/fever_triage.py` to mark items read/unread in FreshRSS
-  - Endpoint: FreshRSS Fever API (`FRESHRSS_FEVER_URL?api&...`)
-  - Payload: Form-encoded with `api_key`, `unread_item_ids`, `read_item_ids`
-  - Used by: `fever()` function in `score/fever_triage.py`
+
+- **RabbitMQ bus** (`rabbitmq` 3.13-management) — event-driven fabric.
+  - AMQP: `INFOTRIAGE_AMQP_DSN=amqp://infotriage:infotriage_rmq@rabbitmq:5672`; host `127.0.0.1:22001:5672`; mgmt UI `127.0.0.1:22002:15672`.
+  - Routing keys (current): `item.ingested`, `verdict.ready`, `sab.published`, plus per-Phase-12 `cnn.cat-i`, `outbox.publish`, `outbox.dlx` (sub-wave b).
+  - **Fan-out:** `verdict.ready` fans to BOTH `q.brief` AND `q.wiki` via `ROUTING_KEY_TO_QUEUE` list (commit `ec52292`).
+  - DLX/DLQ: `infotriage.dlq` is consumed by `apps/dlq_consumer/`. Live RabbitMQ-mgmt queue-depth probe + auto-replay; tunable per `DLQ_DEPTH_*` envs.
+
+- **FreshRSS Fever API** — still available for external clients (e.g. legacy scripts / external readers); no longer in the InfoTriage runtime path (fever_triage retired 2026-07-11, Phase 7).
 
 ## Content Sources (Feed Inputs)
 
 **Subscribed Feeds:**
-- 44+ RSS/Atom feeds in `opml/feeds.opml` (Norwegian + world + defense/geopolitics)
-  - News outlets: NRK, VG, DN, Klassekampen, etc.
+
+- 44+ curated RSS/Atom feeds in `apps/opml/feeds.opml` (CCIR-grouped, regenerated by `make ccir-sync` from the registry in `libs/contracts/src/contracts/ccir.py`).
+  - News outlets: NRK, VG, DN, Klassekampen, BBC, Reuters, etc.
   - Government: Regjeringen.no, Stortinget, etc.
   - Defense/Security: ISW (Institute for the Study of War), Lawfare, Breaking Defense, etc.
-  - International: Major news (BBC, Reuters, etc.), defense analysts
-  - Data sources: GDELT (geopolitical events, 1 req / 5 sec rate limit)
+  - Data sources: GDELT (geopolitical events, 1 req / 5 s rate limit).
+- Sites without native RSS (Forsvarets forum, FFI, NUPI, UTSYN, High North News) → built via **rss-bridge** at `http://127.0.0.1:3000` (CSS-selector / XPathBridge).
 
-- Sites without native RSS:
-  - Forsvarets forum, FFI, NUPI, UTSYN, High North News
-  - Workaround: Built via rss-bridge at `http://localhost:3000` (CSS-selector / XPathBridge)
+**SOCMINT sources (Phase 11):**
+
+- Telegram public channels (Telethon) — published channels only (`ingest-telegram`). ADR-014 explicitly gates DM scraping out. Tags items with `discipline=SOCMINT` + `admiralty_reliability=A-F/1-6` provenance.
+
+**MASINT/AIS sources (Phase 11):**
+
+- BarentsWatch AIS — Arctic vessel positions (`ingest-barentswatch`). Tagged `discipline=MASINT/AIS`.
 
 **Rate Limiting Compliance:**
 - GDELT: 1 request per 5 seconds (FreshRSS fetches at :23/:53 twice per hour, plus per-feed 6-hour TTL minimum)
