@@ -29,7 +29,7 @@ Nothing leaves the machine. No paid services.
 | OPML-health admin + DLQ consumer | ✅ health-aggregator (`:22032`); DLQ auto-replay |
 | ntfy push channel (`ntfy`, pre-baked deny-all ACL) | ✅ image `infotriage-ntfy:prebaked` (`:22070`); Phase 12 sub-wave (a) |
 | YouTube local audio transcription (`faster-whisper`) | ✅ opt-in via `INFOTRIAGE_YOUTUBE_TRANSCRIBE=1`; runtime default `INFOTRIAGE_WHISPER_MODEL=tiny` (bump to `large-v3-turbo` for multilingual) |
-| Test suite | ✅ last recorded baseline **572 passed / 0 failed** (Phase 12 sub-wave (a) closeout, 2026-07-23) — refresh via `make test-safe` |
+| Test suite | ⚠️ **671 passed / 3 failed** (`make test-safe`, 42.98s; 2026-07-31) — 99 net additional passing since the 2026-07-23 572-baseline (some previously-skipped `db_live` tests now run via the test DSN `test-safe` sets); 3 pre-existing env-dependent failures (NOT introduced by `260725-lme` or `260726-jpe`): `test_ingest_emits_item_with_discipline_and_reliability`, `test_ingest_dry_run_does_not_persist`, `test_ingest_r2_dual_output` (need real Telethon client + correct `INFOTRIAGE_YOUTUBE_TRANSCRIBE` env isolation) |
 | FreshRSS provisioned headless (admin user, 44 feeds, 1642 articles) | ✅ done |
 
 ## Live services (operator reference)
