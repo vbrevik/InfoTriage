@@ -12,15 +12,51 @@ Nothing leaves the machine. No paid services.
  Gmail ─ ingest-gmail (MCP/OAuth2) ─▶ Postgres        mark junk read)
 ```
 
-## Status of this spike (what's verified)
+## Status of the system (verified, 2026-07-24)
 
 | Piece | State |
 |-------|-------|
-| FreshRSS + rss-bridge + feeds server in Docker | ✅ up, reachable (`:8088`, `:3000`) |
-| qwen36 triage scorer vs your oMLX endpoint | ✅ tested live — correct buckets, ~3s/item |
-| Gmail via OAuth2 MCP (`ingest-gmail`) | ✅ MCP path proven; replaces legacy IMAP bridge (ADR-008) |
-| Scorer → FreshRSS auto-mark-read (Fever API) | ✅ wired + tested live (verified 2026-06-23) — marks junk read, unread count drops |
-| FreshRSS provisioned headless (admin user, 44 feeds, 1642 articles) | ✅ done (see creds below) |
+| FreshRSS + rss-bridge + feeds static server | ✅ reachable (`:8088`, `:3000`, `127.0.0.1:22041`) |
+| Postgres 16 + pgvector (`postgres`) | ✅ base storage for all post-Phase-2 data (`:22000`) |
+| RabbitMQ 3.13-management (`rabbitmq`) | ✅ event-driven bus; AMQP `:22001`, mgmt UI `:22002` |
+| DGX Spark (vLLM, qwen 80B) primary + oMLX fallback via `ops/llm-router.py` | ✅ ADR-004 — local-only; no cloud LLM anywhere |
+| Event-driven triage worker (`triage`) | ✅ consumes `item.ingested` → emits `verdict.ready` (`:22030`) |
+| Inbound adapters — IMAP · YouTube · Gmail MCP · Obsidian | ✅ containers at `127.0.0.1:22010..22013` |
+| Brief app (`brief`) — SAB + cluster + Obsidian vault projection | ✅ consumes `verdict.ready` (`:22040`) |
+| Wiki-LLM (`wiki`) — periodic + events modes; optional DGX Spark backend | ✅ writes Obsidian wiki pages (`:22042`) |
+| SOCMINT — Telegram public channels (`ingest-telegram`) | ✅ discipline + admiralty reliability (`:22015`); needs `TELEGRAM_API_ID`/`HASH` |
+| MASINT/AIS — BarentsWatch (`ingest-barentswatch`) | ✅ needs `BARENTSWATCH_CLIENT_ID`/`SECRET` (`:22016`) |
+| OPML-health admin + DLQ consumer | ✅ health-aggregator (`:22032`); DLQ auto-replay |
+| ntfy push channel (`ntfy`, pre-baked deny-all ACL) | ✅ image `infotriage-ntfy:prebaked` (`:22070`); Phase 12 sub-wave (a) |
+| YouTube local audio transcription (`faster-whisper`) | ✅ opt-in via `INFOTRIAGE_YOUTUBE_TRANSCRIBE=1`; runtime default `INFOTRIAGE_WHISPER_MODEL=tiny` (bump to `large-v3-turbo` for multilingual) |
+| Test suite | ✅ last recorded baseline **572 passed / 0 failed** (Phase 12 sub-wave (a) closeout, 2026-07-23) — refresh via `make test-safe` |
+| FreshRSS provisioned headless (admin user, 44 feeds, 1642 articles) | ✅ done |
+
+## Live services (operator reference)
+
+The 19 `docker-compose.yml` services run on the `infotriage` Docker network. Published ports follow the `127.0.0.1:2Nxxx:container-port` convention (22010–22070 band, localhost-only per ADR-016). Up + down + status: `make help` from `ops/Makefile`. Live CCIR distribution is mid-flight per the 2026-07-24 dedup-fix re-score (verify before trusting).
+
+| Service | Host port | Purpose | Healthcheck |
+|---|---|---|---|
+| `freshrss` | `8088:80` | RSS hub + web UI + Fever API | `http://127.0.0.1:8088/` |
+| `rssbridge` | `3000:80` | turn non-RSS sites (Forsvarets forum, FFI…) into Atom | `http://127.0.0.1:3000/` |
+| `feeds` | `127.0.0.1:22041:80` | static Atom server, mounts `data/feeds/<name>.xml` | `http://127.0.0.1:22041/` |
+| `postgres` | `127.0.0.1:22000:5432` | pgvector; `InfoTriage.*` schema | `pg_isready` |
+| `rabbitmq` | `127.0.0.1:22001:5672` + `:22002:15672` | AMQP bus + mgmt UI | `:22002` UI |
+| `ingest-imap` | `127.0.0.1:22010:8000` | multi-protocol mail (IMAP/POP3, ADR-014) | `/health` |
+| `ingest-youtube` | `127.0.0.1:22011:8000` | channels → Atom + opt-in `faster-whisper` | `/health` |
+| `ingest-gmail` | `127.0.0.1:22012:8000` | OAuth2/MCP Gmail (ADR-008) | `/health` |
+| `ingest-obsidian` | `127.0.0.1:22013:8000` | vault `articles-inbox/` → Atom (READ-ONLY) | `/health` |
+| `ingest-telegram` | `127.0.0.1:22015:8000` | SOCMINT — public channels (Telethon) | `/health` |
+| `ingest-barentswatch` | `127.0.0.1:22016:8000` | AIS MASINT — Arctic vessels | `/health` |
+| `gmail-mcp-server` | `127.0.0.1:22025:3000` | `@shinzolabs/gmail-mcp` Node service (ADR-008) | TCP probe |
+| `triage` | `127.0.0.1:22030:22030` | LLM scorer (CCIR-driven, qwen36/qwen80b) | `/health` |
+| `opml-health` | `127.0.0.1:22032:22032` | cross-service health dashboard, `/admin/health` | `/health` |
+| `brief` | `127.0.0.1:22040:22040` | SAB + markdown digest + Obsidian vault | `/health` |
+| `wiki` | `127.0.0.1:22042:22040` | standup Obsidian wiki pages | `/health` |
+| `dlq-consumer` | (background) | RabbitMQ `infotriage.dlq`; auto-replay | log watch |
+| `ntfy` | `127.0.0.1:22070:80` | CAT-I 🚩 push channel (single-binary local ntfy, ADR-018) | `wget --spider :22070` |
+| `scheduler` | `127.0.0.1:22014:8000` | APScheduler cron for ingest adapters | `/health` |
 
 ## Run it
 
@@ -78,22 +114,20 @@ Too narrow a profile = it nukes everything (learned that the hard way).
 | `LLM_MODEL` | `qwen36-ud-4bit` | any model your server lists |
 | `GMAIL_QUERY` | `newer_than:7d` | Gmail search syntax (used by ingest-gmail MCP adapter) |
 
-## Bridges (ingest paths)
+## Ingest adapters (containerized)
 
-Three `apps/ingest/` scripts write Atom feeds into `data/feeds/<name>.xml`, which the `feeds` container serves to FreshRSS at `http://feeds/<name>.xml`. All are read-only of their source.
+Each adapter is a containerized service under `apps/ingest-*/`, exposing an HTTP `/health` endpoint and (for adapters that need on-demand retrieval) a `/run` trigger endpoint. Each writes `Item` rows into `InfoTriage.articles` and emits `item.ingested` on RabbitMQ. All adapters are READ-ONLY of their source (no markup, no deletes, no replies — ADR-004 contract).
 
-- **`apps/ingest-gmail/`** — Gmail via OAuth2 MCP (`ingest-gmail` container + `gmail-mcp-server`). Provision once with `scripts/provision_gmail_oauth.py`, then start containers (ADR-008).
-- **`apps/ingest/imap_to_atom.py`** — multi-IMAP mailboxes (Outlook / Fastmail / ProtonMail / custom-domain). One runner, per-account provider dispatch via standard RFC 3501 SEARCH.
+- **`ingest-imap` (`:22010`)** — multi-protocol mail. Protocol `imap` (Outlook / Fastmail / ProtonMail / custom-domain) or `pop3` (RFC 1939, UIDL-keyed) per mailbox entry. Per-account provider dispatch via standard RFC 3501 SEARCH.
+  - Env: `MAILBOXES='[…]'` (JSON array) or `.mailboxes.json` sibling. **Plaintext IMAP creds; gitignored.**
+- **`ingest-youtube` (`:22011`)** — YouTube channels → optional audio transcription (Phase 11 W5, opt-in via `INFOTRIAGE_YOUTUBE_TRANSCRIBE=1`, default model `large-v3-turbo`) → Atom feed.
+  - Env: `YT_CHANNELS='[…]'` (JSON array) or `.yt_channels.json` sibling.
+- **`ingest-gmail` (`:22012`)** — Gmail via OAuth2/MCP. Provision once with `scripts/provision_gmail_oauth.py`; runtime talks to `gmail-mcp-server` (`:22025`); replaces the legacy IMAP bridge (ADR-008).
+- **`ingest-obsidian` (`:22013`)** — reads `Vault/articles-inbox/` (READ-ONLY bind per T-04-17) → emits `item.ingested`.
+- **`ingest-telegram` (`:22015`)** — SOCMINT. Telethon over **public channels only** (ADR-014; no DM scraping). Needs `TELEGRAM_API_ID`/`HASH`. Tags items with discipline + admiralty reliability per Phase 11 schema.
+- **`ingest-barentswatch` (`:22016`)** — MASINT/AIS. Arctic vessel positions from `barentswatch.no` (registered OAuth client). Needs `BARENTSWATCH_CLIENT_ID`/`SECRET`. Optional `BARENTSWATCH_AREA` bounding box.
 
-      Env / config:
-      - `MAILBOXES='[…]'` — JSON array, set as a shell env var.
-      - `.mailboxes.json` — sibling file fallback. **Plaintext IMAP creds; gitignored.**
-- **`apps/ingest/yt_to_atom.py`** — YouTube channels → optional audio transcription → Atom feed. Default runner: `mlx_whisper` (Apple Silicon); cross-platform fallback: `whisper`. With `transcribe: false`, the script emits stub summaries so the wiring is end-to-end testable without any MLX install.
-
-      Env / config:
-      - `YT_CHANNELS='[…]'` — JSON array, set as a shell env var.
-      - `.yt_channels.json` — sibling file fallback (gitignored).
-      - Channel name slug is the output-filename stem (`youtube-<slug>.xml`); provide an explicit `name` if two channel URLs slug to the same string.
+The legacy `apps/ingest/` host-side bridge scripts (`imap_to_atom.py`, `yt_to_atom.py`) are no longer in the runtime path; superseded by the containerized adapters. Kept under `apps/ingest/` only for the `RSS_BRIDGE_NOTES.md` cross-reference.
 
 For sites without native RSS (Forsvarets forum, FFI, NUPI, UTSYN, High North News), see [`apps/ingest/RSS_BRIDGE_NOTES.md`](apps/ingest/RSS_BRIDGE_NOTES.md) for how to bridge them via rss-bridge at [`http://localhost:3000`](http://localhost:3000).
 
