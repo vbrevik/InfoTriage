@@ -2,36 +2,101 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 12-03 (ntfy bearer-token ACL) COMPLETE — ntfy topic ACL tightened from wildcard to SPEC R6 explicit per-topic grants (apps/ntfy/Dockerfile), idempotent `make ntfy-token`/`make ntfy-acl-check` targets, ADR-018 amendment, tests/test_alerting_auth.py (4 tests), COVERAGE.md ntfy capability matrix; Task 3 (operator confirmation) closed this session — operator pasted their own NTFY_TOKEN into .env and confirmed; continuation agent re-verified ntfy-acl-check 3/3 PASS + full test-safe 723/0/1 (0 regressions) without ever reading .env. See 12-03-SUMMARY.md
-stopped_at: "Phase 12 Plan 03 complete (all 3 tasks). Next: Plan 12-04 (dedupe/throttle wiring)."
-last_updated: "2026-08-01T17:20:00.000Z"
+status: Phase 12-04 (dedupe/dual-trigger wiring) COMPLETE — apps/alerting/dedupe.py (compute_dedupe_id + claim, SPEC R2), sab.published now bound to q.alerting alongside verdict.ready (D-01), emitter.py split into handle_verdict_ready/handle_sab_published/_emit_if_claimed sharing one atomic claim-before-read path (SPEC R1 exactly-once), 17 new tests (6 dedupe + 11 dual-trigger), full test-safe 740/0/1 (0 regressions). See 12-04-SUMMARY.md
+stopped_at: "Phase 12 Plan 04 complete (both tasks). Next: Plan 12-05 (throttle wiring)."
+last_updated: "2026-08-01T17:58:00.000Z"
 progress:
   total_phases: 13
   completed_phases: 8
   total_plans: 48
-  completed_plans: 37
+  completed_plans: 38
 last_baseline:
   command: make -f ops/Makefile test-safe
   date: 2026-08-01
-  duration_seconds: 53.37
-  passed: 723
+  duration_seconds: 43.58
+  passed: 740
   failed: 0
   skipped: 1
-  note: "720 -> 724 (723 passed + 1 skipped): +4 tests from 12-03 tests/test_alerting_auth.py (SPEC R6 bearer-token ACL matrix); the 1 skip is test_real_bearer_token_accepted since NTFY_TOKEN isn't exported in the ambient test-safe environment. 0 regressions."
+  note: "723 -> 740 (740 passed + 1 skipped): +17 tests from 12-04 (6 tests/test_alerting_dedupe.py + 11 tests/test_alerting_emitter.py). The 1 skip is unchanged from the 12-03 baseline (test_real_bearer_token_accepted, NTFY_TOKEN not exported in ambient test-safe env). 0 regressions."
   production_code_regressions: 0
   throwaway_pg_port: 22062
   prod_pg_port: 22000
   db_live_variants_unblocked: 15
   db_live_variants_source: tests/test_store_entities.py parametric Postgres variants
-  prior_baseline_sha: 227b9ab (685 passed / 0 failed / 35.31s)
-  resolved_in_commit: "195b8d2 (12-03 Task 2: ntfy-token/ntfy-acl-check + tests/test_alerting_auth.py)"
-make_test_safe_status: CLEAN (723/0/1 baseline; Phase 12 Plan 03 Tasks 1-2 shipped this session, Task 3 checkpoint pending)
+  prior_baseline_sha: d83d15e (723 passed / 0 failed / 1 skipped)
+  resolved_in_commit: "bc2e568 (12-04 Task 2: dual-trigger consumption with exactly-once egress)"
+make_test_safe_status: CLEAN (740/0/1 baseline; Phase 12 Plan 04 both tasks shipped this session)
 ---
 
 # STATE — InfoTriage
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-08-01 (continuation 5) — Phase 12 Plan 04 (dedupe/dual-trigger wiring) COMPLETE
+
+### Just-completed (this session)
+
+- **Phase 12-04 shipped: dual-trigger, exactly-once CAT I alerting (SPEC R1/R2).** 2-task plan,
+  2 atomic commits:
+
+  1. `29b486f` — Task 1: `apps/alerting/dedupe.py` — `compute_dedupe_id(item_id, cnr_tier)`
+     (sha256(item_id|tier)[:16], SPEC R2's exact formula) and `claim(store, ...)`, a thin
+     no-read-before-write wrapper over plan 12-02's `Store.claim_alert`. `emitter.py`'s
+     `build_alert_payload` refactored to import `compute_dedupe_id` instead of inlining a
+     second sha256 call — one definition of the identity in the tree.
+     `tests/test_alerting_dedupe.py` (6 tests) drives the 24h TTL boundary with an injected
+     clock, no sleeping.
+
+  2. `bc2e568` — Task 2: `libs/contracts/_bus_rabbitmq.py`'s `ROUTING_KEY_TO_QUEUE["sab.published"]`
+     widened to `["q.notify", "q.alerting"]` (q.notify unchanged, still first). `emitter.py`
+     split into `handle_verdict_ready` (reads item_id off the decoded payload body, not the
+     header) and `handle_sab_published` (fallback second look over `item_refs` via
+     `_extract_cat_i_item_ids`, never reads the message header — for sab.published that
+     header identifies the SAB snapshot, not an article), both funneling through a shared
+     `_emit_if_claimed` path that claims BEFORE any Store read of item/enrichment — the claim
+     itself is the entire race window, per SPEC R1. `run_consumer` registers ONE shared
+     handler for both routing keys on `q.alerting`, dispatching on the decoded event's own
+     `"event"` field (RabbitMQ round-robins competing consumers on a shared queue, so two
+     different handler functions would misroute message shapes). `tests/test_alerting_emitter.py`
+     (11 tests) proves both trigger orders yield exactly one push, TTL re-fire after 25h,
+     non-CAT-I/missing-cnr/missing-enrichment on both shapes produce zero egress with no
+     exceptions.
+
+- **Two mechanical (non-architectural) accommodations, both explicit consequences of the
+  plan's own "must survive the refactor" constraint on `tests/test_alerting_tracer.py`** (a
+  file outside this plan's `files_modified`): `handle_trigger` kept as a back-compat shim
+  delegating into `_emit_if_claimed`, and `build_alert_payload` gained optional
+  `alert_id`/`dedupe_id` keyword params (default to fresh generation) so the dual-trigger path
+  can reuse a winning claim's identity while the tracer's 4-positional-arg call keeps working
+  unchanged. Full rationale in `12-04-SUMMARY.md` Decisions section.
+
+- **`tests/conftest.py` gained the shared `stub_ntfy_server` fixture + `_RecordingHandler`**,
+  extracted from `test_alerting_tracer.py` per the plan's explicit direction (that file's own
+  local fixture of the same name was left untouched — file-scoped fixture resolution means no
+  conflict).
+
+- **Verification:** `python -m pytest tests/test_alerting_dedupe.py tests/test_alerting_emitter.py
+  tests/test_bus_rabbitmq.py tests/test_bus_consume.py tests/test_alerting_tracer.py -q` →
+  **32 passed**. `make -f ops/Makefile test-safe` → **740 passed, 1 skipped, 0 failed**
+  (723 → 740, +17 new tests, 0 regressions; the 1 skip is the pre-existing
+  `test_real_bearer_token_accepted` NTFY_TOKEN-not-in-ambient-env skip, unchanged from the
+  12-03 baseline). `black --check` clean, `mypy` clean on both new/modified production files.
+
+- **`ROADMAP.md` updated** via `gsd-tools query roadmap.update-plan-progress 12` (plan_count 9,
+  summary_count 4, status "In Progress" — Phase 12 has 5 more plans (12-05..12-09) still open).
+
+- **`REQUIREMENTS.md` NOT updated for `ADR-003`** — `requirements.mark-complete ADR-003`
+  returned `not_found` again, matching the identical 12-03-session finding: `ADR-003` is a
+  design-doc reference cited across ~10 requirement rows, not itself a REQUIREMENTS.md ID
+  with its own checkbox. No action needed.
+
+### Next
+
+- **Phase 12 Plan 05** (throttle wiring — volume caps across distinct items, per T-12-17's
+  disposition note referencing this plan's dedupe substrate) is next per the phase's 5-wave
+  plan map. `dedupe.py`'s `claim()` and the dual-trigger consumer are proven and available for
+  it to build on; `run_consumer` already consumes both `verdict.ready` and `sab.published`.
 
 ## Session: 2026-08-01 (continuation 4) — Phase 12 Plan 03 (ntfy bearer-token ACL) COMPLETE — Task 3 closed
 
