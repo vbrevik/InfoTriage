@@ -72,7 +72,8 @@ async def handle_trigger(item_id: str, payload: dict, store, client) -> None:
         return
 
     alert_payload = build_alert_payload(item, enrichment, item_id, cnr_tier)
-    await client.deliver(alert_payload)
+    item_title = getattr(item, "title", None) or ""
+    await client.deliver(alert_payload, item_title=item_title)
 
 
 async def run_consumer(bus, store, client) -> None:

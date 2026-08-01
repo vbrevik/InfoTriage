@@ -108,6 +108,8 @@ def test_cat_i_produces_exactly_one_authenticated_post(stub_ntfy_server, tmp_pat
     assert req["path"].endswith("/cnr-cat-i")
     assert req["headers"]["Authorization"].startswith("Bearer ")
     assert "secret-token-value" in req["headers"]["Authorization"]
+    assert req["headers"]["X-Title"] == item.title
+    assert "rationale text" not in req["headers"]["X-Title"]
 
     body = json.loads(req["body"])
     assert sorted(body.keys()) == [

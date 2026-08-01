@@ -25,19 +25,19 @@ class NtfyClient:
         self._token = token
         self._topic = topic
 
-    async def deliver(self, payload: dict) -> None:
+    async def deliver(self, payload: dict, item_title: str = "") -> None:
         """POST payload to {base_url}/{topic} with bearer auth + ntfy headers.
+
+        `item_title` is the item's own title (NOT part of the 7-key JSON
+        payload body — SPEC R1 locks that to 7 keys) used only to derive the
+        `X-Title` header, single line, truncated to 80 characters.
 
         Raises on non-2xx via httpx's raise_for_status().
         """
         url = f"{self._base_url}/{self._topic}"
 
-        sab_excerpt = payload.get("sab_excerpt") or ""
-        title = (
-            sab_excerpt.splitlines()[0][:80]
-            if sab_excerpt
-            else (f"CAT {payload.get('cnr_tier', '')} Alert")
-        )
+        title_line = (item_title or "").strip().splitlines()[0] if (item_title or "").strip() else ""
+        title = title_line[:80] if title_line else (f"CAT {payload.get('cnr_tier', '')} Alert")
         tags = ",".join(
             ["triangular_flag_on_post", *(payload.get("pmseii_tags") or [])]
         )
