@@ -12,9 +12,10 @@ Topology (declared in this order — DLX first is mandatory to avoid 406):
 
 A routing key may be bound to MORE THAN ONE independently-declared queue, so a single
 published message fans out to every bound queue as its own copy. `verdict.ready` is the
-live example: it is bound to both `q.brief` (apps/brief/consumer.py) and `q.wiki`
-(apps/wiki/wiki_worker.py --mode events), so one verdict.ready event is delivered to
-each service independently instead of the two competing for a single queue.
+live example: it is bound to `q.brief` (apps/brief/consumer.py), `q.wiki`
+(apps/wiki/wiki_worker.py --mode events), and `q.alerting` (apps/alerting/emitter.py),
+so one verdict.ready event is delivered to each service independently instead of
+the queues competing for a single one.
 
 Usage:
     from contracts import RabbitMQBus
@@ -49,7 +50,7 @@ RABBITMQ_DEFAULT_URL = "amqp://infotriage:infotriage_rmq@127.0.0.1:22001"
 # primary queue used when consume() is called with no queue_name override.
 ROUTING_KEY_TO_QUEUE: dict[str, list[str]] = {
     "item.ingested": ["q.triage"],
-    "verdict.ready": ["q.brief", "q.wiki"],
+    "verdict.ready": ["q.brief", "q.wiki", "q.alerting"],
     "sab.published": ["q.notify"],
     "feed.unhealthy": ["q.ops"],
 }
