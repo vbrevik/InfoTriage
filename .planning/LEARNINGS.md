@@ -130,6 +130,113 @@ Test 2 of 5 awaiting verdict. Phase 11 sibling debt (`articles.discipline
   latent cosmetic surface). Pre-decide at Test 4 verdict time, not
   under pressure at Test 5.
 
+### 2026-08-01 (push gate) — `make test-safe` as canonical pre-push verification
+
+Scope: Ran `make -f ops/Makefile test-safe` end-to-end against a
+throwaway test Postgres (port 22062, distinct from prod 22000); used
+the resulting 674 passed / 3 failed / 0 regressions baseline as the
+canonical pre-push gate for the operator-authorized push that landed
+3 commits to origin/main. Recorded for next-session pre-push ritual.
+
+#### Patterns
+
+- **`make test-safe` = canonical PRE-PUSH gate.** Spawns a throwaway
+  Postgres test container on port 22062 (NOT prod 22000), runs the
+  full `pytest tests/` matrix against it with
+  `INFOTRIAGE_TEST_DSN` set, then trap-teardowns the container.
+  Belt-and-suspenders DSN safety: `scripts/check_test_dsn.sh`
+  (shell-layer DSN-port guard, called by the Makefile before docker
+  compose up) + `tests/test_dsn_safety.py` (always-run pytest guard
+  that fails on any prod-port DSN under `tests/`). Three layers
+  because prod-DSN reachability from a test container is
+  catastrophic — a single `pytest` run connecting to prod wipes
+  live data. Source: `ops/Makefile` target `test-safe:`,
+  `scripts/check_test_dsn.sh`, `tests/test_dsn_safety.py`. Run it
+  before every `git push origin main`.
+
+- **`make test-safe` < `make integration` (scoping, not quality).**
+  test-safe = throwaway Postgres + pytest only (fast path, single
+  observed runtime = 66s on the 2026-08-01 674-test baseline).
+  integration = test-safe plus RabbitMQ live consumer contention
+  (broader scope; runtime + test-count not observed this session
+  — see `ops/Makefile` `integration:` target for ground truth).
+  Structural discriminator: integration's stdout adds a
+  `infotriage-rabbitmq-test` container lifecycle block that
+  test-safe lacks. Pattern: `test-safe` for every pre-push gate
+  ritual; `integration` for full-stack rehearsal before milestone cuts.
+
+- **2026-08-01 baseline = 674 / 3 / 0 / 66s.** Full pytest matrix through
+  test-safe = 674 passed, 3 failed, 0 production-code regressions,
+  66s elapsed (baseline pinned at `208a598`; pre-`208a598` lines
+  may differ). The 15 parametric Postgres variants in
+  `tests/test_store_entities.py` that were previously carry-over-skipped
+  fired for the first time and all 15 PASSED — InMemoryStore/db_live
+  path equivalence asserted by `08-VALIDATION.md` (6959e4d) is now
+  ground truth, not assertion. The 3 failures are pre-existing test-side
+  bugs classified in `.planning/phases/11-socmint/11-INGEST-TEST-FIXES-PLAN.md`
+  (open at `da2ca0d`): 2 TIME-BOMB telegram `fake_message` fixtures
+  (hardcoded date 2026-07-21, stale vs 2026-08-01 via `parse_since("7d")`)
+  + 1 `INFOTRIAGE_YOUTUBE_TRANSCRIBE` env-var leak in youtube dry-run
+  test (needs `monkeypatch.delenv`). Zero `.py`/`.sql`/`.yml`
+  production-code regressions — all test-side.
+
+- **THREE-LAYER DSN safety defense.** Three independent layers:
+  (1) `scripts/check_test_dsn.sh` — shell-side port guard that
+  runs before compose-up, rejects prod-port / unparseable DSN;
+  (2) `tests/test_dsn_safety.py` — always-run pytest guard that
+  fails any future prod-port regression at unit-test time;
+  (3) throwaway Postgres uses port 22062 (NOT prod 22000) so the
+  test container cannot physically reach prod by socket even if
+  Layers 1+2 both fail. Defense in depth: shell + always-run +
+  port distinct. Don't remove Layer 3 assuming Layers 1+2 are
+  "enough" — the three layers cover different failure modes
+  (operator misconfig / accidental regression in code /
+  reachability-by-socket).
+
+#### Pitfalls
+
+- **Pre-existing 3-failure baseline can mask shipped-code regressions.**
+  The 674/3 baseline is the new normal for any future pre-push run.
+  If future `make test-safe` returns 671/6 instead of 674/3, that
+  delta = 3 new failures = real regression. Don't accept the 3
+  pre-existing failures as "the baseline;" accept them ONLY as
+  "this phase's acknowledged debt" counted from the SPECIFIC
+  baseline of `da2ca0d` / `208a598` / after the 11-INGEST-TEST-FIXES
+  Plan lands. Pattern: diff future test-safe output against THE
+  baseline, not the historical "approximately N passed" figure.
+
+- **Don't conflate `make test-safe` and `make integration` durations.**
+  Only the 66s observation for test-safe is grounded (this session);
+  integration runtime + test-count are unobserved here — defer
+  duration claims until an integration run is captured. Pick the
+  path explicitly per task: pre-push ritual = test-safe; full-stack
+  rehearsal (e.g., before milestone cut) = integration.
+  Cleanest discriminator: test-safe shows Postgres spin-up +
+  tear-down lines in stdout; integration adds
+  `infotriage-rabbitmq-test` container lifecycle lines. Watch for
+  those in the invocation output to know which path ran.
+
+#### Preferences
+
+- **Pre-push canonical order = `make test-safe` → `git status` →
+  `git log origin/main..HEAD` → operator push.** test-safe runs
+  first (catches any shipped-code regressions the prior baseline
+  wouldn't have caught), then a triple-check of working-tree state
+  (no secret-leaks / uncommitted binaries), then drift count
+  (re-fetched immediately before push, not at session start), then
+  operator is delegated. The 12+ commits ahead of origin/main
+  pre-existing in earlier sessions was a project-rule signal —
+  not a push trigger. The push is gated on fresh test-safe output.
+
+#### Open questions
+
+- **Fix the 3 surfaced test-side bugs before or after the next push?**
+  Two paths: (a) fix-then-push — cleanly flip 674/3 → 677/0
+  baseline before more code lands, preventing drift; (b)
+  push-then-fix — risk the baseline silently drifting while
+  Phase 12 work proceeds. Operator call required. Tracked in
+  `.planning/phases/11-socmint/11-INGEST-TEST-FIXES-PLAN.md`.
+
 ### 2026-08-01 — Phase 8/9/10 audit-chain full closure + Phase 11 validation (State B) + push pack
 
 Scope: Continued Phase 8 UAT, Phase 9 / Phase 10 VALIDATION.md reopen
@@ -332,6 +439,21 @@ debt), and operator-authorized push of the catchup chain to
   path: `apps/ingest-acled/` or whichever ingest surface is responsible
   for discipline-mapping. Needs root-cause + backfill + per-ingest
   contract test when Phase 11 opens.
+
+- **Phase 11 verify-work bug-fix sub-task (3 surfaced test-side bugs):**
+  `.planning/phases/11-socmint/11-INGEST-TEST-FIXES-PLAN.md` —
+  documents the 3 pre-existing failures surfaced by `make test-safe`
+  on 2026-08-01 (2 TIME-BOMB telegram fixtures in
+  `tests/test_ingest_telegram.py` + 1 `INFOTRIAGE_YOUTUBE_TRANSCRIBE`
+  env-var leak in `tests/test_ingest_youtube.py`). Fix paths in the
+  plan; expected effort ≤15 minutes; verification gate = same
+  `make test-safe` baseline flipped to 677/0.
+- **Pre-push gate ritual:** `make -f ops/Makefile test-safe` →
+  `git status` → `git log origin/main..HEAD` → operator push.
+  Belt-and-suspenders DSN safety =
+  `scripts/check_test_dsn.sh` + `tests/test_dsn_safety.py` + throwaway
+  Postgres on port 22062 (NOT prod 22000). Baseline 66s/674-pass/3-fail
+  pinned at `208a598` (post-this-commit).
 
 ## Versioning
 
