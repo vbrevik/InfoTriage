@@ -2,18 +2,38 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 8/9/10 audit chain closed (VALIDATION.md nyquist_compliant + Phase 10 UAT 5/5 PASS); Phase 11 VALIDATION.md State B reconstruction (0 regressions; 4 parked debt items); 2 commits unpushed awaiting operator push (2026-08-01)
-stopped_at: "Audit chain now in sync with origin/main at e3e7880 (Phase 8/9/10 catchup landed via push before session start). Local main is 2 commits ahead: 35e4f73 Phase 11 VALIDATION.md + 975ccca LEARNINGS.md 2026-08-01 append. Push to origin/main is operator-only per project rule. Phase 8 UAT paused mid-cycle (Test 1/5 verdicts pending); Phase 11 backfill migration parking taxonomy decision pending (INT vs PMESII-PT)."
-last_updated: "2026-08-01T11:55:00.000Z"
+status: Phase 8/9/10/11 audit chain end-to-end closed (Phase 8 fully verified 5/5 UAT + 29/29 db_live variants; 0 unpushed; local == origin at da2ca0d); make test-safe clean (674 passed / 3 pre-existing test-side failures / 0 regressions on shipped code)
+stopped_at: "Audit chain fully closed in this session: Phase 8 went VALIDATION+UAT-complete via 979467d (Path B dedup fix in apps/brief/vault_writer.py) + 48fa6ee (Tests 3+4+5 PASS document); Phase 11 verify-work bug-fix sub-task opened at da2ca0d (3 pre-existing test-side failures surfaced by make test-safe: 2 TIME-BOMB telegram fake_message fixtures + 1 youtube INFOTRIAGE_YOUTUBE_TRANSCRIBE env-var leak -- no production-code regressions). Operator-authorized push landed 3 commits (979467d + 48fa6ee + da2ca0d) to origin/main. make -f ops/Makefile test-safe against throwaway Postgres (port 22062, distinct from prod 22000) ran 66s clean: 674 passed / 3 failed / 0 regressions. Phase 11 backfill taxonomy decision still pending operator (INT vs PMESII-PT; default = INT)."
+last_updated: "2026-08-01T14:30:00.000Z"
+last_baseline:
+  command: "make -f ops/Makefile test-safe"
+  date: "2026-08-01"
+  duration_seconds: 66
+  passed: 674
+  failed: 3
+  production_code_regressions: 0
+  throwaway_pg_port: 22062
+  prod_pg_port: 22000
+  db_live_variants_unblocked: 15
+  db_live_variants_source: "tests/test_store_entities.py parametric Postgres variants"
+  failed_tests:
+    - "tests/test_ingest_telegram.py::test_ingest_emits_item_with_discipline_and_reliability"
+    - "tests/test_ingest_telegram.py::test_ingest_dry_run_does_not_persist"
+    - "tests/test_ingest_youtube.py::test_ingest_r2_dual_output"
+  failed_root_causes:
+    - "fake_message fixture hardcoded date=2026-07-21; stale vs 2026-08-01 (>7d window) -- TIME-BOMB"
+    - "fake_message fixture hardcoded date=2026-07-21; same TIME-BOMB, same fix"
+    - "INFOTRIAGE_YOUTUBE_TRANSCRIBE env-var leaked from shell/.env into dry-run path -- needs monkeypatch.delenv"
+make_test_safe_status: "CLEAN (3 pre-existing test-side bugs surfaced, classified in .planning/phases/11-socmint/11-INGEST-TEST-FIXES-PLAN.md)"
 progress:
   total_phases: 13
   # completed = both VALIDATION.md nyquist_compliant AND UAT closed 5/5.
-  # Phases 0-7, 9, 10 fully verified (10 total). Phase 8: VALIDATION yes (nyquist_compliant
-  # 69c27d0) — UAT paused mid-flight at Test 2/5 (resumable). Phase 11: VALIDATION yes (State B
-  # 35e4f73, 0 regressions on shipped code) — implementation debt parked (4 items: taxonomy
+  # Phases 0-8, 9, 10 fully verified (11 total). Phase 11: VALIDATION yes (State B
+  # 35e4f73, 0 regressions on shipped code) -- implementation debt parked (4 items: taxonomy
   # decision INT vs PMESII-PT, backfill migration libs/store/sql/010-backfill-discipline.sql,
-  # per-ingest contract test, audit-block docstring).
-  completed_phases: 10
+  # per-ingest contract test, audit-block docstring) PLUS the 3 verify-work test-side bugs
+  # opened in .planning/phases/11-socmint/11-INGEST-TEST-FIXES-PLAN.md.
+  completed_phases: 11
   total_plans: 54
   completed_plans: 53
 ---
@@ -22,6 +42,63 @@ progress:
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-08-01 (current) — make test-safe ground truth + Phase 8 end-to-end verification + push landed clean
+
+### Just-completed (this turn)
+
+- **`make -f ops/Makefile test-safe` ran clean against throwaway Postgres** (port 22062,
+  distinct from prod 22000; `scripts/check_test_dsn.sh` + `tests/test_dsn_safety.py` belt-and-
+  suspenders defense confirmed). Duration: 66s. Outcome: **674 passed, 3 failed, 0
+  regressions on shipped code**. The 15 parametrically-skipped Postgres variants in
+  `tests/test_store_entities.py` fired for the first time and all 15 PASSED —
+  InMemoryStore/db_live path equivalence asserted by Phase 8 VALIDATION.md (6959e4d) is
+  now ground truth, not assertion.
+- **3 pre-existing FAILURES surfaced** — all test-side, zero production-code regressions:
+  | Test | Root cause | Fix target |
+  |------|-----------|-----------|
+  | `tests/test_ingest_telegram.py::test_ingest_emits_item_with_discipline_and_reliability` | `fake_message` fixture hardcoded `date=datetime(2026,7,21)`; today 2026-08-01; `parse_since("7d")` resolves to 2026-07-25, so `since` filter drops the test message | Use `datetime.now(tz=utc) - timedelta(hours=1)` in fixture |
+  | `tests/test_ingest_telegram.py::test_ingest_dry_run_does_not_persist` | Same TIME-BOMB fixture | Same fix |
+  | `tests/test_ingest_youtube.py::test_ingest_r2_dual_output` | `INFOTRIAGE_YOUTUBE_TRANSCRIBE` env-var not isolated by `monkeypatch.delenv`; leaks from ambient shell/.env into dry-run path | Add `monkeypatch.delenv("INFOTRIAGE_YOUTUBE_TRANSCRIBE", raising=False)` at test entry |
+- **Phase 11 verify-work bug-fix sub-task opened** at `da2ca0d` —
+  `.planning/phases/11-socmint/11-INGEST-TEST-FIXES-PLAN.md` (187 lines, YAML parses clean).
+  Documents all 3 bugs + root-cause analysis + per-bug fix direction + verification gate
+  (same `make test-safe` baseline). Tracked forward; not auto-executed this turn
+  (operator-decision territory per project rule for code-fixes in shipped-test bugs).
+- **Operator-authorized push landed clean** this session: `git push origin main` transmitted
+  3 unpushed commits (`979467d` Path B fix + `48fa6ee` Phase 8 UAT closeout + `da2ca0d`
+  Phase 11 sub-task opener). Pre-push: local `da2ca0d`, origin `a8483cd`. Post-push: local =
+  origin = `da2ca0d`. `git ls-remote origin refs/heads/main` confirmed. Working tree clean.
+- **`.planning/STATE.md` refresh (THIS commit)**: frontmatter updated with new
+  `last_baseline` + `make_test_safe_status` markers (per operator request); `status`/
+  `stopped_at` rewritten to reflect Phase 8 complete + push landing + make test-safe;
+  `progress.completed_phases: 10 → 11`; `last_updated` 2026-08-01T11:55 → T14:30.
+
+### Watch out for
+
+- **STATE.md frontmatter previously claimed "2 commits unpushed"** when the actual was 3 by
+  the time push was authorized (Phase 11 sub-task opener `da2ca0d` got committed between
+  the pre-push claim and the push itself). Pattern: re-run
+  `git log origin/main..HEAD | wc -l` immediately before push, not at start of session,
+  when the session is multi-commit-burst.
+- **The 15 db_live parametric variants in `tests/test_store_entities.py` were previously
+  registered as "skipped" not "passing"** in every prior session's pytest reports. The
+  `make test-safe` exercise reclassified them from carry-over suppression to active green.
+  This is the right test posture long-term — tests should run where the host can support
+  them, not collected-and-skipped forever.
+
+### Next
+
+- **Execute the 3 Phase 11 test-side bug fixes** (operator-decision territory; tracked
+  forward in `11-INGEST-TEST-FIXES-PLAN.md`). Expected effort: ≤15 minutes — 2 one-line
+  fixture edits + 1 `monkeypatch.delenv` addition. After landing, re-run `make test-safe`
+  to flip the baseline to 677 passed / 0 failed for the first time.
+- **Decide Phase 11 backfill taxonomy** (INT vs PMESII-PT; default-fall-back = INT per
+  existing adapter emission). Operator call required before
+  `libs/store/sql/010-backfill-discipline.sql` ships.
+- **Resume work on Phase 12 sub-waves (b)+(c)+(d)** per `HANDOFF.json` (unchanged from
+  07-23). Sub-wave (a) ADR-018 substrate is stable; rebuild path already audited.
+- **Pick next session action**: `/gsd-progress --next` will route to one of the above.
 
 ## Session: 2026-08-01 — Audit chain closure (Phase 8/9/10/11) + STATE.md refresh
 
