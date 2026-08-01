@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import os
 import sys
 from unittest.mock import MagicMock, patch
 
@@ -42,7 +43,10 @@ def fake_store():
 
 
 def _run_recall(*args, fake_store, fake_embedding=None, fake_llm=None):
-    with patch("recall.PostgresStore", return_value=fake_store):
+    # Store is fully mocked; DSN only needs to exist so main() passes its guard.
+    # Set explicitly so tests don't depend on an ambient shell INFOTRIAGE_PG_DSN.
+    env = {"INFOTRIAGE_PG_DSN": "postgresql://mock:mock@localhost:1/mock"}
+    with patch.dict(os.environ, env), patch("recall.PostgresStore", return_value=fake_store):
         with patch(
             "recall._get_embedding", return_value=fake_embedding or [0.1] * 1024
         ):
