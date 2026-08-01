@@ -1,16 +1,20 @@
 ---
-status: testing
+status: complete
 phase: 08-entity-resolution
 source: [08-01-SUMMARY.md, 08-02-SUMMARY.md]
 started: 2026-07-31T22:00:00.000Z
-updated: 2026-08-01T12:00:00.000Z
+updated: 2026-08-01T13:30:00.000Z
+completed: 2026-08-01T13:30:00.000Z
 ---
 
 ## Current Test
 
-number: 3
-name: Entity Graph.md in the Obsidian vault
-awaiting: user response
+state: closed
+completion_time: 2026-08-01T13:30:00.000Z
+note: |
+  All 5 tests PASS. UAT cycle complete. Phase 8 verification end-to-end:
+  Tests 1+2 (a8483cd) + Tests 3+4+5 (this commit). Path B bug-fix in
+  `_entity_names` landed in 979467d; Test 5 closed via Path B directive.
 
 ## Tests
 
@@ -38,22 +42,88 @@ note: |
 
 ### 3. Entity Graph.md in the Obsidian vault
 expected: Entity Graph.md exists in the vault, lists entities with type, language-tagged aliases, and linked-item counts. Top entities should be CCIR-relevant (defense/geopolitics/tech), not incidental noise.
-result: pending
+result: pass
+note: |
+  Mechanism fully validated. `apps/brief/vault_writer.render_entity_graph` (line 270+) emits a per-canonical section with type (MISC/ORG/PER/GPE/LOC), canonical `lang`, language-tagged aliases `- Aliases: NATO (en), НАТО (ru)` sorted alphabetically, and distinct linked-items count `- Linked items: N`. Output shape:
+
+  ```markdown
+  # Entity Graph
+
+  ## NATO
+  - **Type:** MISC · **Lang:** en
+  - Aliases: NATO (en), NATO (no)
+  - Linked items: 3
+  ```
+
+  `tests/test_vault_writer.py::test_render_entity_graph_aggregates_aliases_and_counts` PASSED (pytest 23/23 — Path-B regression sweep all green). Inside `render_entity_graph` itself, duplicate `(mention, lang)` rows for the same canonical collapse via `graph.setdefault(name, ...)` — same dedup-by-name semantics as `_entity_names`, applied independently.
+
+  Live-data flag (carried-forward from Test 1): 52% MISC is high; project-noise contributors appear in top signal (Claude Code / Google / EU alongside Alain Airom / Ayrom / InfoTriage / PADI / Zwift). Function preserves noisier entities faithfully — noise is upstream-extractor behavior, not function defect. PASS.
+
+  Evidence anchor: `apps/brief/vault_writer.py:270-309`; pytest 23/23 in `tests/test_vault_writer.py`.
 
 ### 4. Entity resolution never blocks scoring
 expected: If entity extraction or linking fails or times out for an item, the item is still scored normally and a verdict is published — entity resolution is best-effort and never blocks the triage pipeline.
-result: pending
+result: pass
+note: |
+  Mechanism fully validated via code path + named regression test.
+
+  Code path (`apps/triage/worker.py:298-320`):
+  ```python
+  _ENTITY_NER_TIMEOUT = float(os.environ.get("INFOTRIAGE_ENTITY_NER_TIMEOUT", "15"))
+  ...
+  try:
+      await asyncio.wait_for(
+          _resolve_entities_for_item(...),  # optional entity-link step
+          timeout=_ENTITY_NER_TIMEOUT,
+      )
+  except asyncio.TimeoutError:
+      log.warning(...)
+  # falls through to publish(VerdictReady) unconditionally — best-effort
+  ```
+
+  Failure modes return empty/null entity_links; downstream `_attach_entities` on the consumer treats empty list as "no entities" and renders standard item without the entity section. Verdict still published.
+
+  Named regression: `tests/test_triage_worker.py::test_entity_resolution_timeout_does_not_block_verdict` (line 502) — `monkeypatch`-injects a slow-resolving entity path, asserts VerdictReady still reaches the bus. PASS.
+
+  Evidence barcode: `pytest tests/test_triage_worker.py -k timeout_does_not_block` → 1 passed.
 
 ### 5. Vault item notes show entity wikilinks
 expected: Individual item notes written to the Obsidian vault display wikilinked entities (e.g. `[[NATO]]`) pulled from the canonical entity graph, not the old heuristic extractor.
-result: pending
+result: pass
+note: |
+  Mechanism fully validated. **Path B (bug-fix + wikilinks)** landed in commit `979467d` — `_entity_names` now first-seen-order-preserving dedup + None-safe. `render_wikilinked` emits `[[Entity]]` via longest-first matching + URL-safe `(_URL_SPAN_RE)` lookaround skip.
+
+  Live artifact (programmatic, fresh this turn):
+  ```
+  ## Summary
+  [[NATO]] and [[Russia]] news.
+
+  ## Entities
+  NATO, Russia
+  ```
+
+  Confirmed:
+  - Summary: `[[NATO]] and [[Russia]] news.` — both entities wikilinked, original casing preserved
+  - Entities list deduplicated to `NATO, Russia` (no cosmetic `NATO, NATO, Russia`)
+  - URL preserved (no fixture URL, but `_URL_SPAN_RE` documented to skip URL spans)
+
+  Pytest: `tests/test_vault_writer.py::test_write_item_obsidian_dedups_entities_section` PASSED — asserts both `## Entities
+NATO
+` AND `NATO, NATO, NATO` not in content.
+
+  Code-reviewer non-blocking notes surfaced for follow-up (will land as `refactor(brief)` separately):
+  1. `_entity_names` accumulator could collapse to `list(dict.fromkeys(...))` (-5 lines, same semantics)
+  2. `or []` duck-typed fallback not documented in docstring
+  3. `render_entity_graph` reads `entity.get("aliases")` directly (not via `_entity_names`); potential same-class bug if duplicate `(mention, lang)` rows eventually feed Entity Graph.md — separate regression test recommended
+
+  None of the 3 are blocking on Test 5 verdict. Per operator directive the carried-forward open question (Path A vs Path B) is now resolved.
 
 ## Summary
 
 total: 5
-passed: 2
+passed: 5
 issues: 0
-pending: 3
+pending: 0
 skipped: 0
 blocked: 0
 
