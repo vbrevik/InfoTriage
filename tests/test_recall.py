@@ -4,13 +4,27 @@ from __future__ import annotations
 
 import datetime
 import json
-import os
 import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 import recall
+
+
+@pytest.fixture(autouse=True)
+def _isolate_pg_dsn_env(monkeypatch):
+    """Hermetic isolation: stub ``INFOTRIAGE_PG_DSN`` so tests don't depend on
+    ambient shell state.
+
+    ``PostgresStore`` is fully mocked in these tests, so this env-var only
+    needs a sentinel value to satisfy the ``main()`` guard. Port 1 is reserved
+    (RFC 6335) and will never connect — that guards against any module-level
+    read of the DSN that runs before the recursive ``patch`` calls fire.
+    """
+    monkeypatch.setenv(
+        "INFOTRIAGE_PG_DSN", "postgresql://stub:stub@127.0.0.1:1/stub"
+    )
 
 
 @pytest.fixture
@@ -43,10 +57,11 @@ def fake_store():
 
 
 def _run_recall(*args, fake_store, fake_embedding=None, fake_llm=None):
-    # Store is fully mocked; DSN only needs to exist so main() passes its guard.
-    # Set explicitly so tests don't depend on an ambient shell INFOTRIAGE_PG_DSN.
-    env = {"INFOTRIAGE_PG_DSN": "postgresql://mock:mock@localhost:1/mock"}
-    with patch.dict(os.environ, env), patch("recall.PostgresStore", return_value=fake_store):
+    # ``INFOTRIAGE_PG_DSN`` is provided by the module-level autouse
+    # `_isolate_pg_dsn_env` fixture so this helper no longer needs to
+    # patch it inline — keeping a single source of truth for hermetic
+    # isolation that covers any new test added below.
+    with patch("recall.PostgresStore", return_value=fake_store):
         with patch(
             "recall._get_embedding", return_value=fake_embedding or [0.1] * 1024
         ):
