@@ -307,14 +307,28 @@ prompt elicits `[item_id: <hash>]`. Phase 999.4 closure was premature — reopen
 **Plans**: 9 plans (5 waves) — scope locked by `12-SPEC.md` (8 requirements) and `12-CONTEXT.md` (D-01–D-04, T1-01–T1-03). Bundles Phase 13 sub-wave (f) `articles.body` wiring per T1-01 INTEGRATED-SUB-WAVE.
 
 Plans:
+**Wave 1**
+
 - [ ] 12-01-PLAN.md — TRACER: one CAT I verdict → one authenticated ntfy push, end-to-end (W1)
 - [ ] 12-02-PLAN.md — `alert_state` substrate: migration 011 + Store protocol methods with dual-impl parity (W1)
 - [ ] 12-03-PLAN.md — ntfy bearer-token provisioning + three-topic ACL + COVERAGE.md (W1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 12-04-PLAN.md — Dual-trigger consumption with atomic dedupe, exactly-once across both orders (W2)
-- [ ] 12-05-PLAN.md — 3-tier sliding-window throttle + hourly PMESII-grouped digest tick (W3)
-- [ ] 12-06-PLAN.md — Outbox retry (1s/5s) → dedicated DLX queue + audit row, ack-after-record (W4)
 - [ ] 12-07-PLAN.md — Sub-wave (f) part 1: `Item.body` contract + body-aware store write path (W2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 12-05-PLAN.md — 3-tier sliding-window throttle + hourly PMESII-grouped digest tick (W3)
 - [ ] 12-08-PLAN.md — Sub-wave (f) part 2: all 7 ingest adapters populate `articles.body` (W3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 12-06-PLAN.md — Outbox retry (1s/5s) → dedicated DLX queue + audit row, ack-after-record (W4)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 12-09-PLAN.md — Prohibitions P1–P5 structural guards, AC8 isolation, ADR-015 reconciliation, operator UAT (W5)
 
 ## Backlog
@@ -374,6 +388,7 @@ Plans:
 **Method (2026-07-12, see `999.3-VERDICT.md`):** ModuleSpec-mocked torchvision bypass + `transformers.XLMRobertaModel` direct load (mirrors R3 workaround), manual mean-pool with attention mask + L2 normalize, 1024-dim `query:`-prefixed embeddings loaded from local safetensors cache. Default 12-entity cross-language pair set + curated distinct control set. Threshold sweep mirrors R2 format.
 
 **Phase 8 implications:**
+
 - Adopt T*=0.92 in `apps/triage/entities.py::LINK_THRESHOLD` and `libs/store/_postgres.py::find_similar_entity` default (replace current 0.85).
 - Item-level dedup threshold (R2 mE5-large @ 0.84) for `find_near_duplicate` stays unchanged — separate problem.
 - ~~A follow-up spike could re-run `--corpus-from-postgres` with a Cyrillic↔Latin transliteration table to fully validate the cross-language bar against production data; the current heuristic in `_corpus_from_postgres` only matches same-script titles.~~ **DONE 2026-07-13**: dependency-free `CYRILLIC_TO_LATIN` table + `_cyrillic_to_latin_key()` added; live `--corpus-from-postgres` run produced **GO at T*=0.92**, confirming the cross-language bar is met.

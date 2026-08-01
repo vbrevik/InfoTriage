@@ -449,14 +449,18 @@ async def _handle_health(reader, writer) -> None:
 | A2 | Obsidian's `obsidian://open?vault=X` parameter expects the vault's **display/folder name**, not a filesystem path, and there is no existing project constant for it | Architecture Patterns §6 | If Obsidian actually accepts a path-form `vault=` value, `INFOTRIAGE_VAULT_PATH` could be reused directly instead of introducing a new env var. Low risk either way since this only affects the `deep_link`/`item_link` field's tap-through UX, not any pass/fail acceptance criterion beyond R5's path-match check. |
 | A3 | The recommended in-process retry loop (1s, then 5s, then write to `outbox.dlx.queue`) satisfies SPEC R4/AC4 without needing the RabbitMQ TTL+DLX chain recipe | Architecture Patterns §5 | If the planner/reviewer decides retries must survive an `apps/alerting` process crash mid-backoff (not explicitly required by SPEC), the TTL+DLX chain becomes necessary instead of the simpler in-process loop. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Bearer-token bootstrap mechanics for ntfy (SPEC R6, D-02/Claude's Discretion)**
+> Both questions were "Claude's Discretion" carve-outs; the plans made concrete choices (2026-08-01):
+> Q1 → post-boot `docker exec` token mint captured into `.env` at the 12-03 `checkpoint:human-verify` (recommendation adopted).
+> Q2 → plain TEXT columns matching the `enrichment` convention, pinned column list in 12-02 (recommendation adopted).
+
+1. **Bearer-token bootstrap mechanics for ntfy (SPEC R6, D-02/Claude's Discretion)** *(RESOLVED — 12-03)*
    - What we know: `ntfy token add <user>` generates the token; the existing Dockerfile only pre-bakes passwords.
    - What's unclear: Whether to generate the token at image-build time (inside the same `RUN` block that already starts/stops `ntfy serve` to seed `auth.db`) and write it to a file COPYed into the final image (then read via `docker exec` once), or generate it post-boot via a `make ntfy-token` operator step.
    - Recommendation: Prefer the post-boot `docker exec` + operator-captured `.env` value — it avoids baking any credential-shaped value into an image layer even transiently, matching the ADR-018 philosophy ("only bcrypt hashes land in image layers") extended to tokens (tokens are themselves bearer-equivalent secrets, arguably higher-value than a bcrypt hash since they're used directly, not hashed).
 
-2. **`alert_state` exact column set (D-02 explicitly left open)**
+2. **`alert_state` exact column set (D-02 explicitly left open)** *(RESOLVED — 12-02)*
    - What we know: Needs `dedupe_id` PK/unique, `fired_at`, and enough bookkeeping to distinguish "fired" vs "suppressed-and-pending-digest" vs "already-digested."
    - What's unclear: Whether `suppressed`/`digested_at` should be separate boolean+timestamp columns or a single `status` enum-like TEXT column (matching the existing `bucket`/`ccir`/`cnr` TEXT-not-enum convention used throughout `infotriage.enrichment`).
    - Recommendation: Follow the existing project convention of plain TEXT columns with app-level validation (not Postgres ENUM types — none exist elsewhere in the schema) for consistency with `006-enrichment.sql`.
