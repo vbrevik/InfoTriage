@@ -10,6 +10,7 @@ import pytest
 from contracts import from_frontmatter
 from apps.brief.vault_writer import (
     ENTITY_GRAPH_ACTIVE_LIMIT,
+    _entity_names,
     render_entity_graph,
     render_wikilinked,
     write_entity_graph,
@@ -382,6 +383,70 @@ def test_write_vault_digest_view_projection(temp_vault):
 
 
 # --- Phase 8 Wave 4: Entity Graph ---------------------------------------------
+
+
+def test_entity_names_dedups_canonical_dupes_preserving_first_seen_order():
+    """Regression: items with >1 entity-link to same canonical name must dedup.
+
+    Pre-fix behaviour: ``_entity_names`` was a list comprehension without
+    dedup, returning ``["NATO", "Russia", "NATO", "Oslo", "Russia"]`` for
+    rows with 2 NATO links + 2 Russia links + 1 Oslo. Downstream joiners
+    (``write_item_obsidian``'s ``## Entities`` line, ``render_sab_obsidian``'s
+    ``**Emner**`` line) emitted cosmetic ``NATO, NATO, NATO`` duplicates.
+
+    Post-fix: dedup on canonical ``name``; first-seen order preserved so the
+    rendered list is stable for the same item.
+    """
+    item = {
+        "item_id": "test-dedup",
+        "entities": [
+            {"name": "NATO", "mention": "NATO", "lang": "en"},
+            {"name": "Russia", "mention": "Russia", "lang": "en"},
+            {"name": "NATO", "mention": "NATO", "lang": "ru"},  # dup NATO
+            {"name": "Oslo", "mention": "Oslo", "lang": "en"},
+            {"name": "Russia", "mention": "Russland", "lang": "no"},  # dup Russia
+        ],
+    }
+    assert _entity_names(item) == ["NATO", "Russia", "Oslo"]
+
+
+def test_entity_names_empty_and_nameless_inputs():
+    """No entities / Nones / nameless links -> empty list, no crash."""
+    assert _entity_names({"item_id": "x"}) == []
+    assert _entity_names({"item_id": "x", "entities": None}) == []
+    assert _entity_names({"item_id": "x", "entities": []}) == []
+    assert _entity_names(
+        {"item_id": "x", "entities": [{"mention": "y", "lang": "en"}]}
+    ) == []
+
+
+def test_write_item_obsidian_dedups_entities_section(temp_vault):
+    """Integration check: ``## Entities`` line shows NATO once, not 3x."""
+    item = {
+        "item_id": "test-dup-nato",
+        "title": "Test",
+        "summary": "About NATO and NATO and NATO.",
+        "source": "Example",
+        "url": "https://example.com/dup",
+        "ts": "2026-08-01T10:00:00+00:00",
+        "ccir": "PIR-3",
+        "cnr": "I",
+        "score": 9,
+        "bucket": "read",
+        "why": "Important",
+        "entities": [
+            {"name": "NATO", "mention": "NATO", "lang": "en"},
+            {"name": "NATO", "mention": "NATO", "lang": "en"},  # duplicate
+            {"name": "NATO", "mention": "NATO", "lang": "ru"},  # duplicate
+        ],
+    }
+    path = write_item_obsidian(item, temp_vault)
+    content = path.read_text(encoding="utf-8")
+    # Use literal newline char (\n) in the string literal — Python interprets
+    # them as actual newlines when comparing against the file content.
+    assert "## Entities\nNATO\n" in content
+    # Negative regression sentinel: the exact bug string MUST NOT appear post-fix.
+    assert "NATO, NATO, NATO" not in content
 
 
 def test_render_entity_graph_aggregates_aliases_and_counts():

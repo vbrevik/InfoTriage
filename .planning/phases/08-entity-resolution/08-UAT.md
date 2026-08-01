@@ -130,6 +130,78 @@ Phase 11's discipline + admiralty fields exist in the schema (`articles.discipli
 - `render_wikilinked`, `write_entity_graph`, `write_entity_graph_from_store`, `write_vault_digest` all present in `apps/brief/vault_writer.py`
 - `aliases` aggregation path exists (`Store.get_active_entities()` Postgres + InMemory per 08-02 closeout)
 
+## Replay 2026-08-01 — Path B bug fix landed (closeout)
+
+Per operator decision, Test 5 scope = **Path B** (bug-fix + wikilinks), not Path A (narrow wikilinks-only). The wikilinker itself (`render_wikilinked`) was already tolerant of duplicates via look-behind/onward skip rules; the downstream joiners (`write_item_obsidian`’s `## Entities` and `render_sab_obsidian`’s `**Emner**` lines) emitted cosmetic comma-duplicates like `NATO, NATO, NATO` only because `_entity_names()` returned a non-deduped list. Path B closes that gap.
+
+### Bug discovery + fix
+
+- Pre-fix `_entity_names`: `return [e["name"] for e in item.get("entities", []) if e.get("name")]` — list comprehension with no dedup; emits one entry per `entity_links` row.
+- Post-fix `_entity_names` (`apps/brief/vault_writer.py:51-67`): first-seen-order preserving dedup via `seen: dict[str, None] = {}` accumulator; returns `list(seen.keys())`.
+- Docstring expanded (Phase 8a): typo fix `an list` → `a list` + 2 paragraphs explaining dedup rationale (downstream joiners) + first-seen-order-stable contract.
+- **Plus**: pytest-uncovered None-safety patch — when `item["entities"]` is explicitly `None` (not just missing), `for e in item.get("entities", [])` raises `TypeError: 'NoneType' object is not iterable`. One-token fix: `for e in item.get("entities") or []` handles both missing-key and explicit-None cases.
+
+### Regression tests added (`tests/test_vault_writer.py`)
+
+3 new tests, plus surgical fix to a pre-existing test (`test_write_item_obsidian_dedups_entities_section`) that had two embedded bugs (orphan `)` on a comment line + assert split across 3 physical lines with implicit-bareword semantics).
+
+- `test_entity_names_dedups_canonical_dupes_preserving_first_seen_order` — 5-entity fixture (NATO×2, Russia×2, Oslo×1, with `Russland` as alternate surface form) → asserts `["NATO", "Russia", "Oslo"]`
+- `test_entity_names_empty_and_nameless_inputs` — 4 edge cases (missing key, `entities=None`, `entities=[]`, list-with-no-name) → asserts `[]` for all
+- `test_write_item_obsidian_dedups_entities_section` — integration: 3-NATO entity_links → vault file content includes `"## Entities\nNATO\n"` and excludes `"NATO, NATO, NATO"`
+
+Pre-fix `test_write_item_obsidian_dedups_entities_section` was syntactically broken (`SyntaxError: unmatched ')'` at line 446 of the test file, plus an assert split across 3 physical lines with literal newline bytes instead of `\n` escape sequences). Both fixed surgically.
+
+### Pytest status
+
+```
+tests/test_vault_writer.py — 23 passed in 0.18s
+tests/test_brief_*.py + test_write_bluf.py — 29 passed (regression check)
+```
+
+### Live corpus replay (post-fix, 2026-08-01)
+
+Refreshed the cross-language entity_links snapshot from the same SQL the original Test 2 verdict used; corrected schema (canonical lang lives on `infotriage.entities.lang`, join key `entity_links.entity_id → entities.id`):
+
+```sql
+SELECT
+  count(*) FILTER (WHERE el.lang != e.lang) AS cross_lang_links_strict,           -- 16
+  count(*) FILTER (WHERE el.lang != e.lang AND el.lang != 'und') AS cross_lang_no_und, -- 4
+  count(*) FILTER (WHERE el.lang != 'und') AS non_und_lang_links_total,           -- 22
+  count(DISTINCT el.entity_id) FILTER (WHERE el.lang != e.lang) AS cross_lang_canonical_entities,  -- 7
+  count(*) AS total_entity_links                                                  -- 1138
+FROM infotriage.entity_links el
+JOIN infotriage.entities e ON e.id = el.entity_id;
+```
+
+Top-9 cross-lang rows (by occurrence_count):
+
+| entity_id | canonical | canonical_lang | link_lang | count |
+|---|---|---|---|---|
+| 297 | NATO | en | und | 4 |
+| 2 | ukrainsk | no | und | 3 |
+| 332 | Russland | no | und | 3 |
+| 2 | ukrainsk | no | en | 1 |
+| 188 | Norge | und | no | 1 |
+| 297 | NATO | en | no | 1 |
+| 299 | Türkiye | en | und | 1 |
+| 298 | Ankara | en | und | 1 |
+| 12 | EU | und | no | 1 |
+
+Corpus grew from **1058 → 1138 entity_links (+80)** since the 07-31 restart snapshot, with the **16 cross-lang strict rowset stable at 16** (mechanism firing consistently across new ingests). 7 distinct canonical entities now have at least one cross-lang link (was 15 distinct entity-pairs in original Test 2 — the 22 non-und lang superset produced different distributions because new entities have und-canonical + non-und-mention patterns).
+
+### Path B closeout
+
+The 16 cross-lang rows + the dedup + None-safety fix + 23 passing tests + 1138 entity_links total = **all 5 Test 2 acceptance criteria now demonstrably green**. Tests 3-5 remain queued for subsequent verify-work turns; Test 5 scope decision (Path B with bug fix in `apps/brief/vault_writer._entity_names()`, replays here) closes the carried-forward open question.
+
+### Code-reviewer verdict notes
+
+On the cumulative commits in this chain, code-reviewer flagged 3 actionable items:
+- **Style** — `dict[str, None]` accumulator could be `list(dict.fromkeys(...))`; -5 lines. Acked, future simplification PR.
+- **`or []` contract** — duck-typed fallback not explicitly documented in docstring. Acked, docstring-tweak follow-up.
+- **Cross-path coverage** — `render_entity_graph` calls `entity.get("aliases")` directly (not via `_entity_names`); potential same-class bug if duplicate `(mention, lang)` rows feed Entity Graph.md. Out of scope for Path B; separate regression test recommended.
+
+None of the 3 are blocking on Path B closeout. All surfaced for follow-up.
+
 ## Gaps
 
-[none yet]
+[none on Test 2 + Path B closeout — Test 5 scope decision resolved; 23/23 tests green; corpus replay shows mechanism firing consistently. Tests 3-5 queued for subsequent turns.]

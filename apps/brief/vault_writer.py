@@ -51,12 +51,23 @@ def extract_entities(text: str, known_topics: Optional[list[str]] = None) -> lis
 def _entity_names(item: dict) -> list[str]:
     """Return canonical entity names from the item's entity graph links.
 
-    Phase 8 populates each enrichment row with an list of entity-link dicts under
+    Phase 8 populates each enrichment row with a list of entity-link dicts under
     the ``entities`` key (e.g. ``[{"name": "NATO", "mention": "NATO", ...}]``).
-    The vault writer no longer extracts entities heuristically; it projects the
-    canonical graph stored by the triage worker.
+    A single item can carry multiple entity-link rows pointing at the same
+    canonical entity (one per surface-form mention in the same article);
+    this projection deduplicates on canonical ``name`` so downstream joiners
+    (``write_item_obsidian``'s ``## Entities`` line, ``render_sab_obsidian``'s
+    ``**Emner**`` line) don't emit ``NATO, NATO, NATO`` cosmetic duplicates.
+    First-seen order is preserved so the rendered list is stable across
+    repeated calls for the same item.
     """
-    return [e["name"] for e in item.get("entities", []) if e.get("name")]
+    seen: dict[str, None] = {}
+    for e in item.get("entities") or []:
+        name = e.get("name")
+        if not name or name in seen:
+            continue
+        seen[name] = None
+    return list(seen.keys())
 
 
 _URL_SPAN_RE = re.compile(r"https?://\S+")
