@@ -2,14 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: CCIR registry shipped + real dedup-collapse bug fixed (2026-07-24); full-corpus re-score in progress; Phase 12 (b)(c)(d) still not started
-stopped_at: Full re-score running in background after dedup fix (3e5b7cf) — verify CCIR distribution + Kimi K3/FFIR-4 outcome before trusting SAB; 12 commits unpushed (2026-07-24)
-last_updated: "2026-07-24T13:10:00.000Z"
+status: Phase 8/9/10 audit chain closed (VALIDATION.md nyquist_compliant + Phase 10 UAT 5/5 PASS); Phase 11 VALIDATION.md State B reconstruction (0 regressions; 4 parked debt items); 2 commits unpushed awaiting operator push (2026-08-01)
+stopped_at: "Audit chain now in sync with origin/main at e3e7880 (Phase 8/9/10 catchup landed via push before session start). Local main is 2 commits ahead: 35e4f73 Phase 11 VALIDATION.md + 975ccca LEARNINGS.md 2026-08-01 append. Push to origin/main is operator-only per project rule. Phase 8 UAT paused mid-cycle (Test 1/5 verdicts pending); Phase 11 backfill migration parking taxonomy decision pending (INT vs PMESII-PT)."
+last_updated: "2026-08-01T11:55:00.000Z"
 progress:
   total_phases: 13
-  # completed = verification passed (phases 00-07). Phases 08-11 are executed
-  # but carry verification_status: missing — counted as debt, not complete.
-  completed_phases: 8
+  # completed = both VALIDATION.md nyquist_compliant AND UAT closed 5/5.
+  # Phases 0-7, 9, 10 fully verified (10 total). Phase 8: VALIDATION yes (nyquist_compliant
+  # 69c27d0) — UAT paused mid-flight at Test 2/5 (resumable). Phase 11: VALIDATION yes (State B
+  # 35e4f73, 0 regressions on shipped code) — implementation debt parked (4 items: taxonomy
+  # decision INT vs PMESII-PT, backfill migration libs/store/sql/010-backfill-discipline.sql,
+  # per-ingest contract test, audit-block docstring).
+  completed_phases: 10
   total_plans: 54
   completed_plans: 53
 ---
@@ -18,6 +22,97 @@ progress:
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-08-01 — Audit chain closure (Phase 8/9/10/11) + STATE.md refresh
+
+### Just-completed
+
+- **Phase 8/9/10 audit chain fully closed.** VALIDATION.md written/reopened for all
+  three phases (State A for Phase 8: existing VALIDATION.md, nyquist_compliant=true at
+  `69c27d0`; State B for Phase 9 + 10: PLAN + SUMMARY reconstruction, commits
+  `a54e015` + `057f2d8` + `6f0ac8f`). Phase 8 was already Nyquist-compliant per
+  07-31 re-audit; Phases 9 + 10 had VERIFICATION.md missing and were reconstructed.- **Phase 10 UAT closed**: Tests 4 + 5 PASS at `eb566f9` (DGX Spark recall routing
+  via `apps/wiki/dgx_client.py` + `apps/triage/recall.py --backend dgx`; 7 named tests,
+  live `pytest -q -k [N selectors]` → `7 passed, 667 deselected in 0.50s`);
+  `verify_language_coverage` flow verified (10 named tests, `10 passed in 0.20s`).
+  Final closeout commit `eb566f9 docs(phase-10): close UAT — Tests 4 + 5 PASS (5/5)`.
+- **Phase 11 VALIDATION.md State B reconstruction** (commit `35e4f73`):
+  PLAN + 2 SUMMARYs reconstructed; per-task map (11 rows × 11 GREEN × 0 unresolved);
+  5 success_criteria all GREEN. Audit block surfaced the parked
+  `articles.discipline = 0 across 499 rows` schema-discipline gap with **falsified
+  root-cause analysis**: thinker-with-files-gemini ranked H1 (Postgres UPSERT path
+  omits discipline column) as highest prior; ground-truth via
+  `grep -nE 'discipline\|admiralty_reliability' libs/store/src/store/_postgres.py`
+  showed H1 was FALSIFIED (UPSERT correctly writes the column at lines 167/179/193).
+  True root cause = legacy ingest adapters (pre-007) never populated
+  `Item.discipline`; backfill debt for `libs/store/sql/010-backfill-discipline.sql`.
+  4 parked debt items: (1) backfill migration; (2) INT vs PMESII-PT taxonomy
+  decision (operator-owned, default-fall-back = INT to match what Phase 11
+  adapters already emit — telegram SOCMINT, barentswatch MASINT/AIS); (3)
+  per-ingest contract test in `tests/test_phase11_gates.py`; (4) audit-block
+  docstring polish.
+- **Operator-authorized push pack landed clean** (25 commits in chain
+  `a4c2830..e3e7880`, `make -f ops/Makefile test-safe` pre-push). Catchup
+  atomized into 3 atomic commits per Milestone-commit policy: `acf6783`
+  docs(phase-08) + `dab7a52` docs(readme) + `e3e7880` chore(planning): add
+  LEARNINGS.md. `git ls-remote origin refs/heads/main` confirmed `e3e7880`
+  on origin. Subsequent work added 2 new commits (`35e4f73` + `975ccca`)
+  to local ahead of origin.
+- **LEARNINGS.md append** (commit `975ccca`): pre-pended
+  `### 2026-08-01 — Phase 8/9/10 audit-chain full closure + Phase 11
+  validation (State B) + push pack` capturing 8 Patterns / 5 Pitfalls /
+  3 Preferences / 3 Open questions. Self-defeating bullet fix (rewrote
+  the angle-bracket placeholder entry to use `[N selectors]` shorthand
+  + named vulnerable pipelines: pandoc `markdown_strict`, GitLab
+  `:render_as_plain_text`, Obsidian export).
+- **`.planning/STATE.md` refresh (this commit)**: YAML frontmatter updated
+  to reflect audit chain closure + 2 unpushed commits + new
+  `progress.completed_phases: 10` (was 8: 0-7 plus 9-10 now fully
+  verified). Top session entry added (this block).
+
+### Watch out for
+
+- **Mental-model drift check revealed extra commit.** Initial
+  `git log origin/main..HEAD | wc -l` after this turn's LEARNINGS commit
+  reported "2 unpushed" — `git fetch origin` confirmed both `35e4f73`
+  (Phase 11 VALIDATION, earlier in this session) and `975ccca` (this
+  LEARNINGS append) are unpushed. Pattern: re-fetch origin before
+  judging drift, especially after multi-commit burst sessions where
+  earlier commits may have been forgotten.
+- **Phase 8 UAT still paused at Test 1/5** per the 07-31 carry-forward
+  open question. Tests 2-5 (cross-language linking, Entity Graph.md
+  quality, non-blocking fallback, vault wikilinks + Test 5 cosmetic
+  dup-name decision) all queued for resume. The Test 5 scope decision
+  (Path A wikilinks-only vs Path B bug-fix in `apps/brief/vault_writer._entity_names()`
+  + wikilinks) was carried into the new LEARNINGS.md session as a
+  forward-looking open question.
+- **Phase 11 backfill taxonomy decision pending**: INT collection
+  disciplines (OSINT/HUMINT/SIGINT/MASINT/GEOINT/SOCMINT — matches
+  adapter emission already in production rows) vs PMESII-PT hybrid per
+  `.planning/research/pmesii-hybrid-definitions.md` (wider taxonomy
+  favored by research but requires schema-mapping work + alignment
+  with `_phase11_gates.py` constants). Default-fallback = INT; operator
+  decision needed before `libs/store/sql/010-backfill-discipline.sql`
+  migration ships. The parked debt is documented in
+  `.planning/phases/11-socmint/11-VALIDATION.md` for grep-forward
+  retention.
+
+### Next
+
+- **Push the 2 unpushed commits to origin/main** (operator action):
+  `git push origin main` to land `35e4f73` (Phase 11 VALIDATION.md State B)
+  + `975ccca` (LEARNINGS.md 2026-08-01 append). Post-push state should be
+  LOCAL == ORIGIN at SHA `975ccca`.
+- **Resume `/gsd-verify-work 8` at Test 2/5** (cross-language linking,
+  Entity Graph.md quality, non-blocking fallback, vault wikilinks).
+  Test 5 scope decision (Path A vs Path B per 07-31 open question) is
+  required before resuming — pick narrow vs wider scope so Test 5 verdict
+  cleanly maps.
+- **Resolve Phase 11 backfill taxonomy** (operator decision): pick INT
+  vs PMESII-PT hybrid; then proceed to backfill migration + per-ingest
+  contract test (Phase 11 debt parked). Default-fallback = INT.
+- **Update `.planning/LEARNINGS.md`** if any new patterns surface from
+  the above work — single-session pre-pend discipline per file convention.
 
 ## Session: 2026-07-24 — CCIR registry shipped; root-caused a real dedup-collapse bug (87% of corpus silently zeroed)
 
