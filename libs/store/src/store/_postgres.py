@@ -824,6 +824,203 @@ class PostgresStore:
         )
         self._conn.commit()
 
+    # -------------------------------------------------------------------------
+    # Alert state — dedupe/throttle substrate — Phase 12 (D-02, T-12-06, T-12-07)
+    # -------------------------------------------------------------------------
+
+    def claim_alert(
+        self,
+        dedupe_id: str,
+        item_id: str,
+        cnr_tier: str,
+        alert_id: str,
+        *,
+        ttl_seconds: int = 86400,
+        now: "datetime.datetime | None" = None,
+    ) -> bool:
+        """Atomic check-and-set claim on dedupe_id. One statement — no read-then-write.
+
+        A fresh dedupe_id inserts and RETURNING yields a row (True). A conflicting
+        dedupe_id whose existing fired_at is within ttl_seconds of the new timestamp
+        fails the DO UPDATE's WHERE clause — Postgres treats that exactly like DO
+        NOTHING, RETURNING yields no row (False, the suppress signal). A conflicting
+        dedupe_id whose existing fired_at is at or before (new fired_at - ttl_seconds)
+        passes the WHERE clause, updates, and RETURNING yields a row (True, the
+        re-fire signal).
+
+        Security (V5/T-05-01, T-12-06): all values bound via %s; the TTL interval is
+        built with make_interval(secs => %s) from the bound ttl_seconds — never an
+        f-string or concatenated SQL.
+        Race safety (T-12-07): this single statement IS the entire race window for
+        two concurrent claims of the same dedupe_id.
+        """
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
+        result = self._conn.execute(
+            """
+            INSERT INTO infotriage.alert_state
+                (dedupe_id, item_id, cnr_tier, alert_id, fired_at)
+            VALUES (%s, %s, %s, %s, COALESCE(%s::timestamptz, NOW()))
+            ON CONFLICT (dedupe_id) DO UPDATE SET
+                item_id      = EXCLUDED.item_id,
+                cnr_tier     = EXCLUDED.cnr_tier,
+                fired_at     = EXCLUDED.fired_at,
+                alert_id     = EXCLUDED.alert_id,
+                suppressed   = FALSE,
+                digested_at  = NULL,
+                delivered_at = NULL,
+                dlx_at       = NULL
+            WHERE infotriage.alert_state.fired_at
+                  <= EXCLUDED.fired_at - make_interval(secs => %s)
+            RETURNING dedupe_id
+            """,
+            (dedupe_id, item_id, cnr_tier, alert_id, now, ttl_seconds),
+        ).fetchone()
+        self._conn.commit()
+        return result is not None
+
+    def count_alerts_in_window(
+        self,
+        *,
+        window_seconds: int,
+        now: "datetime.datetime | None" = None,
+    ) -> int:
+        """Count non-suppressed alert_state rows fired within window_seconds of `now`.
+
+        The window boundary is computed from an injectable `now` against each row's
+        fired_at — never a fixed calendar bucket (SPEC R3).
+        Security: window interval bound via make_interval(secs => %s) — never an
+        f-string.
+        """
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
+        row = self._conn.execute(
+            """
+            SELECT COUNT(*) AS n
+            FROM infotriage.alert_state
+            WHERE fired_at > COALESCE(%s::timestamptz, NOW()) - make_interval(secs => %s)
+              AND suppressed = FALSE
+            """,
+            (now, window_seconds),
+        ).fetchone()
+        self._conn.rollback()  # end read txn — avoid idle-in-transaction
+        assert row is not None  # COUNT(*) always returns exactly one row
+        return cast(int, row["n"])
+
+    def mark_alert_suppressed(
+        self,
+        dedupe_id: str,
+        *,
+        pmesii: "str | None" = None,
+        title: "str | None" = None,
+    ) -> None:
+        """Flip suppressed to True on dedupe_id's row and record pmesii/title.
+
+        The row is never deleted — digested_at records enumeration instead (SPEC R3,
+        T-12-09).
+        """
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
+        self._conn.execute(
+            """
+            UPDATE infotriage.alert_state
+            SET suppressed = TRUE, pmesii = %s, title = %s
+            WHERE dedupe_id = %s
+            """,
+            (pmesii, title, dedupe_id),
+        )
+        self._conn.commit()
+
+    def list_undigested_suppressed(
+        self,
+        *,
+        now: "datetime.datetime | None" = None,
+    ) -> list[dict]:
+        """Return suppressed rows awaiting digest enumeration.
+
+        Ordered by pmesii then fired_at ascending for stable digest grouping.
+        Rows are returned again on every call until mark_alerts_digested is called.
+        """
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
+        rows = self._conn.execute(
+            """
+            SELECT dedupe_id, item_id, alert_id, pmesii, title, fired_at
+            FROM infotriage.alert_state
+            WHERE suppressed = TRUE AND digested_at IS NULL
+            ORDER BY pmesii ASC, fired_at ASC
+            """
+        ).fetchall()
+        self._conn.rollback()  # end read txn — avoid idle-in-transaction
+        return [
+            {
+                "dedupe_id": r["dedupe_id"],
+                "item_id": r["item_id"],
+                "alert_id": r["alert_id"],
+                "pmesii": r["pmesii"],
+                "title": r["title"],
+                "fired_at": r["fired_at"],
+            }
+            for r in rows
+        ]
+
+    def mark_alerts_digested(
+        self,
+        dedupe_ids: "list[str]",
+        *,
+        now: "datetime.datetime | None" = None,
+    ) -> None:
+        """Set digested_at on the given dedupe_ids in one statement. No-op if empty."""
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
+        if not dedupe_ids:
+            return
+        self._conn.execute(
+            """
+            UPDATE infotriage.alert_state
+            SET digested_at = COALESCE(%s::timestamptz, NOW())
+            WHERE dedupe_id = ANY(%s)
+            """,
+            (now, list(dedupe_ids)),
+        )
+        self._conn.commit()
+
+    def mark_alert_outcome(
+        self,
+        dedupe_id: str,
+        *,
+        outcome: str,
+        now: "datetime.datetime | None" = None,
+    ) -> None:
+        """Record a push outcome: 'delivered' sets delivered_at, 'dead_lettered' sets dlx_at.
+
+        Each branch uses a fully literal SQL string — the outcome string never
+        reaches SQL text construction, only the Python if/elif dispatch (T-12-06).
+
+        Raises:
+            ValueError: outcome is neither 'delivered' nor 'dead_lettered'.
+        """
+        assert self._conn is not None, "PostgresStore must be used as a context manager"
+        if outcome == "delivered":
+            self._conn.execute(
+                """
+                UPDATE infotriage.alert_state
+                SET delivered_at = COALESCE(%s::timestamptz, NOW())
+                WHERE dedupe_id = %s
+                """,
+                (now, dedupe_id),
+            )
+        elif outcome == "dead_lettered":
+            self._conn.execute(
+                """
+                UPDATE infotriage.alert_state
+                SET dlx_at = COALESCE(%s::timestamptz, NOW())
+                WHERE dedupe_id = %s
+                """,
+                (now, dedupe_id),
+            )
+        else:
+            raise ValueError(
+                f"mark_alert_outcome: unknown outcome {outcome!r} "
+                "(expected 'delivered' or 'dead_lettered')"
+            )
+        self._conn.commit()
+
 
 class PostgresTranslationCache:
     """Postgres-backed implementation of contracts.TranslationCache.

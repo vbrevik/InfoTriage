@@ -305,3 +305,103 @@ class Store(Protocol):
             details: optional JSON-serializable metadata.
         """
         ...
+
+    # -------------------------------------------------------------------------
+    # Alert state — dedupe/throttle substrate — Phase 12 (D-02)
+    # -------------------------------------------------------------------------
+
+    def claim_alert(
+        self,
+        dedupe_id: str,
+        item_id: str,
+        cnr_tier: str,
+        alert_id: str,
+        *,
+        ttl_seconds: int = 86400,
+        now: Optional[datetime.datetime] = None,
+    ) -> bool:
+        """Atomically claim dedupe_id for alert_id; return True iff the alert should fire.
+
+        Single check-and-set: a fresh dedupe_id always claims and returns True. A
+        conflicting dedupe_id whose stored fired_at is within ttl_seconds of `now`
+        is a no-op — the alert is suppressed (returns False). A conflicting
+        dedupe_id whose stored fired_at is at or before `now - ttl_seconds` re-fires:
+        fired_at and alert_id are refreshed and suppressed/digested_at/delivered_at/
+        dlx_at are cleared (returns True).
+
+        Args:
+            dedupe_id: sha256-truncated identity from SPEC R2.
+            item_id: the article this alert refers to.
+            cnr_tier: the CNR tier that produced the alert.
+            alert_id: the per-push identifier the payload carries.
+            ttl_seconds: dedupe TTL in seconds (default 24h).
+            now: injectable clock; None means server/wall-clock time (SPEC R2).
+
+        There is no separate read before the write — this is the entire race
+        window for two concurrent claims of the same dedupe_id (T-12-07).
+        """
+        ...
+
+    def count_alerts_in_window(
+        self,
+        *,
+        window_seconds: int,
+        now: Optional[datetime.datetime] = None,
+    ) -> int:
+        """Count non-suppressed alert_state rows fired within window_seconds of `now`.
+
+        The window boundary is computed from an injectable `now` relative to each
+        row's fired_at — never a fixed calendar bucket (SPEC R3).
+        """
+        ...
+
+    def mark_alert_suppressed(
+        self,
+        dedupe_id: str,
+        *,
+        pmesii: Optional[str] = None,
+        title: Optional[str] = None,
+    ) -> None:
+        """Flip suppressed to True on dedupe_id's row and record pmesii/title.
+
+        A suppressed row stops counting toward count_alerts_in_window and becomes
+        eligible for list_undigested_suppressed. Rows are never deleted (SPEC R3).
+        """
+        ...
+
+    def list_undigested_suppressed(
+        self,
+        *,
+        now: Optional[datetime.datetime] = None,
+    ) -> list[dict]:
+        """Return suppressed rows awaiting digest enumeration.
+
+        Rows where suppressed is True and digested_at is None, ordered by pmesii
+        then fired_at ascending (stable digest grouping). Returns the same rows
+        again on every call until mark_alerts_digested is called.
+        """
+        ...
+
+    def mark_alerts_digested(
+        self,
+        dedupe_ids: list[str],
+        *,
+        now: Optional[datetime.datetime] = None,
+    ) -> None:
+        """Set digested_at on the given dedupe_ids. No-op for an empty sequence."""
+        ...
+
+    def mark_alert_outcome(
+        self,
+        dedupe_id: str,
+        *,
+        outcome: str,
+        now: Optional[datetime.datetime] = None,
+    ) -> None:
+        """Record a push outcome for dedupe_id: 'delivered' sets delivered_at,
+        'dead_lettered' sets dlx_at.
+
+        Raises:
+            ValueError: outcome is neither 'delivered' nor 'dead_lettered'.
+        """
+        ...

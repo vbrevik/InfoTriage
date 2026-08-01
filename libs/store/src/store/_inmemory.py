@@ -70,6 +70,8 @@ class InMemoryStore:
         # Phase 9 state: CCIR vectors + audit
         self._ccir_vectors: dict[str, list[float]] = {}
         self._audit: list[dict] = []
+        # Phase 12 state: alert_state dedupe/throttle substrate (D-02)
+        self._alert_state: dict[str, dict] = {}
 
     # Context manager — no-ops; implemented for Store Protocol compliance
 
@@ -462,3 +464,163 @@ class InMemoryStore:
                 "details": details,
             }
         )
+
+    # -------------------------------------------------------------------------
+    # Alert state — dedupe/throttle substrate — Phase 12 (D-02)
+    # -------------------------------------------------------------------------
+
+    def claim_alert(
+        self,
+        dedupe_id: str,
+        item_id: str,
+        cnr_tier: str,
+        alert_id: str,
+        *,
+        ttl_seconds: int = 86400,
+        now: Optional[datetime.datetime] = None,
+    ) -> bool:
+        """Atomic (single-process) check-and-set claim on dedupe_id.
+
+        Mirrors PostgresStore's INSERT-ON-CONFLICT-WHERE semantics: a fresh
+        dedupe_id always claims (True); a conflicting dedupe_id whose stored
+        fired_at is within ttl_seconds of `now` is suppressed (False); a
+        conflicting dedupe_id whose stored fired_at is at or before
+        (now - ttl_seconds) re-fires (True) and resets suppressed/digested_at/
+        delivered_at/dlx_at.
+        """
+        effective_now = (
+            now if now is not None else datetime.datetime.now(datetime.timezone.utc)
+        )
+        existing = self._alert_state.get(dedupe_id)
+        if existing is None:
+            self._alert_state[dedupe_id] = {
+                "dedupe_id": dedupe_id,
+                "item_id": item_id,
+                "cnr_tier": cnr_tier,
+                "alert_id": alert_id,
+                "fired_at": effective_now,
+                "suppressed": False,
+                "pmesii": None,
+                "title": None,
+                "digested_at": None,
+                "delivered_at": None,
+                "dlx_at": None,
+            }
+            return True
+        ttl = datetime.timedelta(seconds=ttl_seconds)
+        if existing["fired_at"] <= effective_now - ttl:
+            existing.update(
+                {
+                    "item_id": item_id,
+                    "cnr_tier": cnr_tier,
+                    "alert_id": alert_id,
+                    "fired_at": effective_now,
+                    "suppressed": False,
+                    "digested_at": None,
+                    "delivered_at": None,
+                    "dlx_at": None,
+                }
+            )
+            return True
+        return False
+
+    def count_alerts_in_window(
+        self,
+        *,
+        window_seconds: int,
+        now: Optional[datetime.datetime] = None,
+    ) -> int:
+        """Count non-suppressed rows fired within window_seconds of `now`."""
+        effective_now = (
+            now if now is not None else datetime.datetime.now(datetime.timezone.utc)
+        )
+        window_start = effective_now - datetime.timedelta(seconds=window_seconds)
+        return sum(
+            1
+            for row in self._alert_state.values()
+            if row["fired_at"] > window_start and not row["suppressed"]
+        )
+
+    def mark_alert_suppressed(
+        self,
+        dedupe_id: str,
+        *,
+        pmesii: Optional[str] = None,
+        title: Optional[str] = None,
+    ) -> None:
+        """Flip suppressed to True on dedupe_id's row and record pmesii/title."""
+        row = self._alert_state.get(dedupe_id)
+        if row is not None:
+            row["suppressed"] = True
+            row["pmesii"] = pmesii
+            row["title"] = title
+
+    def list_undigested_suppressed(
+        self,
+        *,
+        now: Optional[datetime.datetime] = None,
+    ) -> list[dict]:
+        """Return suppressed rows awaiting digest enumeration.
+
+        Ordered by pmesii then fired_at ascending, matching Postgres's
+        ORDER BY pmesii ASC (NULLS LAST) semantics.
+        """
+        rows = [
+            {
+                "dedupe_id": r["dedupe_id"],
+                "item_id": r["item_id"],
+                "alert_id": r["alert_id"],
+                "pmesii": r["pmesii"],
+                "title": r["title"],
+                "fired_at": r["fired_at"],
+            }
+            for r in self._alert_state.values()
+            if r["suppressed"] and r["digested_at"] is None
+        ]
+        rows.sort(key=lambda r: (r["pmesii"] is None, r["pmesii"] or "", r["fired_at"]))
+        return rows
+
+    def mark_alerts_digested(
+        self,
+        dedupe_ids: list[str],
+        *,
+        now: Optional[datetime.datetime] = None,
+    ) -> None:
+        """Set digested_at on the given dedupe_ids. No-op for an empty sequence."""
+        if not dedupe_ids:
+            return
+        effective_now = (
+            now if now is not None else datetime.datetime.now(datetime.timezone.utc)
+        )
+        for dedupe_id in dedupe_ids:
+            row = self._alert_state.get(dedupe_id)
+            if row is not None:
+                row["digested_at"] = effective_now
+
+    def mark_alert_outcome(
+        self,
+        dedupe_id: str,
+        *,
+        outcome: str,
+        now: Optional[datetime.datetime] = None,
+    ) -> None:
+        """Record a push outcome: 'delivered' sets delivered_at, 'dead_lettered' sets dlx_at.
+
+        Raises:
+            ValueError: outcome is neither 'delivered' nor 'dead_lettered'.
+        """
+        if outcome not in ("delivered", "dead_lettered"):
+            raise ValueError(
+                f"mark_alert_outcome: unknown outcome {outcome!r} "
+                "(expected 'delivered' or 'dead_lettered')"
+            )
+        row = self._alert_state.get(dedupe_id)
+        if row is None:
+            return
+        effective_now = (
+            now if now is not None else datetime.datetime.now(datetime.timezone.utc)
+        )
+        if outcome == "delivered":
+            row["delivered_at"] = effective_now
+        else:
+            row["dlx_at"] = effective_now
