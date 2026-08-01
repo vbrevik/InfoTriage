@@ -14,6 +14,27 @@
 #   ntfy_producer_password  → NTFY_PRODUCER_PASSWORD
 #   ntfy_reader_password    → NTFY_READER_PASSWORD
 #   ntfy_topic_prefix       → NTFY_TOPIC_PREFIX (e.g. cnr-cat-i)
+#
+# Topic ACL matrix (Phase 12 Plan 03 — SPEC R6). A single wildcard grant per
+# identity (producer write-only / reader read-only on "<prefix>*") was
+# replaced with 4 explicit per-topic grants below, so topic-vs-wildcard
+# precedence is never relied on:
+#   producer  <prefix>        read-write   (bearer token minted for this
+#                                            identity inherits this grant —
+#                                            SPEC R6 requires the primary
+#                                            topic to require a token for
+#                                            BOTH read and write)
+#   producer  <prefix>-debug  write-only
+#   producer  <prefix>-test   write-only
+#   reader    <prefix>        read-only
+#   reader    <prefix>-debug  (no grant — falls through to deny-all)
+#   reader    <prefix>-test   (no grant — falls through to deny-all)
+#
+# The bearer token itself is NOT minted here (no `ntfy token add` call in this
+# builder stage) — a token minted at build time would land in an image layer,
+# exactly what this file's bcrypt-only-artifact philosophy forbids. The token
+# is minted post-boot via `make -f ops/Makefile ntfy-token` (Phase 12 Plan 03
+# Task 2) and captured only into the gitignored .env.
 
 FROM binwiederhier/ntfy:latest AS builder
 
@@ -43,8 +64,10 @@ RUN --mount=type=secret,id=ntfy_producer_password \
         ntfy user add producer; \
     NTFY_PASSWORD="$(cat /run/secrets/ntfy_reader_password)" \
         ntfy user add reader; \
-    ntfy access producer "${TOPIC}*" write-only; \
-    ntfy access reader "${TOPIC}*" read-only
+    ntfy access producer "${TOPIC}" read-write; \
+    ntfy access producer "${TOPIC}-debug" write-only; \
+    ntfy access producer "${TOPIC}-test" write-only; \
+    ntfy access reader "${TOPIC}" read-only
 
 # Final stage: pure ntfy image, only the (already-bcrypt'd) auth.db is layered in.
 # Plaintext passwords are NOT in any image layer — only bcrypt-derived hashes.
