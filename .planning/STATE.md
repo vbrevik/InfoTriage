@@ -3,11 +3,16 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Phase 8/9/10/11 audit chain end-to-end closed (Phase 8 fully verified 5/5 UAT + 29/29 db_live variants); make test-safe CLEAN at 677/0/0 (3 pre-existing test-side bugs resolved via this-commit fixture fixes); local == origin at the imminent commit SHA
-stopped_at: "Audit chain fully closed in this session: Phase 8 went VALIDATION+UAT-complete via 979467d (Path B dedup fix in apps/brief/vault_writer.py) + 48fa6ee (Tests 3+4+5 PASS document); Phase 11 verify-work bug-fix sub-task opened at da2ca0d (3 pre-existing test-side failures surfaced by make test-safe: 2 TIME-BOMB telegram fake_message fixtures + 1 youtube INFOTRIAGE_YOUTUBE_TRANSCRIBE env-var leak -- no production-code regressions). Operator-authorized push landed 3 commits (979467d + 48fa6ee + da2ca0d) to origin/main. make -f ops/Makefile test-safe against throwaway Postgres (port 22062, distinct from prod 22000) ran 66s clean: 674 passed / 3 failed / 0 regressions. Phase 11 backfill taxonomy decision still pending operator (INT vs PMESII-PT; default = INT)."
-last_updated: "2026-08-01T15:30:00.000Z"
+stopped_at: Phase 12 context gathered
+last_updated: "2026-08-01T11:55:29.836Z"
+progress:
+  total_phases: 13
+  completed_phases: 8
+  total_plans: 40
+  completed_plans: 34
 last_baseline:
-  command: "make -f ops/Makefile test-safe"
-  date: "2026-08-01"
+  command: make -f ops/Makefile test-safe
+  date: 2026-08-01
   duration_seconds: 35.31
   passed: 685
   failed: 0
@@ -16,21 +21,10 @@ last_baseline:
   throwaway_pg_port: 22062
   prod_pg_port: 22000
   db_live_variants_unblocked: 15
-  db_live_variants_source: "tests/test_store_entities.py parametric Postgres variants"
-  prior_baseline_sha: "6dbac4b (674 passed / 3 failed / 66s)"
+  db_live_variants_source: tests/test_store_entities.py parametric Postgres variants
+  prior_baseline_sha: 6dbac4b (674 passed / 3 failed / 66s)
   resolved_in_commit: "this commit (test fixtures: TIME-BOMB telegram + autouse youtube delenv)"
-make_test_safe_status: "CLEAN (677/0/0 baseline; 3 pre-existing test-side bugs resolved via .planning/phases/11-socmint/11-INGEST-TEST-FIXES-PLAN.md -- this commit ships the fixture fixes)"
-progress:
-  total_phases: 13
-  # completed = both VALIDATION.md nyquist_compliant AND UAT closed 5/5.
-  # Phases 0-8, 9, 10 fully verified (11 total). Phase 11: VALIDATION yes (State B
-  # 35e4f73, 0 regressions on shipped code) -- implementation debt parked (4 items: taxonomy
-  # decision INT vs PMESII-PT, backfill migration libs/store/sql/010-backfill-discipline.sql,
-  # per-ingest contract test, audit-block docstring) PLUS the 3 verify-work test-side bugs
-  # opened in .planning/phases/11-socmint/11-INGEST-TEST-FIXES-PLAN.md.
-  completed_phases: 11
-  total_plans: 54
-  completed_plans: 53
+make_test_safe_status: CLEAN (677/0/0 baseline; 3 pre-existing test-side bugs resolved via .planning/phases/11-socmint/11-INGEST-TEST-FIXES-PLAN.md -- this commit ships the fixture fixes)
 ---
 
 # STATE — InfoTriage
@@ -70,6 +64,7 @@ progress:
   hardcoded date goes stale silently; only `make test-safe` (full
   live-Postgres) catches it because narrower `pytest -k foo` collections
   may pass with the same stale data.
+
 - **Autouse vs inline isolation choice = file-wide vs test-specific.**
   The autouse fixture here covers all 9 tests in the file at once (1
   edit), vs 9 inline `monkeypatch.delenv` calls (9 edits, none benefit
@@ -88,21 +83,25 @@ progress:
   `tests/test_store_entities.py` fired for the first time and all 15 PASSED —
   InMemoryStore/db_live path equivalence asserted by Phase 8 VALIDATION.md (6959e4d) is
   now ground truth, not assertion.
+
 - **3 pre-existing FAILURES surfaced** — all test-side, zero production-code regressions:
   | Test | Root cause | Fix target |
   |------|-----------|-----------|
   | `tests/test_ingest_telegram.py::test_ingest_emits_item_with_discipline_and_reliability` | `fake_message` fixture hardcoded `date=datetime(2026,7,21)`; today 2026-08-01; `parse_since("7d")` resolves to 2026-07-25, so `since` filter drops the test message | Use `datetime.now(tz=utc) - timedelta(hours=1)` in fixture |
   | `tests/test_ingest_telegram.py::test_ingest_dry_run_does_not_persist` | Same TIME-BOMB fixture | Same fix |
   | `tests/test_ingest_youtube.py::test_ingest_r2_dual_output` | `INFOTRIAGE_YOUTUBE_TRANSCRIBE` env-var not isolated by `monkeypatch.delenv`; leaks from ambient shell/.env into dry-run path | Add `monkeypatch.delenv("INFOTRIAGE_YOUTUBE_TRANSCRIBE", raising=False)` at test entry |
+
 - **Phase 11 verify-work bug-fix sub-task opened** at `da2ca0d` —
   `.planning/phases/11-socmint/11-INGEST-TEST-FIXES-PLAN.md` (187 lines, YAML parses clean).
   Documents all 3 bugs + root-cause analysis + per-bug fix direction + verification gate
   (same `make test-safe` baseline). Tracked forward; not auto-executed this turn
   (operator-decision territory per project rule for code-fixes in shipped-test bugs).
+
 - **Operator-authorized push landed clean** this session: `git push origin main` transmitted
   3 unpushed commits (`979467d` Path B fix + `48fa6ee` Phase 8 UAT closeout + `da2ca0d`
   Phase 11 sub-task opener). Pre-push: local `da2ca0d`, origin `a8483cd`. Post-push: local =
   origin = `da2ca0d`. `git ls-remote origin refs/heads/main` confirmed. Working tree clean.
+
 - **`.planning/STATE.md` refresh (THIS commit)**: frontmatter updated with new
   `last_baseline` + `make_test_safe_status` markers (per operator request); `status`/
   `stopped_at` rewritten to reflect Phase 8 complete + push landing + make test-safe;
@@ -115,6 +114,7 @@ progress:
   the pre-push claim and the push itself). Pattern: re-run
   `git log origin/main..HEAD | wc -l` immediately before push, not at start of session,
   when the session is multi-commit-burst.
+
 - **The 15 db_live parametric variants in `tests/test_store_entities.py` were previously
   registered as "skipped" not "passing"** in every prior session's pytest reports. The
   `make test-safe` exercise reclassified them from carry-over suppression to active green.
@@ -127,11 +127,14 @@ progress:
   forward in `11-INGEST-TEST-FIXES-PLAN.md`). Expected effort: ≤15 minutes — 2 one-line
   fixture edits + 1 `monkeypatch.delenv` addition. After landing, re-run `make test-safe`
   to flip the baseline to 677 passed / 0 failed for the first time.
+
 - **Decide Phase 11 backfill taxonomy** (INT vs PMESII-PT; default-fall-back = INT per
   existing adapter emission). Operator call required before
   `libs/store/sql/010-backfill-discipline.sql` ships.
+
 - **Resume work on Phase 12 sub-waves (b)+(c)+(d)** per `HANDOFF.json` (unchanged from
   07-23). Sub-wave (a) ADR-018 substrate is stable; rebuild path already audited.
+
 - **Pick next session action**: `/gsd-progress --next` will route to one of the above.
 
 ## Session: 2026-08-01 — Audit chain closure (Phase 8/9/10/11) + STATE.md refresh
@@ -147,6 +150,7 @@ progress:
   live `pytest -q -k [N selectors]` → `7 passed, 667 deselected in 0.50s`);
   `verify_language_coverage` flow verified (10 named tests, `10 passed in 0.20s`).
   Final closeout commit `eb566f9 docs(phase-10): close UAT — Tests 4 + 5 PASS (5/5)`.
+
 - **Phase 11 VALIDATION.md State B reconstruction** (commit `35e4f73`):
   PLAN + 2 SUMMARYs reconstructed; per-task map (11 rows × 11 GREEN × 0 unresolved);
   5 success_criteria all GREEN. Audit block surfaced the parked
@@ -162,6 +166,7 @@ progress:
   adapters already emit — telegram SOCMINT, barentswatch MASINT/AIS); (3)
   per-ingest contract test in `tests/test_phase11_gates.py`; (4) audit-block
   docstring polish.
+
 - **Operator-authorized push pack landed clean** (25 commits in chain
   `a4c2830..e3e7880`, `make -f ops/Makefile test-safe` pre-push). Catchup
   atomized into 3 atomic commits per Milestone-commit policy: `acf6783`
@@ -169,13 +174,16 @@ progress:
   LEARNINGS.md. `git ls-remote origin refs/heads/main` confirmed `e3e7880`
   on origin. Subsequent work added 2 new commits (`35e4f73` + `975ccca`)
   to local ahead of origin.
+
 - **LEARNINGS.md append** (commit `975ccca`): pre-pended
   `### 2026-08-01 — Phase 8/9/10 audit-chain full closure + Phase 11
   validation (State B) + push pack` capturing 8 Patterns / 5 Pitfalls /
   3 Preferences / 3 Open questions. Self-defeating bullet fix (rewrote
   the angle-bracket placeholder entry to use `[N selectors]` shorthand
+
   + named vulnerable pipelines: pandoc `markdown_strict`, GitLab
   `:render_as_plain_text`, Obsidian export).
+
 - **`.planning/STATE.md` refresh (this commit)**: YAML frontmatter updated
   to reflect audit chain closure + 2 unpushed commits + new
   `progress.completed_phases: 10` (was 8: 0-7 plus 9-10 now fully
@@ -190,13 +198,16 @@ progress:
   LEARNINGS append) are unpushed. Pattern: re-fetch origin before
   judging drift, especially after multi-commit burst sessions where
   earlier commits may have been forgotten.
+
 - **Phase 8 UAT still paused at Test 1/5** per the 07-31 carry-forward
   open question. Tests 2-5 (cross-language linking, Entity Graph.md
   quality, non-blocking fallback, vault wikilinks + Test 5 cosmetic
   dup-name decision) all queued for resume. The Test 5 scope decision
   (Path A wikilinks-only vs Path B bug-fix in `apps/brief/vault_writer._entity_names()`
+
   + wikilinks) was carried into the new LEARNINGS.md session as a
   forward-looking open question.
+
 - **Phase 11 backfill taxonomy decision pending**: INT collection
   disciplines (OSINT/HUMINT/SIGINT/MASINT/GEOINT/SOCMINT — matches
   adapter emission already in production rows) vs PMESII-PT hybrid per
@@ -212,16 +223,20 @@ progress:
 
 - **Push the 2 unpushed commits to origin/main** (operator action):
   `git push origin main` to land `35e4f73` (Phase 11 VALIDATION.md State B)
+
   + `975ccca` (LEARNINGS.md 2026-08-01 append). Post-push state should be
   LOCAL == ORIGIN at SHA `975ccca`.
+
 - **Resume `/gsd-verify-work 8` at Test 2/5** (cross-language linking,
   Entity Graph.md quality, non-blocking fallback, vault wikilinks).
   Test 5 scope decision (Path A vs Path B per 07-31 open question) is
   required before resuming — pick narrow vs wider scope so Test 5 verdict
   cleanly maps.
+
 - **Resolve Phase 11 backfill taxonomy** (operator decision): pick INT
   vs PMESII-PT hybrid; then proceed to backfill migration + per-ingest
   contract test (Phase 11 debt parked). Default-fallback = INT.
+
 - **Update `.planning/LEARNINGS.md`** if any new patterns surface from
   the above work — single-session pre-pend discipline per file convention.
 
@@ -235,6 +250,7 @@ progress:
   today. Same class of issue as backlog phase `999.2` (uncalibrated
   absolute-cosine threshold needing a larger corpus with synthetic negative
   controls).
+
 - **Operational fixes to get real (non-test) data flowing:** brought RabbitMQ back up
   (was down); fixed `ops/llm-router.py` — the Spark chat branch had thinking left ON,
   so every triage LLM call spent 25-30s on an empty `<think>` block and timed out
@@ -243,6 +259,7 @@ progress:
   couldn't build — no `--mount=type=secret`, wrong `ntfy access` arg order; compose had
   no `command: serve`, so the image has NO default CMD and crash-looped). Live-validated:
   `make ntfy-build && make ntfy-up && make ntfy-publish-test` all pass.
+
 - **CCIR registry shipped** (`libs/contracts/src/contracts/ccir.py`, 6 commits
   62ee64b..472e4d3) — collapses the 8 scattered CCIR-definition sites (scorer prompt,
   two duplicated `CCIR_ORDER` literals = DRIFT-1, `COP_CCIR` set, `ccir.md` prose,
@@ -252,17 +269,21 @@ progress:
   by `tests/test_ccir_sync.py` (PMESII/TESSOC trailer + id-set parity). Design doc at
   `docs/superpowers/specs/2026-07-24-ccir-registry-design.md`, plan at
   `docs/superpowers/plans/2026-07-24-ccir-registry.md`.
+
   - Fixed a real pre-existing drift bug as a side effect: SIR-3 was missing from the
     scorer's JSON enum AND quick-reference — the scorer could never emit SIR-3 even
     though it was in `CCIR_ORDER`/`ccir.md`. Now present.
+
   - Added **FFIR-4 "Frontier AI & LLM-landskap"**, split from FFIR-3, per operator
     request: FFIR-3 = own local AI (oMLX, MLX, Ollama, LM Studio, vLLM, own Spark/GB10,
     homelab incl. ngrok); FFIR-4 = external frontier landscape (Kimi, GPT, Gemini,
     Claude, Qwen, Llama, DeepSeek releases/benchmarks). First real dogfood of the
     registry's "add/retire a requirement = one edit" design goal.
+
   - WC2026/SIR-2 retirement (`active=False`) was scoped for this work but NOT executed
     — deliberately deferred so it wouldn't collide with the in-flight re-scores. Still
     open; one-line flag flip + `make ccir-sync` when ready.
+
 - **Root-caused and fixed the actual reason local scoring looked broken** (commit
   `3e5b7cf`) — NOT a scorer/taxonomy problem, a **dedup false-collapse bug**. The
   near-dup embed text (`title + summary[:512]`) was dominated by newsletter/tracking
@@ -276,20 +297,24 @@ progress:
   summary/title and SAB rendering are untouched. 2 new regression tests
   (`test_triage_worker.py`); `tests/test_ccir_registry.py` + `test_ccir_sync.py` +
   `test_triage_worker.py` all green.
+
 - **Enabled YouTube transcription** (`INFOTRIAGE_YOUTUBE_TRANSCRIBE=1`,
   `INFOTRIAGE_WHISPER_MODEL=large-v3-turbo` — bumped from `tiny`→`base`→`large-v3-turbo`
   per operator steer; multilingual, ~8x turbo speed vs `large-v3`). Partially applied —
   some NATO/Bellingcat/NVIDIA/Karpathy videos still carry the old "(transcription
   disabled)" stub summary and need a re-ingest pass.
+
 - **117 hover emails flagged `\Seen`** on the live INBOX — one-time cleanup per operator
   request, not an automated behavior. 109 of the 226 ingested hover articles were
   already moved/deleted from INBOX (not touched).
+
 - **Forensic audit fix:** `.planning/phases/06-brief-app/deferred-items.md`'s
   `status: resolved` annotations from the prior session never actually worked —
   `gsd-tools audit-uat`'s field parser does strict-equality on the whole line after
   `status:`, so `status: resolved — folded into...` never matched bare `resolved`.
   Split into `status: resolved` + a separate `note:` field; `audit-uat` now reports 0
   unresolved items (was 3).
+
 - **Corrected two operational mistakes surfaced by this session's own forensic audit:**
   the CCIR registry implementation plan was written but never committed (caught after 6
   dependent commits already existed); a full-corpus re-score was silently losing
@@ -306,6 +331,7 @@ progress:
   with no DLQ, no error surfaced beyond a log line. Bit this session twice. Real fix:
   either reconnect-on-`OperationalError` in the store, or nack-and-requeue instead of
   acking on that specific exception class.
+
 - Do not trust the SAB or any CCIR distribution number until the in-progress full
   re-score (started after `3e5b7cf`) settles — check `q.triage` depth in RabbitMQ mgmt
   and `SELECT count(*) FROM infotriage.enrichment`.
@@ -315,13 +341,17 @@ progress:
 - **Verify the re-score settled clean**: FFIR-4 catching frontier-AI items (Kimi K3
   etc.), dedup-hit rate back to a sane fraction (spot-checked mid-run: genuine
   transactional-email duplicates, not cross-topic collisions — looks correct).
+
 - **WC2026/SIR-2 retirement** (deferred from this session): `active=False` in
   `libs/contracts/src/contracts/ccir.py`, `make ccir-sync`, update the OPML
   group-count test assertions, full suite green.
+
 - **Re-run YouTube ingest** for the channels still carrying transcription-disabled
   stub summaries, now that `large-v3-turbo` is live.
+
 - **Push decision**: 12 commits ahead of `origin/main` (unchanged posture — explicit
   operator action per project rule).
+
 - Phase 12 sub-waves (b)+(c)+(d) — still not started, per
   `HANDOFF.json#phase_12_subwave_a_final_architecture.ship_next`.
 
@@ -337,6 +367,7 @@ progress:
   `/run/secrets/*` without `--mount=type=secret`, used a nonexistent `ntfy user add
   --password` flag, wrong `ntfy access` arg order (topic before user), invalid `deny-all`
   topic permission, and `set -eux` would have echoed plaintext passwords into the build log.
+
 - **Pivot completed and committed (`1afb1ea`):** Dockerfile fixed (secret mounts,
   NTFY_PASSWORD env for non-interactive user add, `ntfy access USER TOPIC write-only|read-only`,
   no xtrace); compose ntfy → `build:` + top-level `secrets:` (environment-sourced) + NTFY_*
@@ -345,17 +376,22 @@ progress:
   `test_ntfy_prebaked_users_via_docker_exec` added). Stale staged `configs/ntfy-sealed/*` +
   `scripts/seed_ntfy_sealed.py` unstaged and deleted AFTER syncing the newer script revision
   into the archive (archive had an older copy).
+
 - **POP3 + links-view feature committed (`908fba8`)** — the 7 out-of-scope working-tree files
   from the previous entry, as the separate feature commit the project rule required.
+
 - **Phase 06 deferred items folded into ROADMAP backlog Phase 999.5**; all 3 entries in
   `06-brief-app/deferred-items.md` now carry `status: resolved — folded into 999.5`.
+
 - **progress.completed_phases corrected 12 → 8** (phases 08-11 executed but
   VERIFICATION.md missing — that debt is real and still open).
+
 - **Validation:** `docker compose config` clean; pytest 572 passed / 0 real failures
   (6 ntfy tests docker-dependent until `make ntfy-build && make ntfy-up`; 10
   test_recall.py tests need `INFOTRIAGE_PG_DSN` in env — pre-existing env dependency,
   they pass with any DSN set since the store is mocked); black clean; mypy --strict
   clean on test_ntfy_health.py.
+
 - **Not done (out of scope, still open):** `.env.example` NTFY comment still mentions
   server.yml (file read-blocked by permission settings this session); verification re-runs
   for phases 08-11.
@@ -364,8 +400,10 @@ progress:
 
 - **/gsd-execute-phase 12** — sub-waves (b)+(c)+(d) per
   `HANDOFF.json#phase_12_subwave_a_final_architecture.ship_next` (unchanged).
+
 - **Live operator validation:** `make ntfy-build && make ntfy-up && make ntfy-publish-test`
   → 6 docker-dependent ntfy tests flip to passing.
+
 - **Verification debt:** re-run verification for phases 08-11 (each `/gsd-execute-phase NN`
   or `/gsd-verify-work NN`) or explicitly waive.
 
@@ -1299,9 +1337,9 @@ untouched this session, still needs separate investigation.
 
 ## Session
 
-**Last session:** 2026-07-22T16:25:50.066Z
-**Stopped at:** context exhaustion at 76% (2026-07-22)
-**Resume file:** .planning/phases/07-ops-cutover/07-01-PLAN.md
+**Last session:** 2026-08-01T11:55:29.810Z
+**Stopped at:** Phase 12 context gathered
+**Resume file:** .planning/phases/12-cnr-alerting-dissemination/12-CONTEXT.md
 
 ## Performance Metrics
 
