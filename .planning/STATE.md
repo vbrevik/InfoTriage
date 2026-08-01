@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 12-02 (Postgres alert_state dedupe/throttle substrate) COMPLETE — infotriage.alert_state migration + 6 Store protocol methods (claim_alert/count_alerts_in_window/mark_alert_suppressed/list_undigested_suppressed/mark_alerts_digested/mark_alert_outcome), PostgresStore+InMemoryStore parity, 2-task plan (migration, TDD RED/GREEN) shipped across 3 atomic commits; make test-safe CLEAN at 720/0/0
-stopped_at: Completed 12-02-PLAN.md
-last_updated: "2026-08-01T16:44:10.498Z"
+status: Phase 12-03 (ntfy bearer-token ACL) Tasks 1-2 COMPLETE, Task 3 checkpoint:human-verify PENDING — ntfy topic ACL tightened from wildcard to SPEC R6 explicit per-topic grants (apps/ntfy/Dockerfile), idempotent `make ntfy-token`/`make ntfy-acl-check` targets, ADR-018 amendment, tests/test_alerting_auth.py (4 tests), COVERAGE.md ntfy capability matrix; live-verified end-to-end against a rebuilt infotriage-ntfy container this session. Blocked on operator placing their own NTFY_TOKEN into their real .env (Task 3, gate=blocking, human-only per plan) — see 12-03-SUMMARY.md
+stopped_at: "Checkpoint: 12-03 Task 3 (human-verify) — operator must run make -f ops/Makefile ntfy-token and place NTFY_TOKEN into .env, then confirm ntfy-acl-check PASSes"
+last_updated: "2026-08-01T16:58:00.000Z"
 progress:
   total_phases: 13
   completed_phases: 8
@@ -13,24 +13,99 @@ progress:
 last_baseline:
   command: make -f ops/Makefile test-safe
   date: 2026-08-01
-  duration_seconds: 44.69
-  passed: 720
+  duration_seconds: 53.37
+  passed: 723
   failed: 0
-  note: "697 -> 720: +23 tests from 12-02 (2 migration + 10 parity behavior x[inmemory,postgres] partial + 1 empty-noop + 1 raises + 1 concurrency); infotriage.alert_state migration + 6 Store protocol methods shipped"
+  skipped: 1
+  note: "720 -> 724 (723 passed + 1 skipped): +4 tests from 12-03 tests/test_alerting_auth.py (SPEC R6 bearer-token ACL matrix); the 1 skip is test_real_bearer_token_accepted since NTFY_TOKEN isn't exported in the ambient test-safe environment. 0 regressions."
   production_code_regressions: 0
   throwaway_pg_port: 22062
   prod_pg_port: 22000
   db_live_variants_unblocked: 15
   db_live_variants_source: tests/test_store_entities.py parametric Postgres variants
   prior_baseline_sha: 227b9ab (685 passed / 0 failed / 35.31s)
-  resolved_in_commit: "0211a1e (12-02 Task 2 GREEN: implement alert_state Store methods)"
-make_test_safe_status: CLEAN (720/0/0 baseline; Phase 12 Plan 02 alert_state substrate shipped this session)
+  resolved_in_commit: "195b8d2 (12-03 Task 2: ntfy-token/ntfy-acl-check + tests/test_alerting_auth.py)"
+make_test_safe_status: CLEAN (723/0/1 baseline; Phase 12 Plan 03 Tasks 1-2 shipped this session, Task 3 checkpoint pending)
 ---
 
 # STATE — InfoTriage
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-08-01 (continuation 3) — Phase 12 Plan 03 (ntfy bearer-token ACL) Tasks 1-2 COMPLETE, checkpointed at Task 3
+
+### Just-completed (this session)
+
+- **Phase 12-03 Tasks 1-2 shipped: ntfy topic ACL tightened to SPEC R6 + idempotent bearer-token
+  provisioning.** 2 atomic commits, live-verified end-to-end:
+
+  1. `dfcc195` — Task 1: `apps/ntfy/Dockerfile`'s 2 wildcard `ntfy access` grants
+     (producer write-only / reader read-only on `"<prefix>*"`) replaced with 4 explicit
+     per-topic grants matching SPEC R6 exactly (producer read-write on the primary topic,
+     write-only on `-debug`/`-test`; reader read-only on the primary topic only — no grant
+     on debug/test). `docker compose build ntfy` build log confirmed exactly the 4 intended
+     grants landed. New `.planning/phases/12-cnr-alerting-dissemination/COVERAGE.md` ntfy
+     capability matrix (publish/auth/priority/tags/click-action INTEGRATE; attachment/
+     delayed-delivery/email-forward/websocket/caching/icon-buttons OPT-OUT).
+
+  2. `195b8d2` — Task 2: idempotent `make -f ops/Makefile ntfy-token` (mints or reveals the
+     producer identity's bearer token against the running container by parsing `tk_...` out
+     of `ntfy token list`/`ntfy token add` stdout — never writes a file, never touches a
+     build argument) + `make -f ops/Makefile ntfy-acl-check` (live curl proof of the full
+     matrix) + ADR-018 amendment (`docs/adr/ADR-018-phase-12-dockerfile-buildkit-secrets.md`
+     — records why a server-generated token can't ride the BuildKit-secret pre-bake path
+     used for passwords) + `tests/test_alerting_auth.py` (4 cases, module-skips cleanly when
+     ntfy unreachable, per-test-skips the real-token case when `NTFY_TOKEN` is unset).
+
+- **1 in-scope regression caught and fixed (Rule 1):** the removed wildcard grant had also
+  covered an ad hoc `-smoke` topic that `ops/Makefile`'s `ntfy-publish-test` target and
+  `tests/test_ntfy_health.py` depended on. SPEC R6's explicit 3-topic grant doesn't cover
+  `-smoke`, so both were retargeted to the primary topic (same producer-write/reader-denied
+  intent, now correctly ACL'd). `tests/test_ntfy_health.py` re-verified: 6 passed.
+
+- **Live end-to-end verification this session:** rebuilt `infotriage-ntfy` via
+  `docker compose up -d --wait ntfy` on the new image; minted a real bearer token via
+  `make ntfy-token`, confirmed idempotency (2nd run returned the identical value, no new
+  mint); ran the full curl matrix directly AND via `make ntfy-acl-check` (3/3 PASS: unauth
+  publish 403, authed publish 200, unauth read 403); also spot-checked producer write to the
+  debug topic (200, authed) and unauthenticated read of the debug topic (403, no reader
+  grant). `mypy --strict`/`black --check` clean on the new test file. `git grep -nE
+  'tk_[A-Za-z0-9]{8,}'` over ops/docs/apps confirmed no token value is committed anywhere.
+
+- **`make -f ops/Makefile test-safe`: 723 passed, 1 skipped** (720 → 724 total; +4 new tests
+  from `tests/test_alerting_auth.py`, 0 regressions; the 1 skip is
+  `test_real_bearer_token_accepted` since `NTFY_TOKEN` isn't exported in the ambient
+  test-safe environment — expected, matches the plan's designed skip behavior).
+
+- **Checkpointed at Task 3** (`type="checkpoint:human-verify" gate="blocking"`) — ntfy
+  generates the token value server-side; it cannot be pre-selected and must not be written
+  into any tracked file by automation. This executor's own verification pass minted an
+  ephemeral token (never persisted anywhere), but only the operator can place their *own*
+  persistent token into their real gitignored `.env`. Full checkpoint detail, the exact
+  operator steps, and the coverage/deviation record are in
+  `.planning/phases/12-cnr-alerting-dissemination/12-03-SUMMARY.md` (`status: checkpoint`).
+
+### Next
+
+- **Operator action required (Task 3):** `make -f ops/Makefile ntfy-token` (already minted
+  this session — will reveal the same value, idempotent), copy the printed `tk_...` value
+  into the gitignored `.env` as `NTFY_TOKEN=`, then `make -f ops/Makefile ntfy-acl-check` to
+  confirm PASS on all three cases. Once approved, resume Plan 12-03 to close Task 3, run the
+  final `docs(12-03): complete ...` plan-metadata commit, and advance
+  `STATE.md`/`ROADMAP.md`/`REQUIREMENTS.md` (ADR-003) for this plan — none of that was run
+  this session since the plan is not yet fully complete.
+- **After 12-03 closes:** Plan 12-04 (dedupe/throttle wiring against the 12-02 `alert_state`
+  Store methods) is next per the phase's 5-wave plan map; it does not depend on Task 3's
+  operator action completing first (the emitter already sends the correct
+  `Authorization: Bearer` header per the 12-01 tracer), so 12-04 could also be started in
+  parallel if the operator prefers to defer Task 3.
+- **Known constraint reconfirmed this session:** `gsd-tools query state.record-session`
+  (and by extension the other `state.*` SDK verbs) reconstructs/clobbers large parts of this
+  project's custom STATE.md frontmatter (wrong phase/plan counts, dropped `last_baseline`
+  block) rather than doing a minimal field update — do not run it against this file. This
+  matches the existing `state-md-custom-format-not-advanced` memory; STATE.md continues to
+  be hand-edited every session.
 
 ## Session: 2026-08-01 (continuation 2) — Phase 12 Plan 02 (Postgres alert_state substrate) COMPLETE
 
