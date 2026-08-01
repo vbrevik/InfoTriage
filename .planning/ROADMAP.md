@@ -304,13 +304,13 @@ prompt elicits `[item_id: <hash>]`. Phase 999.4 closure was premature — reopen
   1. A CNR CAT I 🚩 post-write publishes a push (ntfy local-server preferred; ADR-004-friendly) with SAB excerpt + dedupe ID.
   2. The SAB remains the canonical artifact.
 
-**Plans**: 9 plans (5 waves) — scope locked by `12-SPEC.md` (8 requirements) and `12-CONTEXT.md` (D-01–D-04, T1-01–T1-03). Bundles Phase 13 sub-wave (f) `articles.body` wiring per T1-01 INTEGRATED-SUB-WAVE.
+**Plans**: 2/9 plans executed
 
 Plans:
 **Wave 1**
 
 - [x] 12-01-PLAN.md — TRACER: one CAT I verdict → one authenticated ntfy push, end-to-end (W1) — COMPLETE 2026-08-01, see 12-01-SUMMARY.md
-- [ ] 12-02-PLAN.md — `alert_state` substrate: migration 011 + Store protocol methods with dual-impl parity (W1)
+- [x] 12-02-PLAN.md — `alert_state` substrate: migration 011 + Store protocol methods with dual-impl parity (W1)
 - [ ] 12-03-PLAN.md — ntfy bearer-token provisioning + three-topic ACL + COVERAGE.md (W1)
 
 **Wave 2** *(blocked on Wave 1 completion)*

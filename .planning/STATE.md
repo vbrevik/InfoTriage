@@ -2,29 +2,29 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 12-01 (CNR alerting tracer) COMPLETE — apps/alerting containerized, wired into compose, 3-task plan shipped across 4 atomic commits (tracer, X-Title operator fix, deep-link contract test, compose wiring); make test-safe CLEAN at 697/0/0
-stopped_at: Phase 12-01 complete; 12-02 (Postgres alert_state) next
-last_updated: "2026-08-01T16:18:15.000Z"
+status: Phase 12-02 (Postgres alert_state dedupe/throttle substrate) COMPLETE — infotriage.alert_state migration + 6 Store protocol methods (claim_alert/count_alerts_in_window/mark_alert_suppressed/list_undigested_suppressed/mark_alerts_digested/mark_alert_outcome), PostgresStore+InMemoryStore parity, 2-task plan (migration, TDD RED/GREEN) shipped across 3 atomic commits; make test-safe CLEAN at 720/0/0
+stopped_at: Completed 12-02-PLAN.md
+last_updated: "2026-08-01T16:44:10.498Z"
 progress:
   total_phases: 13
   completed_phases: 8
   total_plans: 48
-  completed_plans: 35
+  completed_plans: 36
 last_baseline:
   command: make -f ops/Makefile test-safe
   date: 2026-08-01
-  duration_seconds: 46.05
-  passed: 697
+  duration_seconds: 44.69
+  passed: 720
   failed: 0
-  note: "685 -> 697: +12 tests from 12-01 (tracer 6 + deeplink 5 + X-Title fix delta 1); apps/alerting tracer + deep-link contract + compose wiring shipped"
+  note: "697 -> 720: +23 tests from 12-02 (2 migration + 10 parity behavior x[inmemory,postgres] partial + 1 empty-noop + 1 raises + 1 concurrency); infotriage.alert_state migration + 6 Store protocol methods shipped"
   production_code_regressions: 0
   throwaway_pg_port: 22062
   prod_pg_port: 22000
   db_live_variants_unblocked: 15
   db_live_variants_source: tests/test_store_entities.py parametric Postgres variants
   prior_baseline_sha: 227b9ab (685 passed / 0 failed / 35.31s)
-  resolved_in_commit: "a8de752 (12-01 Task 3: containerize apps/alerting)"
-make_test_safe_status: CLEAN (697/0/0 baseline; Phase 12 Plan 01 tracer + deep-link contract test + compose wiring shipped this session)
+  resolved_in_commit: "0211a1e (12-02 Task 2 GREEN: implement alert_state Store methods)"
+make_test_safe_status: CLEAN (720/0/0 baseline; Phase 12 Plan 02 alert_state substrate shipped this session)
 ---
 
 # STATE — InfoTriage
@@ -32,25 +32,69 @@ make_test_safe_status: CLEAN (697/0/0 baseline; Phase 12 Plan 01 tracer + deep-l
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
 
+## Session: 2026-08-01 (continuation 2) — Phase 12 Plan 02 (Postgres alert_state substrate) COMPLETE
+
+### Just-completed (this session)
+
+- **Phase 12-02 shipped: `infotriage.alert_state` dedupe/throttle substrate.** 2-task plan
+  across 3 atomic commits:
+  1. `79999da` — Task 1: `libs/store/sql/011-alert-state.sql` migration (idempotent
+     `CREATE TABLE IF NOT EXISTS` + `alert_state_dedupe_id_unique`/`alert_state_fired_at_idx`/
+     `alert_state_digest_pending_idx`), plus 2 migration-only tests (`-k migration`) and a
+     Rule-1 fix to `tests/test_store_integration.py::test_all_tables_exist`'s expected
+     table set (invalidated by the new table, same pattern as the prior `ccir_vectors` fix).
+  2. `cb6da82` — Task 2 RED: 10 parity tests (parametrized over InMemoryStore/PostgresStore
+     via a `store` fixture) + 1 two-connection concurrency test, confirmed failing
+     (`AttributeError: no claim_alert` etc.) before any Store method existed.
+  3. `0211a1e` — Task 2 GREEN: six Store protocol methods (`claim_alert`,
+     `count_alerts_in_window`, `mark_alert_suppressed`, `list_undigested_suppressed`,
+     `mark_alerts_digested`, `mark_alert_outcome`) implemented in both `_postgres.py` and
+     `_inmemory.py`. `claim_alert` is a single `INSERT ... ON CONFLICT ... WHERE ...
+     RETURNING` statement (no read-then-write race window); a threaded two-connection race
+     test against live throwaway Postgres confirms exactly one winner. Every time-aware
+     method takes an injectable `now: datetime | None = None`.
+
+- **1 real bug caught by the plan's own D-02 parity requirement:** `claim_alert`'s Postgres
+  `DO UPDATE SET` clause omitted `item_id`/`cnr_tier` on re-fire — InMemoryStore's dict
+  `.update()` refreshed them correctly, so the mismatch only surfaced as a
+  `[postgres]`-parametrized test failure under `make test-safe`. Fixed in the same GREEN
+  commit; full detail in `12-02-SUMMARY.md`'s Deviations section.
+
+- **Verification:** `make -f ops/Makefile test-safe` → **720 passed, 0 failed** (697 → 720,
+  +23 new tests, 0 regressions), including all `db_live` parity variants and the concurrency
+  test running against a real throwaway Postgres. `mypy --strict` clean, `black` clean.
+
+### Next
+
+- **Phase 12 Plan 03** (Wave 2 — ntfy Bearer-token wiring, per the 12-01 carry-forward open
+  item: making the live `ntfy` server's Basic-Auth-only posture actually accept the Bearer
+  token the tracer already sends) is next, or Plan 04/05 (dedupe/throttle wiring against this
+  plan's Store methods) if 12-03 is deferred — check the phase's wave map for the correct
+  next dependency.
+
 ## Session: 2026-08-01 (continuation) — Phase 12 Plan 01 (CNR alerting tracer) COMPLETE
 
 ### Just-completed (this session)
 
 - **Phase 12-01 shipped: `apps/alerting` standalone service, tracer-proven end-to-end and
   containerized.** 3-task plan across 4 atomic commits:
+
   1. `350a864` (prior session) — Task 1 tracer: `q.alerting` bound to `verdict.ready`,
      `build_alert_payload`/`handle_trigger`/`run_consumer` in `emitter.py`, `NtfyClient.deliver()`
      in `outbox.py`, `obsidian://` deep-link construction in `deep_link.py`, `alerting_worker.py`
      cloned from `apps/wiki/wiki_worker.py`'s shape with 3 fail-closed startup guards
      (dsn, amqp-dsn, NTFY_TOKEN). Ended at a human-verify checkpoint.
+
   2. `20b19c8` — operator-requested fix: `X-Title` now derives from the item's own title
      (passed as a separate `deliver()` param) instead of `sab_excerpt`'s first line, without
      widening the SPEC R1-locked 7-key JSON payload.
+
   3. `f1ab4de` — Task 2: `tests/test_alerting_deeplink.py` cross-module contract test proving
      `item_note_link`'s decoded path equals `apps/brief/vault_writer.py::write_item_obsidian`'s
      actual write path. All 5 tests passed with no further `deep_link.py` changes — Task 1's
      implementation already satisfied the hardening requirements (investigated per TDD fail-fast
      rule, confirmed as a valid cross-module contract, not a tautology).
+
   4. `a8de752` — Task 3: `apps/alerting/Dockerfile` cloned from `apps/wiki/Dockerfile`; new
      `alerting` compose service (`127.0.0.1:22050`, `depends_on: postgres/rabbitmq/ntfy` all
      healthy, no vault mount).
@@ -1384,9 +1428,9 @@ untouched this session, still needs separate investigation.
 
 ## Session
 
-**Last session:** 2026-08-01T16:18:15.000Z
-**Stopped at:** Phase 12-01 complete; 12-02 (Postgres alert_state) next
-**Resume file:** .planning/phases/12-cnr-alerting-dissemination/12-01-SUMMARY.md
+**Last session:** 2026-08-01T16:44:10.480Z
+**Stopped at:** Completed 12-02-PLAN.md
+**Resume file:** None
 
 ## Performance Metrics
 
@@ -1401,6 +1445,11 @@ untouched this session, still needs separate investigation.
 | Phase 06 P05 | 15min | 2 tasks | 7 files |
 | Phase 06-brief-app P07 | 3min | 2 tasks | 2 files |
 | Phase 12 P01 | ~35min (2 sessions) | 3 tasks + 1 operator fix | 9 files |
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 12 P02 | 25min | 2 tasks | 6 files |
 
 ## Decisions
 
@@ -1417,3 +1466,4 @@ untouched this session, still needs separate investigation.
 - [Phase 05]: 05-04: requirements.txt needs feedgen/pydantic/PyYAML beyond aio-pika/psycopg/pgvector — libs/store and libs/contracts are installed --no-deps and import these at module level
 - [Phase 05]: 05-04: intfloat/multilingual-e5-large not yet registered on host oMLX — worker.py's get_embedding() will 404 until set up; tracked as a Phase 5 follow-up, non-blocking for 05-04. **RESOLVED 2026-07-01**: registered at ~/.omlx/models/multilingual-e5-large (standard HF safetensors via mlx-embeddings' native XLMRobertaModel support), verified 200/1024-dim from host and from inside infotriage-triage.
 - [Phase ?]: 06-07: excluded email by matching r['url'] against _EMAIL_URL_SCHEMES (imap://, gmail://) instead of r['source'] -- source_type isn't available to vault_writer.py's row shape, url-scheme is the reliable in-scope signal
+- [Phase ?]: claim_alert re-fire fully resets alert state (suppressed/digested_at/delivered_at/dlx_at) to fresh-claim defaults
