@@ -295,6 +295,46 @@ services:
       start_period: 10s
     networks: [infotriage]
 
+  # Phase 12: alerting worker — consumes verdict.ready from q.alerting,
+  # pushes CAT I alerts to ntfy with an authenticated Bearer POST. No vault
+  # mount: the service only constructs obsidian:// URI strings, it never
+  # writes files (RESEARCH.md responsibility map).
+  alerting:
+    build:
+      context: .
+      dockerfile: apps/alerting/Dockerfile
+    container_name: infotriage-alerting
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:22050:22050"   # health: localhost:22050 → container:22050
+    env_file:
+      - path: .env
+        required: false   # .env is gitignored; present on host, not in repo
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      INFOTRIAGE_PG_DSN: ${INFOTRIAGE_PG_DSN:-postgresql://infotriage:infotriage_dev@postgres:5432/infotriage}
+      INFOTRIAGE_AMQP_DSN: ${INFOTRIAGE_AMQP_DSN:-amqp://infotriage:infotriage_rmq@rabbitmq:5672}
+      NTFY_URL: ${NTFY_URL:-http://ntfy:80}
+      NTFY_TOPIC_PREFIX: ${NTFY_TOPIC_PREFIX:-cnr-cat-i}
+      NTFY_TOKEN: ${NTFY_TOKEN}   # no default — fail-closed startup guard requires it (SPEC R6)
+      INFOTRIAGE_OBSIDIAN_VAULT_NAME: ${INFOTRIAGE_OBSIDIAN_VAULT_NAME:-obsidian}
+      INFOTRIAGE_ALERT_NOTE_SUBDIR: ${INFOTRIAGE_ALERT_NOTE_SUBDIR:-brief-outbox}
+      INFOTRIAGE_ALERTING_HEALTH_PORT: ${INFOTRIAGE_ALERTING_HEALTH_PORT:-22050}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      ntfy:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:22050/health', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks: [infotriage]
+
   ingest-youtube:
     build:
       context: .
