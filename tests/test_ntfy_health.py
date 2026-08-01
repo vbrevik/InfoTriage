@@ -28,7 +28,12 @@ import urllib.request
 
 
 NTFY_BASE_URL: str = os.environ.get("NTFY_BASE_URL", "http://127.0.0.1:22070")
-NTFY_TOPIC: str = os.environ.get("NTFY_TOPIC_PREFIX", "cnr-cat-i") + "-smoke"
+# Phase 12 Plan 03: the ACL wildcard grant ("<prefix>*") that used to cover an
+# ad hoc "-smoke" topic was replaced with 3 explicit per-topic grants (SPEC
+# R6: the primary topic, "-debug", "-test"). Target the primary topic
+# directly so this pre-existing smoke test keeps exercising a topic the
+# producer/reader identities are actually granted access to.
+NTFY_TOPIC: str = os.environ.get("NTFY_TOPIC_PREFIX", "cnr-cat-i")
 
 
 def test_ntfy_container_running() -> None:

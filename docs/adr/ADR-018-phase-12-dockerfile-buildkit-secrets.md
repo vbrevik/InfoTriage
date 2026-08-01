@@ -63,3 +63,43 @@ The 4 LOCKED decisions from ADR-017 phase-12-subwave-a-acl-amendments.md are **p
 ## Backlog (unchanged by this ADR)
 
 - ADR-018 itself (this document) closes the architecture decision. Outstanding backlog items (`:2.27.0+` image pin per ADR-017 D2; commit-time secret scanner per ADR-017 D3) are still tracked in HANDOFF.json human_actions_pending and remain a future ADR.
+
+## Amendment — bearer token provisioning (Phase 12)
+
+**Date:** 2026-08-01
+**Context:** Phase 12 (CNR alerting/dissemination) SPEC R6 requires a **bearer token**
+(`Authorization: Bearer tk_...`), not Basic Auth, to publish to the `cnr-cat-i` topic —
+the emitter (`apps/alerting/outbox.py`) sends this header on every publish and fails
+closed at startup if its token env var is empty.
+
+**Why the BuildKit-secret pre-bake path (Decision A above) does not apply here:**
+`ntfy user add` accepts a plaintext password the operator chooses ahead of time, so that
+value can ride a BuildKit secret into the builder stage exactly as this ADR describes.
+`ntfy token add <user>` is different: it **generates** a random `tk_`-prefixed value at
+the moment it runs; there is no equivalent "supply your own token string" flag. A value
+that does not exist until the command executes cannot be pre-selected by the operator
+and passed in as a build-time secret.
+
+**Resolution:** the token is minted **post-boot**, against the already-running
+container, via `make -f ops/Makefile ntfy-token` (idempotent — lists existing tokens for
+the producer identity first, only calls `ntfy token add` if none exist). The printed
+value is captured by the operator directly into the gitignored `.env` as `NTFY_TOKEN`.
+The make target writes no file itself and passes the value to no build argument.
+
+This **extends, not contradicts**, this ADR's core philosophy ("only bcrypt hashes land
+in image layers"): a bearer token is used directly on the wire (bearer-equivalent — no
+verification step stands between it and a successful publish), so it is strictly
+*higher*-value than a password hash and belongs even further from any image layer or
+`docker history`, not closer to one.
+
+**ACL matrix — wildcard replaced by explicit per-topic grants:** the two wildcard grants
+this ADR originally shipped (`ntfy access producer "<prefix>*" write-only` /
+`ntfy access reader "<prefix>*" read-only`) were replaced in `apps/ntfy/Dockerfile` with
+4 explicit grants, so topic-vs-wildcard precedence is never relied on:
+
+| Identity | `cnr-cat-i` | `cnr-cat-i-debug` | `cnr-cat-i-test` |
+|---|---|---|---|
+| producer | read-write | write-only | write-only |
+| reader | read-only | (no grant — deny-all) | (no grant — deny-all) |
+
+Live-proven by `make -f ops/Makefile ntfy-acl-check` and `tests/test_alerting_auth.py`.

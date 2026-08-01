@@ -15,7 +15,7 @@ ROOT_DIR := $(abspath $(OPS_DIR)/..)
 SCRIPTS_DIR := $(ROOT_DIR)/scripts
 SERVICES := freshrss rssbridge feeds postgres rabbitmq ingest-imap ingest-youtube ingest-gmail ingest-obsidian triage brief scheduler opml-health dlq-consumer
 
-.PHONY: help up down logs status restart shell seed backfill replay test-safe test-full clean ntfy-build ntfy-up ntfy-publish-test ccir-sync
+.PHONY: help up down logs status restart shell seed backfill replay test-safe test-full clean ntfy-build ntfy-up ntfy-publish-test ntfy-token ntfy-acl-check ccir-sync
 
 help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -142,8 +142,50 @@ ntfy-publish-test: ## Smoke-test the pre-baked ACL: producer POST must succeed (
 	set +a; \
 	curl -fsS -u "$${NTFY_PRODUCER_USER:-producer}:$${NTFY_PRODUCER_PASSWORD:?NTFY_PRODUCER_PASSWORD not set (.env)}" \
 		-d "InfoTriage ntfy ACL smoke test" \
-		"$${NTFY_BASE_URL:-http://127.0.0.1:22070}/$${NTFY_TOPIC_PREFIX:-cnr-cat-i}-smoke" >/dev/null \
+		"$${NTFY_BASE_URL:-http://127.0.0.1:22070}/$${NTFY_TOPIC_PREFIX:-cnr-cat-i}" >/dev/null \
 	&& echo "ntfy-publish-test: OK (producer write accepted)"
+
+# ── Phase 12 Plan 03: ntfy bearer-token provisioning + live ACL check (SPEC R6) ──
+# ntfy generates the token value; it cannot be pre-baked as a BuildKit secret
+# the way the Basic Auth passwords were (see ADR-018 amendment). This target
+# mints (or reveals) the producer identity's token idempotently, post-boot,
+# against the already-running container. It never writes any tracked file and
+# never echoes the token into a build argument.
+ntfy-token: ## Mint (or reveal) the producer's ntfy bearer token idempotently — copy into .env as NTFY_TOKEN
+	@EXISTING="$$(docker exec infotriage-ntfy ntfy token list producer 2>/dev/null | grep -oE 'tk_[A-Za-z0-9]+' | head -1)"; \
+	if [ -n "$$EXISTING" ]; then \
+		TOKEN="$$EXISTING"; \
+		echo "ntfy-token: existing token found for producer — no new token minted"; \
+	else \
+		TOKEN="$$(docker exec infotriage-ntfy ntfy token add producer 2>/dev/null | grep -oE 'tk_[A-Za-z0-9]+' | head -1)"; \
+		if [ -z "$$TOKEN" ]; then \
+			echo "ntfy-token: FAILED to mint a token — is infotriage-ntfy running? (make -f ops/Makefile ntfy-up)" >&2; \
+			exit 1; \
+		fi; \
+		echo "ntfy-token: minted a new token for producer"; \
+	fi; \
+	echo ""; \
+	echo "$$TOKEN"; \
+	echo ""; \
+	echo "Copy the value above into the gitignored .env as:"; \
+	echo "  NTFY_TOKEN=$$TOKEN"; \
+	echo "The alerting service refuses to start while NTFY_TOKEN is empty."
+
+ntfy-acl-check: ## Live-prove the SPEC R6 ACL matrix: unauth publish/read 403, authed publish 200 (reads NTFY_* from .env)
+	@set -a; \
+	[ -f $(ROOT_DIR)/.env ] && eval "$$(grep -E '^NTFY_[A-Z_]+=' $(ROOT_DIR)/.env)"; \
+	set +a; \
+	BASE="$${NTFY_BASE_URL:-http://127.0.0.1:22070}"; \
+	TOPIC="$${NTFY_TOPIC_PREFIX:-cnr-cat-i}"; \
+	TOKEN="$${NTFY_TOKEN:?NTFY_TOKEN not set in .env — run 'make -f ops/Makefile ntfy-token' first}"; \
+	FAIL=0; \
+	CODE=$$(curl -s -o /dev/null -w '%{http_code}' -X POST "$$BASE/$$TOPIC" -d 'ntfy-acl-check: unauth publish'); \
+	if [ "$$CODE" = "403" ]; then echo "PASS: unauthenticated publish -> 403"; else echo "FAIL: unauthenticated publish -> $$CODE (expected 403)"; FAIL=1; fi; \
+	CODE=$$(curl -s -o /dev/null -w '%{http_code}' -X POST "$$BASE/$$TOPIC" -H "Authorization: Bearer $$TOKEN" -d 'ntfy-acl-check: authed publish'); \
+	if [ "$$CODE" = "200" ]; then echo "PASS: authenticated publish -> 200"; else echo "FAIL: authenticated publish -> $$CODE (expected 200)"; FAIL=1; fi; \
+	CODE=$$(curl -s -o /dev/null -w '%{http_code}' "$$BASE/$$TOPIC/json?poll=1"); \
+	if [ "$$CODE" = "403" ]; then echo "PASS: unauthenticated read -> 403"; else echo "FAIL: unauthenticated read -> $$CODE (expected 403)"; FAIL=1; fi; \
+	exit $$FAIL
 
 ccir-sync: ## Regenerate CCIR-owned feeds.opml groups from the registry (contracts.ccir)
 	cd $(ROOT_DIR) && python scripts/ccir_sync.py
