@@ -151,7 +151,9 @@ async def handle_sab_published(payload: dict, store, client, *, now=None) -> Non
         await _emit_if_claimed(item_id, CAT_I, store, client, now=now)
 
 
-async def handle_trigger(item_id: str, payload: dict, store, client, *, now=None) -> None:
+async def handle_trigger(
+    item_id: str, payload: dict, store, client, *, now=None
+) -> None:
     """Back-compat shim for the pre-12-04 tracer call shape (item_id passed
     explicitly, sourced from the message header).
 

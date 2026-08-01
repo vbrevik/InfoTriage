@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import http.server
 import os
 import socket
+import threading
 
 import psycopg
 import pytest
@@ -64,3 +66,41 @@ def pg_store(tmp_path):
         )
     with PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs") as store:
         yield store
+
+
+class _RecordingHandler(http.server.BaseHTTPRequestHandler):
+    """Records every POST this stub ntfy server receives.
+
+    Shared by tests/test_alerting_tracer.py (Phase 12-01) and
+    tests/test_alerting_emitter.py (Phase 12-04) — extracted here per
+    12-04's plan so both files drive the same stub server behavior.
+    """
+
+    requests: list[dict] = []
+
+    def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
+        length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(length)
+        self.__class__.requests.append(
+            {"path": self.path, "headers": dict(self.headers), "body": body}
+        )
+        self.send_response(200)
+        self.end_headers()
+
+    def log_message(self, format: str, *args) -> None:  # noqa: A002
+        pass  # silence stub-server access logs during test runs
+
+
+@pytest.fixture
+def stub_ntfy_server():
+    """Start a stub ntfy HTTP server on an ephemeral localhost port."""
+    _RecordingHandler.requests = []
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _RecordingHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    port = server.server_address[1]
+    try:
+        yield f"http://127.0.0.1:{port}", _RecordingHandler
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)

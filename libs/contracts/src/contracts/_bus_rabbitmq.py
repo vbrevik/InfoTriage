@@ -51,7 +51,7 @@ RABBITMQ_DEFAULT_URL = "amqp://infotriage:infotriage_rmq@127.0.0.1:22001"
 ROUTING_KEY_TO_QUEUE: dict[str, list[str]] = {
     "item.ingested": ["q.triage"],
     "verdict.ready": ["q.brief", "q.wiki", "q.alerting"],
-    "sab.published": ["q.notify"],
+    "sab.published": ["q.notify", "q.alerting"],
     "feed.unhealthy": ["q.ops"],
 }
 

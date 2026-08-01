@@ -3,6 +3,7 @@
 Drives the TTL boundary with an injected clock (never sleeps) against
 InMemoryStore.
 """
+
 from __future__ import annotations
 
 import hashlib
