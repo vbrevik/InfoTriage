@@ -1,10 +1,14 @@
 ---
 phase: 03-bus-rabbitmq
 verified: 2026-06-29T00:00:00Z
+reverified: 2026-08-01T00:00:00Z
 status: passed
 score: 5/5 must-haves verified
 behavior_unverified: 0
 overrides_applied: 0
+# Both items below RESOLVED by later code (see Re-verification 2026-08-01):
+# BusClient Protocol is now async (_bus.py:29-37); channel opened with
+# publisher_confirms=True (_bus_rabbitmq.py:98,139). Kept for history.
 behavior_unverified_items:
   - truth: "aio-pika bus client implements BusClient Protocol — async/sync mismatch breaks transport-swappability"
     test: "Use a BusClient-typed variable to call bus.publish() and bus.subscribe() interchangeably on both InMemoryBus and RabbitMQBus without await"
@@ -27,8 +31,18 @@ human_verification:
 
 **Phase Goal:** AMQP broker that also models team information-sharing (fan-out, per-consumer queues) for the M3 growth path.
 **Verified:** 2026-06-29
-**Status:** human_needed
-**Re-verification:** No — initial verification
+**Status:** passed
+**Re-verification:** Yes — 2026-08-01 cross-phase audit. Both `human_needed` items from the
+initial verification were resolved by later code changes and are now VERIFIED:
+
+1. **BusClient sync/async mismatch — RESOLVED.** `libs/contracts/src/contracts/_bus.py:22-37`
+   now defines `BusClient` as async-first: `async def publish(...)` / `async def subscribe(...)`,
+   docstring "Async-first: all callers must await." No coroutine leakage at typed call sites.
+2. **Publisher confirms — RESOLVED.** `libs/contracts/src/contracts/_bus_rabbitmq.py:98` and
+   `:139` open the channel with `publisher_confirms=True`; module docs (lines 70, 193) state
+   `exchange.publish()` blocks on broker ack. Fire-and-forget concern closed.
+
+Suite status at re-verification: `make test-safe` → 678 passed, 0 failed (2026-08-01).
 
 ## Goal Achievement
 
@@ -37,12 +51,12 @@ human_verification:
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
 | 1 | RabbitMQ 3.13 container exposes ports 22001 (AMQP) and 22002 (management UI), joins infotriage network (R1) | ✓ VERIFIED | docker-compose.yml: `rabbitmq:3.13-management`, `127.0.0.1:22001:5672`, `127.0.0.1:22002:15672`, `networks: [infotriage]`, healthcheck via `rabbitmq-diagnostics -q ping` |
-| 2 | aio-pika bus client implements BusClient Protocol with infotriage.events topic exchange, 4 routing keys, durable queues, DLX/DLQ (R2) | ⚠️ PRESENT_BEHAVIOR_UNVERIFIED | `isinstance(RabbitMQBus(), BusClient)` returns True (runtime_checkable presence check). Topology declared correctly. BUT `RabbitMQBus.publish` and `RabbitMQBus.subscribe` are `async def`; BusClient Protocol defines `def` (sync). Transport-swappability behavioral contract is broken at async call sites. |
+| 2 | aio-pika bus client implements BusClient Protocol with infotriage.events topic exchange, 4 routing keys, durable queues, DLX/DLQ (R2) | ✓ VERIFIED (2026-08-01) | Topology declared correctly. Original async/sync mismatch resolved: `BusClient` Protocol is now async-first (`_bus.py:29-37`), matching `RabbitMQBus` `async def publish/subscribe`. Transport-swappability contract holds. |
 | 3 | DLX infotriage.dlx declared before primary queues to avoid 406 PRECONDITION_FAILED (R2, context) | ✓ VERIFIED | `_declare_topology()` in `_bus_rabbitmq.py` lines 128–169: DLX declared step 1, DLQ step 2, infotriage.events step 3, primary queues step 4. Comment explicitly notes "ORDER IS MANDATORY". |
-| 4 | Publisher confirms work via channel.confirm_delivery(), requeue=False dead-lettering routes poison to infotriage.dlq (R2, R2.AC4) | ⚠️ PRESENT_BEHAVIOR_UNVERIFIED | `channel.confirm_delivery()` is NOT called anywhere in `_bus_rabbitmq.py`. Channel is opened with `await self._connection.channel()` only. DLQ dead-lettering IS verified by `test_dlq_poison` (PASS). Publisher confirm guarantee is uncertain without explicit enable. |
+| 4 | Publisher confirms work via channel.confirm_delivery(), requeue=False dead-lettering routes poison to infotriage.dlq (R2, R2.AC4) | ✓ VERIFIED (2026-08-01) | Channel now opened with `publisher_confirms=True` (`_bus_rabbitmq.py:98,139`); `exchange.publish()` blocks on broker ack (module docs lines 70, 193). DLQ dead-lettering verified by `test_dlq_poison` (PASS). |
 | 5 | End-to-end smoke test passes: publish/consume round-trip for all 4 event types (R3) | ✓ VERIFIED | Live run: `pytest tests/test_bus_rabbitmq.py -v -m rabbitmq` → **4 passed** (test_rabbitmq_available, test_publish_consume_roundtrip, test_dedup, test_dlq_poison). |
 
-**Score:** 3/5 truths verified (2 present, behavior-unverified)
+**Score:** 5/5 truths verified (2 resolved retroactively 2026-08-01)
 
 ### Required Artifacts
 

@@ -261,16 +261,21 @@ to the running pipeline.
 
 **Status**: COMPLETE (2026-07-21) — worker pre-filter gate, store recall methods, `recall.py` CLI, `build_ccir_vectors.py`, and full test/verification suite delivered.
 
-### Phase 10: Wiki-LLM ✅ COMPLETE
+### Phase 10: Wiki-LLM ⚠️ GAPS FOUND (2026-08-01 retro-verification)
 
 **Goal**: An auto-maintained intel wiki synthesized from the corpus, plus on-demand synthesized articles.
 **Depends on**: Phase 9
 **Requirements**: ADR-006, spec §Obsidian
-**Status**: Waves 1-3 complete (active-entity lookup, prompt templates, Obsidian create/update writer, periodic/event-driven worker + /health, DGX backend integration). Wave 4 (cross-language verification) queued.
+**Status**: Waves 1-4 shipped, but 10-VERIFICATION.md (2026-08-01) scores 2/6 — two SC clauses unmet:
+(a) wiki pages are NOT cross-linked — 0/46 live vault pages contain a `[[wikilink]]`; `generator.py`
+never uses Phase 6's `render_wikilinked` (lives in `apps/brief/vault_writer.py`); (b) cross-language
+verification inert on live path — `recall_items` never SELECTs `lang` (`_postgres.py:779`) so
+`verify_language_coverage` always returns `[]`, and its regex expects bare `[item_id]` while the
+prompt elicits `[item_id: <hash>]`. Phase 999.4 closure was premature — reopen.
 **Success Criteria** (what must be TRUE):
 
-  1. ✅ A standing, auto-updated per-entity/per-topic wiki is written as cross-linked Obsidian `.md`.
-  2. ✅ On-demand synthesized articles answer ad-hoc queries from the corpus; DGX used for heavy synthesis.
+  1. ⚠️ PARTIAL — standing auto-updated per-entity/per-topic wiki: YES; "cross-linked": NOT MET (see above).
+  2. ⚠️ PARTIAL — on-demand synthesized articles + DGX heavy synthesis: YES; cross-language verification flag: inert.
 
 **Plans**: `.planning/phases/10-wiki-llm/10-PLAN.md`
 
@@ -285,6 +290,7 @@ to the running pipeline.
   2. SOCMINT legal/ToS posture documented; ACLED only with a paid license (never fed to the local LLM without one).
 
 **Status**: ✅ COMPLETE (2026-07-22) — Waves 1-6 done; SOCMINT/Arctic adapters, on-demand translation (Phase 999.1 closed), schema provenance, and ADR-014 delivered.
+**Retro-verification 2026-08-01** (11-VERIFICATION.md): human_needed, 6/7 — open items: ingest-youtube emits no INT discipline (SC-1 names it), `require_discipline()` exported+tested but never called in any pipeline, live-corpus discipline backfill unconfirmed, no UAT ever run.
 
 **Plans**: `.planning/phases/11-socmint/11-PLAN.md` — all waves complete.
 
@@ -325,7 +331,7 @@ Plans:
 
 ### Phase 999.2: Dedup threshold calibration on larger corpus (BACKLOG)
 
-**Goal:** Calibrate the semantic dedup threshold on a larger, held-out corpus with genuinely off-topic controls so that both acceptance bars are cleared (`collapse_rate >= 0.8` AND `control_overmerge == 0`).
+**Goal:** Calibrate the semantic dedup threshold on a larger, held-out corpus with genuinely off-topic controls so that both acceptance bars are cleared (`collapse_rate >= 0.8` AND `control_overmerge == 0`). Also recalibrate the Phase 9 CCIR pre-filter τ on the same corpus: the gate is wired and regression-tested but inert today (observed cosine band 0.743–0.848 leaves no safe cut point; 0% LLM-volume reduction — see 09-VERIFICATION.md deferred item).
 
 **Context:** Phase 00 concept spike (R2) found PARTIAL: mE5-large @ 0.84 threshold got 78.3% collapse rate with 1 control overmerge on a single-day (2026-06-25) corpus from NRK + BBC + TASS. Root cause: same-topic/different-event control pairs (e.g. three distinct Trump articles) have embedding similarity overlapping with same-event cross-language pairs. The control set was too topically narrow. Cross-date generalization was never verified.
 
@@ -365,11 +371,18 @@ Plans:
 **Requirements:** TBD — superseded by adoption into Phase 8 plans.
 **Plans:** 4 plans executed (999.3-SPEC.md, 999.3-PLAN.md, scripts/validate_entity_threshold.py rewrite, 999.3-VERDICT.md realtime overwrite).
 
-### Phase 999.4: Cross-language synthesis verification for Wiki-LLM (CLOSED 2026-07-22 — shipped as Phase 10 Wave 4)
+### Phase 999.4: Cross-language synthesis verification for Wiki-LLM (REOPENED 2026-08-01 — closure premature)
 
 **Goal:** Add per-language coverage verification to Wiki-LLM synthesis so that cross-language corpus items are not silently omitted from synthesized articles.
 
-**Verdict:** **CLOSED** via Phase 10 Wave 4 (2026-07-22). `verify_language_coverage()` lives at `libs/contracts/src/contracts/_verify.py` and is applied by both `apps/wiki/generator.py` (standing pages) and `apps/triage/recall.py` (on-demand synthesis). Cited languages are parsed via a regex on `[item_id]`-bracketed refs; uncited languages surface a `> ⚠️ **Verification Flag**: <lang> sources present but not cited.` line in the rendered wiki page. Mocked-LLM tests in `tests/test_cross_language_synthesis.py` cover both flag-trip and flag-clean paths. The intra-page contradiction flag (Phase 00 R4 nit) is now a prompt-only check (prompt instructs the LLM to surface disagreements explicitly); a dedicated contradiction-detection LLM call is deferred to Phase 12+.
+**Reopened 2026-08-01:** 10-VERIFICATION.md proved the shipped mechanism is inert on the live path:
+`recall_items` never SELECTs `lang` (`libs/store/src/store/_postgres.py:779`) so items reach
+`verify_language_coverage()` without a `lang` key → always returns `[]`; and the citation regex
+matches bare `[item_id]` while the synthesis prompt elicits `[item_id: <hash>]`. 0/46 live vault
+pages carry a Verification Flag. Mocked tests pass because mocks supply `lang` and bare-id citations.
+Fix: add `a.lang` to the recall SELECT + widen the citation regex; add one live-shaped fixture test.
+
+**Original verdict (superseded):** **CLOSED** via Phase 10 Wave 4 (2026-07-22). `verify_language_coverage()` lives at `libs/contracts/src/contracts/_verify.py` and is applied by both `apps/wiki/generator.py` (standing pages) and `apps/triage/recall.py` (on-demand synthesis). Cited languages are parsed via a regex on `[item_id]`-bracketed refs; uncited languages surface a `> ⚠️ **Verification Flag**: <lang> sources present but not cited.` line in the rendered wiki page. Mocked-LLM tests in `tests/test_cross_language_synthesis.py` cover both flag-trip and flag-clean paths. The intra-page contradiction flag (Phase 00 R4 nit) is now a prompt-only check (prompt instructs the LLM to surface disagreements explicitly); a dedicated contradiction-detection LLM call is deferred to Phase 12+.
 
 **Context:** Phase 00 concept spike (R4) found PARTIAL: local qwen36 synthesis mechanism works (NATO standing page + Venezuela on-demand article both coherent with citation grounding PASS). The Venezuela on-demand article retrieved 17 items across 3 languages (en/no/ru) via R3 entity_links, but the synthesis cited only en (bbc) and no (nrk) — all 7 TASS (ru) items were gathered into context yet went uncited. Phase 10 Wave 4 closes this exact silent-omission failure mode.
 
@@ -393,6 +406,25 @@ Plans:
 3. `tests/test_bus_consume.py::test_consume_delivers_message` — `CancelledError` under the same live-consumer contention. Same fix as (2).
 
 **Source:** `.planning/phases/06-brief-app/deferred-items.md` (entries 2026-07-08 + 2026-07-11); folded into backlog by the 2026-07-23 forensic audit.
+
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (promote with /gsd-review-backlog when ready)
+
+### Phase 999.6: Trace Labs OSINT contributions evaluation (BACKLOG)
+
+**Goal:** Evaluate what Trace Labs (nonprofit, crowdsourced-OSINT-for-missing-persons org) can add to InfoTriage, and promote whatever survives evaluation into concrete phases.
+
+**Candidate contributions (captured 2026-08-01):**
+
+1. **Tooling:** the Trace Labs OSINT VM ships a curated tool set (sherlock/maigret/holehe-class username+account enumeration, etc.) — evaluate as candidate SOCMINT ingest adapters or enrichment steps alongside Phase 11 adapters. Passive-collection tools only.
+2. **Taxonomy:** Search Party CTF flag categories (basic/advanced subject info, employment, friends, day-last-seen, etc.) — a battle-tested structured collection-requirement taxonomy; cross-check against CCIR/INT-discipline modelling (ADR-014, Phase 11 provenance work).
+3. **Policy:** their ethical/passive-only OSINT rules (no target contact, no active engagement) — input for source-vetting + provenance policy; complements ADR-014.
+
+**Note:** evaluate official Trace Labs material only; unrelated commercial "shadow OSINT aggregator" platforms are out of scope (provenance/legality/opsec — see session decision 2026-08-01).
 
 **Requirements:** TBD
 **Plans:** 0 plans
