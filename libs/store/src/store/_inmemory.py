@@ -89,7 +89,16 @@ class InMemoryStore:
     # Item CRUD
 
     def put_item(self, item: Item) -> None:
-        """Upsert by item.id — last-write-wins (mirrors ON CONFLICT DO UPDATE)."""
+        """Upsert by item.id — last-write-wins (mirrors ON CONFLICT DO UPDATE).
+
+        SPEC R7 / Edge R7-empty parity with PostgresStore: body is never
+        stored as an empty or whitespace-only string — coerce to None here,
+        the same choke point PostgresStore.put_item uses. Stores a copy with
+        the field normalized rather than mutating the caller's Item.
+        """
+        body = item.body if item.body is not None and item.body.strip() else None
+        if body != item.body:
+            item = item.model_copy(update={"body": body})
         self._items[item.id] = item
 
     def get_item(self, item_id: str) -> Item | None:

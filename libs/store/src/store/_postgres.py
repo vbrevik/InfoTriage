@@ -160,12 +160,17 @@ class PostgresStore:
             "PostgresStore must be used as a context manager: "
             "'with PostgresStore(...) as store:'"
         )
+        # SPEC R7 / Edge R7-empty: body is never persisted as an empty or
+        # whitespace-only string — coerce to None (-> SQL NULL) here, the
+        # single choke point, so no adapter has to remember the rule.
+        # No truncation, no sanitization: the column is TEXT with no size cap.
+        body = item.body if item.body is not None and item.body.strip() else None
         # Upsert the article row. Pitfall 2: Jsonb() is REQUIRED for JSONB columns.
         self._conn.execute(
             """
             INSERT INTO infotriage.articles
-                (id, source, source_type, url, title, ts, lang, summary, body_ref, payload, discipline, admiralty_reliability)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                (id, source, source_type, url, title, ts, lang, summary, body, body_ref, payload, discipline, admiralty_reliability)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (id) DO UPDATE SET
                 source                  = EXCLUDED.source,
                 source_type             = EXCLUDED.source_type,
@@ -174,6 +179,7 @@ class PostgresStore:
                 ts                      = EXCLUDED.ts,
                 lang                    = EXCLUDED.lang,
                 summary                 = EXCLUDED.summary,
+                body                    = EXCLUDED.body,
                 body_ref                = EXCLUDED.body_ref,
                 payload                 = EXCLUDED.payload,
                 discipline              = EXCLUDED.discipline,
@@ -188,6 +194,7 @@ class PostgresStore:
                 item.ts,
                 item.lang,
                 item.summary,
+                body,
                 item.body_ref,
                 Jsonb(item.payload),  # REQUIRED — Pitfall 2: raw dict fails for JSONB
                 item.discipline,
@@ -209,7 +216,7 @@ class PostgresStore:
         assert self._conn is not None, "PostgresStore must be used as a context manager"
         row = self._conn.execute(
             """
-            SELECT source, source_type, url, title, ts, lang, summary, body_ref, payload, discipline, admiralty_reliability
+            SELECT source, source_type, url, title, ts, lang, summary, body, body_ref, payload, discipline, admiralty_reliability
             FROM infotriage.articles
             WHERE id = %s
             """,
@@ -226,6 +233,7 @@ class PostgresStore:
             ts=row["ts"],
             lang=row["lang"],
             summary=row["summary"],
+            body=row["body"],
             body_ref=row["body_ref"],
             discipline=row["discipline"],
             admiralty_reliability=row["admiralty_reliability"],
