@@ -10,7 +10,8 @@ Implements RESEARCH Pattern 2 (get_item pre-check):
 Security: published payload exposes source, source_type, ts only — no DSN or
 credentials ever flow through this path (T-04-01).
 """
-from contracts import BusClient, Item
+from contracts import BusClient, Item, require_discipline
+from contracts._phase11_gates import SOURCE_TYPE_TO_INT_DISCIPLINE
 from store._protocol import Store
 
 
@@ -33,6 +34,14 @@ async def persist_and_publish(store: Store, bus: BusClient, item: Item) -> bool:
     newness signal (RESEARCH Finding 2 — the CONTEXT.md tuple-return description
     is stale and must not be used).
     """
+    # Phase 11 admission gate: every persisted item carries an INT discipline.
+    # Adapters that don't tag explicitly get the canonical source_type mapping;
+    # an unknown source_type with no tag is rejected (DisciplineRequired) —
+    # this is the single choke point all modern adapters flow through.
+    if not item.discipline:
+        item.discipline = SOURCE_TYPE_TO_INT_DISCIPLINE.get(item.source_type)
+    require_discipline(item)
+
     # RESEARCH Pattern 2: capture existing BEFORE put_item
     existing = store.get_item(item.id)
 

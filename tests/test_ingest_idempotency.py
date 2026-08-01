@@ -81,3 +81,58 @@ async def test_persist_and_publish_payload_shape(tmp_path: pathlib.Path) -> None
     assert len(messages) == 1
     payload = messages[0]
     assert set(payload.keys()) == {"source", "source_type", "ts"}
+
+
+# ---------------------------------------------------------------------------
+# Phase 11 admission gate (wired 2026-08-01 — closes 11-VERIFICATION.md gap:
+# require_discipline was exported+tested but never called in any pipeline)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_persist_autofills_discipline_from_source_type(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Untagged item gets the canonical INT discipline for its source_type."""
+    store = InMemoryStore(blob_root=tmp_path / "blobs")
+    bus = InMemoryBus()
+    item = _make_item()  # source_type="rss", no discipline
+    assert item.discipline is None
+
+    await persist_and_publish(store, bus, item)
+
+    stored = store.get_item(item.id)
+    assert stored is not None
+    assert stored.discipline == "OSINT"
+
+
+@pytest.mark.asyncio
+async def test_persist_rejects_unknown_source_type_without_discipline(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Unknown source_type with no explicit tag is rejected at admission."""
+    from contracts import DisciplineRequired
+
+    store = InMemoryStore(blob_root=tmp_path / "blobs")
+    bus = InMemoryBus()
+    item = _make_item()
+    item.source_type = "carrier-pigeon"
+
+    with pytest.raises(DisciplineRequired):
+        await persist_and_publish(store, bus, item)
+    assert len(store.list_items()) == 0
+
+
+@pytest.mark.asyncio
+async def test_persist_keeps_explicit_discipline(tmp_path: pathlib.Path) -> None:
+    """An adapter's explicit tag is never overwritten by the mapping."""
+    store = InMemoryStore(blob_root=tmp_path / "blobs")
+    bus = InMemoryBus()
+    item = _make_item()
+    item.discipline = "HUMINT"
+
+    await persist_and_publish(store, bus, item)
+
+    stored = store.get_item(item.id)
+    assert stored is not None
+    assert stored.discipline == "HUMINT"

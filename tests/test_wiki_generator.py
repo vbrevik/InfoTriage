@@ -99,7 +99,9 @@ def test_worker_run_once(tmp_path, fake_store, mock_embed, mock_llm):
     assert len(paths) == 2
     for path in paths:
         assert path.exists()
-    fake_store.get_active_entities.assert_called_once_with(limit=2)
+    # top-N contract: worker queries with limit=2; the generator additionally
+    # calls get_active_entities() (no args) per page for cross-linking (2026-08-01)
+    fake_store.get_active_entities.assert_any_call(limit=2)
 
 
 def test_worker_run_once_skips_entities_without_name(tmp_path, mock_embed, mock_llm):
@@ -114,7 +116,7 @@ def test_worker_run_once_skips_entities_without_name(tmp_path, mock_embed, mock_
         store, tmp_path / "vault", top_n=10, embed=mock_embed, llm=mock_llm
     )
     assert paths == []
-    store.get_active_entities.assert_called_once_with(limit=10)
+    store.get_active_entities.assert_any_call(limit=10)
 
 
 @pytest.mark.asyncio
@@ -164,7 +166,7 @@ async def test_wiki_worker_event_driven_generates_page(tmp_path, mock_embed, moc
         message, store, tmp_path / "vault", top_n=1, embed=mock_embed, llm=mock_llm
     )
 
-    store.get_active_entities.assert_called_once_with(limit=1)
+    store.get_active_entities.assert_any_call(limit=1)
     assert (tmp_path / "vault" / "wiki" / "auto" / "nato.md").exists()
 
 
@@ -345,3 +347,27 @@ def test_write_wiki_page_overwrites_corrupt_frontmatter(tmp_path):
     assert "New body" in text
     assert "Old body" not in text
     assert "title: NATO" in text
+
+
+def test_wiki_generator_cross_links_active_entities(
+    tmp_path, fake_store, mock_embed
+):
+    """Phase 10 SC-1 "cross-linked": known active entities become [[wikilinks]].
+
+    Regression for the 2026-08-01 finding (10-VERIFICATION.md): 0/46 live
+    vault pages contained a wikilink because the generator never linked.
+    The page's own subject must NOT self-link.
+    """
+    fake_store.get_active_entities.return_value = [
+        {"entity_id": "e1", "name": "NATO", "link_count": 10},
+        {"entity_id": "e2", "name": "Ukraine", "link_count": 5},
+    ]
+    llm_stub = lambda messages: "NATO discussed Ukraine at https://example.com/Ukraine today."
+    gen = WikiGenerator(fake_store, tmp_path / "vault", embed=mock_embed, llm=llm_stub)
+
+    path = gen.generate_page("NATO")
+    text = path.read_text(encoding="utf-8")
+
+    assert "[[Ukraine]]" in text
+    assert "[[NATO]]" not in text  # no self-link on the subject's own page
+    assert "https://example.com/Ukraine" in text  # URLs never corrupted

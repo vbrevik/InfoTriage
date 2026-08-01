@@ -40,6 +40,7 @@ SET discipline = CASE source_type
     -- HUMINT family (human-mediated; e.g., email sources)
     WHEN 'imap'             THEN 'HUMINT'
     WHEN 'gmail'            THEN 'HUMINT'
+    WHEN 'pop3'             THEN 'HUMINT'
     -- SOCMINT (social-media intelligence; Phase 11 Telegram adapter)
     WHEN 'telegram'         THEN 'SOCMINT'
     -- MASINT family (measurement-and-signature; Phase 11 BarentsWatch AIS)

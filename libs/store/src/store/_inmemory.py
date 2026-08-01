@@ -436,6 +436,7 @@ class InMemoryStore:
                     "title": item.title,
                     "source": item.source,
                     "url": item.url,
+                    "lang": item.lang,
                     "ccir": enrichment.get("ccir"),
                     "score": enrichment.get("score"),
                     "similarity": sim,

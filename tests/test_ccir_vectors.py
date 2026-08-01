@@ -242,6 +242,9 @@ def test_recall_items_db_live(pg_store):
     assert len(results) == 1
     assert results[0]["item_id"] == item.id
     assert results[0]["ccir"] == "PIR-2"
+    # lang must ride along so verify_language_coverage sees it on the live
+    # path (2026-08-01 fix — was omitted from the SELECT, check was inert)
+    assert results[0]["lang"] == "en"
 
 
 @db_live
@@ -257,3 +260,42 @@ def test_audit_write_db_live(pg_store):
     assert row is not None
     assert row["op"] == "pre_filter_skip"
     assert row["details"] == {"foo": 1}
+
+
+def test_recall_items_rows_carry_lang(inmemory_store):
+    """Recall rows must include ``lang`` for cross-language coverage checks.
+
+    Regression for the 2026-08-01 finding (10-VERIFICATION.md): the live
+    SELECT omitted lang, so verify_language_coverage always returned [].
+    """
+    from contracts import Item
+
+    store = inmemory_store
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    item = Item(
+        source="tass",
+        source_type="rss",
+        url="https://example.com/ru",
+        title="Arctic (ru)",
+        ts=now,
+        lang="ru",
+        summary="s",
+        body_ref=None,
+        payload={},
+    )
+    store.put_item(item)
+    store.put_embedding(item.id, [1.0] * 1024)
+    store.put_enrichment(
+        item.id,
+        {
+            "ccir": "PIR-2",
+            "cnr": "II",
+            "score": 6,
+            "bucket": "keep",
+            "why": "",
+            "pmesii": "Military",
+            "tessoc": "Espionage",
+        },
+    )
+    results = store.recall_items([1.0] * 1024)
+    assert results[0]["lang"] == "ru"

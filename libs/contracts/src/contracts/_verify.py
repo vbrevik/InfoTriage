@@ -50,7 +50,10 @@ def verify_language_coverage(items: Iterable[dict], text: str) -> list[str]:
 
     found_langs: set[str] = set()
     for match in re.finditer(r"\[([^\]]+)\]", text):
-        cited = match.group(1).strip()
+        # LLMs cite as "[id]" or "[id: <hash/title>]" (the synthesis prompt
+        # elicits the latter) — take the part before the first colon so both
+        # forms resolve. Proven inert-in-prod 2026-08-01 (10-VERIFICATION.md).
+        cited = match.group(1).split(":", 1)[0].strip()
         if cited in lang_by_item:
             found_langs.add(lang_by_item[cited])
 

@@ -22,6 +22,7 @@ from contracts import (
     CONTRADICTION_INSTRUCTION,
     CROSS_LANGUAGE_INSTRUCTION,
     from_frontmatter,
+    render_wikilinked,
     to_frontmatter,
     verify_language_coverage,
 )
@@ -197,7 +198,25 @@ class WikiGenerator:
         """
         return _synthesis_prompt(subject, items)
 
+    def _link_entities(self, subject: str, text: str) -> str:
+        """Wikilink known active-entity names in ``text`` (best-effort).
+
+        Cross-linking is the "cross-linked Obsidian .md" clause of Phase 10
+        SC-1. Uses the same protected renderer as the brief vault-writer.
+        The page's own subject is excluded (self-links are noise).
+        """
+        get_entities = getattr(self.store, "get_active_entities", None)
+        if get_entities is None:
+            return text
+        try:
+            names = [e["name"] for e in get_entities() if e.get("name")]
+        except Exception:
+            return text  # linking is cosmetic — never block page generation
+        names = [n for n in names if n != subject]
+        return render_wikilinked(text, names) if names else text
+
     def _write_page(self, subject: str, synthesis: str, items: list[dict]) -> Path:
+        synthesis = self._link_entities(subject, synthesis)
         metadata = {
             "title": subject,
             "subject": subject,

@@ -347,6 +347,7 @@ async def ingest() -> None:
                         lang="und",
                         summary=text[:500],
                         body_ref=body_ref,
+                        discipline="OSINT",
                     )
                     await persist_and_publish(store, bus, item)
                     atom_entries.append((vid, title, text))

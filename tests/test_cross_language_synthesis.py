@@ -123,3 +123,27 @@ def test_recall_synthesis_prompt_hardens_optional_fields():
     assert "Source: unknown" in prompt
     assert "CCIR: none" in prompt
     assert "Score: 0" in prompt
+
+
+def test_verify_language_coverage_matches_id_colon_hash_citation_form():
+    """Live LLMs cite as ``[id: <hash>]`` (elicited by the synthesis prompt).
+
+    Regression for the 2026-08-01 finding (10-VERIFICATION.md): the regex
+    only matched bare ``[id]``, so every live citation missed and the
+    coverage check was inert (0/46 vault pages flagged).
+    """
+    items = [
+        {"item_id": "a1b2c3", "lang": "en"},
+        {"item_id": "d4e5f6", "lang": "ru"},
+    ]
+    text = "NATO met [a1b2c3: Arctic security article]. TASS agrees [d4e5f6: 4e5f]."
+    assert verify_language_coverage(items, text) == []
+
+
+def test_verify_language_coverage_colon_form_still_flags_missing_lang():
+    items = [
+        {"item_id": "a1b2c3", "lang": "en"},
+        {"item_id": "d4e5f6", "lang": "ru"},
+    ]
+    text = "Only the English source cited [a1b2c3: title]."
+    assert verify_language_coverage(items, text) == ["ru"]

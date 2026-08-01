@@ -113,7 +113,7 @@ def test_all_source_types_mapped_to_valid_int_discipline():
         # OSINT family (open-source / public-data)
         "rss", "obsidian", "yt", "youtube",
         # HUMINT family (human-mediated; e.g., email sources)
-        "imap", "gmail",
+        "imap", "gmail", "pop3",
         # OSINT/DOCEX sub-discipline (Phase 11 ACLED gate)
         "acled",
         # SOCMINT (Phase 11 Telegram adapter)

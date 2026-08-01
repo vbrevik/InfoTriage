@@ -24,6 +24,7 @@ from ._verify import (
     verify_language_coverage,
 )
 from ._translation import translate_to, TranslationCache
+from ._wikilink import render_wikilinked
 from ._phase11_gates import (
     require_discipline,
     require_acled_license,
@@ -45,6 +46,7 @@ __all__ = [
     "setup_logging",
     "LOGGING_CONFIG",
     "verify_language_coverage",
+    "render_wikilinked",
     "CITATION_INSTRUCTION",
     "CROSS_LANGUAGE_INSTRUCTION",
     "CONTRADICTION_INSTRUCTION",

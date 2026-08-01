@@ -70,6 +70,7 @@ SOURCE_TYPE_TO_INT_DISCIPLINE: dict[str, str] = {
     # HUMINT family (human-mediated; e.g., email sources)
     "imap": "HUMINT",
     "gmail": "HUMINT",
+    "pop3": "HUMINT",  # POP3 lane of the imap adapter (surfaced by the admission gate 2026-08-01)
     # SOCMINT (social-media intelligence; Phase 11 Telegram adapter)
     "telegram": "SOCMINT",
     # MASINT family (measurement-and-signature; Phase 11 BarentsWatch AIS)

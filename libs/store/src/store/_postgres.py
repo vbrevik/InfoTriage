@@ -777,7 +777,7 @@ class PostgresStore:
         qvec_ph = psycopg.sql.Placeholder()
         limit_ph = psycopg.sql.Placeholder()
         query = psycopg.sql.SQL(
-            "SELECT a.id AS item_id, a.title, a.source, a.url, e.ccir, e.score, "
+            "SELECT a.id AS item_id, a.title, a.source, a.url, a.lang, e.ccir, e.score, "
             "(emb.embedding <=> {}::vector) AS dist "
             "FROM infotriage.enrichment e "
             "JOIN infotriage.articles a ON a.id = e.item_id "
@@ -797,6 +797,7 @@ class PostgresStore:
                 "title": r["title"],
                 "source": r["source"],
                 "url": r["url"],
+                "lang": r["lang"],
                 "ccir": r["ccir"],
                 "score": r["score"],
                 "similarity": 1.0 - r["dist"],
