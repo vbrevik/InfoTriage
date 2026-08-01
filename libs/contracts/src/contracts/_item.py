@@ -31,6 +31,11 @@ class Item(BaseModel):
 
     # Content fields
     summary: Optional[str] = None
+    # Full source text where one exists. None (-> SQL NULL) for bodyless items
+    # (e.g. AIS pings, photo-only posts) — never the empty string. No size cap:
+    # the backing column is TEXT (SPEC R7). Does NOT participate in item
+    # identity (see `id` below) — adding body here does not re-key existing rows.
+    body: Optional[str] = None
     body_ref: Optional[str] = None
 
     # Phase 11: collection discipline + Admiralty reliability rating
