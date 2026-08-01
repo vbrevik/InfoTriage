@@ -309,7 +309,7 @@ prompt elicits `[item_id: <hash>]`. Phase 999.4 closure was premature — reopen
 Plans:
 **Wave 1**
 
-- [ ] 12-01-PLAN.md — TRACER: one CAT I verdict → one authenticated ntfy push, end-to-end (W1)
+- [x] 12-01-PLAN.md — TRACER: one CAT I verdict → one authenticated ntfy push, end-to-end (W1) — COMPLETE 2026-08-01, see 12-01-SUMMARY.md
 - [ ] 12-02-PLAN.md — `alert_state` substrate: migration 011 + Store protocol methods with dual-impl parity (W1)
 - [ ] 12-03-PLAN.md — ntfy bearer-token provisioning + three-topic ACL + COVERAGE.md (W1)
 

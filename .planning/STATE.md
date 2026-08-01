@@ -2,35 +2,82 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 8/9/10/11 audit chain end-to-end closed (Phase 8 fully verified 5/5 UAT + 29/29 db_live variants); make test-safe CLEAN at 677/0/0 (3 pre-existing test-side bugs resolved via this-commit fixture fixes); local == origin at the imminent commit SHA
-stopped_at: Phase 12 context gathered
-last_updated: "2026-08-01T11:55:29.836Z"
+status: Phase 12-01 (CNR alerting tracer) COMPLETE — apps/alerting containerized, wired into compose, 3-task plan shipped across 4 atomic commits (tracer, X-Title operator fix, deep-link contract test, compose wiring); make test-safe CLEAN at 697/0/0
+stopped_at: Phase 12-01 complete; 12-02 (Postgres alert_state) next
+last_updated: "2026-08-01T16:18:15.000Z"
 progress:
   total_phases: 13
   completed_phases: 8
-  total_plans: 40
-  completed_plans: 34
+  total_plans: 48
+  completed_plans: 35
 last_baseline:
   command: make -f ops/Makefile test-safe
   date: 2026-08-01
-  duration_seconds: 35.31
-  passed: 685
+  duration_seconds: 46.05
+  passed: 697
   failed: 0
-  note: "678 -> 685: +7 tests from 25bdb4e (gate/citation/wikilink/recall-lang); phase 10+11 gap fixes live"
+  note: "685 -> 697: +12 tests from 12-01 (tracer 6 + deeplink 5 + X-Title fix delta 1); apps/alerting tracer + deep-link contract + compose wiring shipped"
   production_code_regressions: 0
   throwaway_pg_port: 22062
   prod_pg_port: 22000
   db_live_variants_unblocked: 15
   db_live_variants_source: tests/test_store_entities.py parametric Postgres variants
-  prior_baseline_sha: 6dbac4b (674 passed / 3 failed / 66s)
-  resolved_in_commit: "this commit (test fixtures: TIME-BOMB telegram + autouse youtube delenv)"
-make_test_safe_status: CLEAN (677/0/0 baseline; 3 pre-existing test-side bugs resolved via .planning/phases/11-socmint/11-INGEST-TEST-FIXES-PLAN.md -- this commit ships the fixture fixes)
+  prior_baseline_sha: 227b9ab (685 passed / 0 failed / 35.31s)
+  resolved_in_commit: "a8de752 (12-01 Task 3: containerize apps/alerting)"
+make_test_safe_status: CLEAN (697/0/0 baseline; Phase 12 Plan 01 tracer + deep-link contract test + compose wiring shipped this session)
 ---
 
 # STATE — InfoTriage
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-08-01 (continuation) — Phase 12 Plan 01 (CNR alerting tracer) COMPLETE
+
+### Just-completed (this session)
+
+- **Phase 12-01 shipped: `apps/alerting` standalone service, tracer-proven end-to-end and
+  containerized.** 3-task plan across 4 atomic commits:
+  1. `350a864` (prior session) — Task 1 tracer: `q.alerting` bound to `verdict.ready`,
+     `build_alert_payload`/`handle_trigger`/`run_consumer` in `emitter.py`, `NtfyClient.deliver()`
+     in `outbox.py`, `obsidian://` deep-link construction in `deep_link.py`, `alerting_worker.py`
+     cloned from `apps/wiki/wiki_worker.py`'s shape with 3 fail-closed startup guards
+     (dsn, amqp-dsn, NTFY_TOKEN). Ended at a human-verify checkpoint.
+  2. `20b19c8` — operator-requested fix: `X-Title` now derives from the item's own title
+     (passed as a separate `deliver()` param) instead of `sab_excerpt`'s first line, without
+     widening the SPEC R1-locked 7-key JSON payload.
+  3. `f1ab4de` — Task 2: `tests/test_alerting_deeplink.py` cross-module contract test proving
+     `item_note_link`'s decoded path equals `apps/brief/vault_writer.py::write_item_obsidian`'s
+     actual write path. All 5 tests passed with no further `deep_link.py` changes — Task 1's
+     implementation already satisfied the hardening requirements (investigated per TDD fail-fast
+     rule, confirmed as a valid cross-module contract, not a tautology).
+  4. `a8de752` — Task 3: `apps/alerting/Dockerfile` cloned from `apps/wiki/Dockerfile`; new
+     `alerting` compose service (`127.0.0.1:22050`, `depends_on: postgres/rabbitmq/ntfy` all
+     healthy, no vault mount).
+
+- **Verification:** `python -m pytest tests/test_alerting_tracer.py tests/test_alerting_deeplink.py -q`
+  → 11 passed. `docker compose -f docker-compose.yml config --quiet` → exit 0, `alerting` service
+  resolves with localhost-only port binding. Full `make -f ops/Makefile test-safe` → **697 passed,
+  0 failed** (685 → 697, +12 new tests, 0 regressions).
+
+- **Known gap — `.env.example` NOT updated.** This executor's global Claude Code permission
+  settings deny `Read`/`Edit`/content-aware `Bash` access to any `.env*` path (including the
+  `.env.example` template). The 5 new keys (`NTFY_TOKEN`, `NTFY_URL`, `INFOTRIAGE_OBSIDIAN_VAULT_NAME`,
+  `INFOTRIAGE_ALERT_NOTE_SUBDIR`, `INFOTRIAGE_ALERTING_HEALTH_PORT`) still need to be added manually —
+  exact block documented in `.planning/phases/12-cnr-alerting-dissemination/12-01-SUMMARY.md` under
+  "Deviations from Plan" item 3. Operator action required before a real `docker compose up alerting`
+  will start (NTFY_TOKEN fail-closed guard).
+
+- **Open item carried forward:** Assumption A-01 (`deep_link` → item note, `item_link` → SAB note)
+  is implemented as specified but still awaits final operator confirmation at the 12-09 human-verify
+  checkpoint. The live `ntfy` compose service currently runs Basic-Auth-only (bcrypt, deny-all
+  default) per ADR-017/018 — plan 12-03 owns making the Bearer token this tracer already sends
+  actually valid against the real server.
+
+### Next
+
+- **Phase 12 Plan 02** (Postgres `alert_state`, Store protocol parity) is next per the phase's
+  5-wave plan map. Plans 12-02/12-03 are Wave 1/2 dependencies for 12-04+ (dedupe/throttle/digest).
 
 ## Session: 2026-08-01 (flip) — 3 pre-existing test-side bug fixes landed; baseline flipped 674/3/0 → 677/0/0
 
@@ -1337,9 +1384,9 @@ untouched this session, still needs separate investigation.
 
 ## Session
 
-**Last session:** 2026-08-01T11:55:29.810Z
-**Stopped at:** Phase 12 context gathered
-**Resume file:** .planning/phases/12-cnr-alerting-dissemination/12-CONTEXT.md
+**Last session:** 2026-08-01T16:18:15.000Z
+**Stopped at:** Phase 12-01 complete; 12-02 (Postgres alert_state) next
+**Resume file:** .planning/phases/12-cnr-alerting-dissemination/12-01-SUMMARY.md
 
 ## Performance Metrics
 
@@ -1353,9 +1400,13 @@ untouched this session, still needs separate investigation.
 | Phase 05 P04 | continuation | 3 tasks | 3 files |
 | Phase 06 P05 | 15min | 2 tasks | 7 files |
 | Phase 06-brief-app P07 | 3min | 2 tasks | 2 files |
+| Phase 12 P01 | ~35min (2 sessions) | 3 tasks + 1 operator fix | 9 files |
 
 ## Decisions
 
+- [Phase 12]: 12-01: X-Title is an ntfy HTTP header set by NtfyClient.deliver(), not part of the SPEC R1-locked 7-key JSON payload — deliver() takes item_title as a separate param rather than widening the payload contract
+- [Phase 12]: 12-01: Assumption A-01 implemented as deep_link -> item's own vault note, item_link -> SAB note (ADR-015 Decision 3); still awaits final operator confirmation at the 12-09 human-verify checkpoint
+- [Phase 12]: 12-01: alerting compose service gets no vault volume mount — it only constructs obsidian:// URI strings, never writes files
 - [Phase ?]: register_vector in init_schema must run AFTER DDL
 - [Phase ?]: postgres fixture requires TRUNCATE before each test for isolation
 - [Phase ?]: DLX infotriage.dlx declared before primary queues (prevents 406 PRECONDITION_FAILED)
