@@ -304,7 +304,18 @@ prompt elicits `[item_id: <hash>]`. Phase 999.4 closure was premature — reopen
   1. A CNR CAT I 🚩 post-write publishes a push (ntfy local-server preferred; ADR-004-friendly) with SAB excerpt + dedupe ID.
   2. The SAB remains the canonical artifact.
 
-**Plans**: TBD
+**Plans**: 9 plans (5 waves) — scope locked by `12-SPEC.md` (8 requirements) and `12-CONTEXT.md` (D-01–D-04, T1-01–T1-03). Bundles Phase 13 sub-wave (f) `articles.body` wiring per T1-01 INTEGRATED-SUB-WAVE.
+
+Plans:
+- [ ] 12-01-PLAN.md — TRACER: one CAT I verdict → one authenticated ntfy push, end-to-end (W1)
+- [ ] 12-02-PLAN.md — `alert_state` substrate: migration 011 + Store protocol methods with dual-impl parity (W1)
+- [ ] 12-03-PLAN.md — ntfy bearer-token provisioning + three-topic ACL + COVERAGE.md (W1)
+- [ ] 12-04-PLAN.md — Dual-trigger consumption with atomic dedupe, exactly-once across both orders (W2)
+- [ ] 12-05-PLAN.md — 3-tier sliding-window throttle + hourly PMESII-grouped digest tick (W3)
+- [ ] 12-06-PLAN.md — Outbox retry (1s/5s) → dedicated DLX queue + audit row, ack-after-record (W4)
+- [ ] 12-07-PLAN.md — Sub-wave (f) part 1: `Item.body` contract + body-aware store write path (W2)
+- [ ] 12-08-PLAN.md — Sub-wave (f) part 2: all 7 ingest adapters populate `articles.body` (W3)
+- [ ] 12-09-PLAN.md — Prohibitions P1–P5 structural guards, AC8 isolation, ADR-015 reconciliation, operator UAT (W5)
 
 ## Backlog
 
