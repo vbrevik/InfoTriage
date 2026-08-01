@@ -7,7 +7,12 @@ from pathlib import Path
 
 import pytest
 from contracts import Item, require_discipline, require_acled_license
-from contracts._phase11_gates import DisciplineRequired, AcledLicenseMissing
+from contracts._phase11_gates import (
+    DisciplineRequired,
+    AcledLicenseMissing,
+    SOURCE_TYPE_TO_INT_DISCIPLINE,
+    VALID_INT_DISCIPLINES,
+)
 
 
 TS = datetime.datetime.now(datetime.timezone.utc)
@@ -91,3 +96,47 @@ async def test_acled_ingest_runs_with_license(monkeypatch):
 
     result = await acled_ingest.ingest()
     assert result is None
+
+
+def test_all_source_types_mapped_to_valid_int_discipline():
+    """Per-ingest contract test: every known ``source_type`` in the codebase
+    has a mapping in ``SOURCE_TYPE_TO_INT_DISCIPLINE``, and every mapped
+    discipline value passes the ``Item.discipline`` Pydantic regex
+    (enforced via Item construction + ``VALID_INT_DISCIPLINES`` vocabulary).
+
+    Future adapter additions MUST update both the dict AND this expected
+    set together, or ``expected_types.issubset(...)`` will fail on a
+    regression. Mirrors the SQL CASE branches in
+    ``libs/store/sql/010-backfill-discipline.sql``.
+    """
+    expected_types = {
+        # OSINT family (open-source / public-data)
+        "rss", "obsidian", "yt", "youtube",
+        # HUMINT family (human-mediated; e.g., email sources)
+        "imap", "gmail",
+        # OSINT/DOCEX sub-discipline (Phase 11 ACLED gate)
+        "acled",
+        # SOCMINT (Phase 11 Telegram adapter)
+        "telegram",
+        # MASINT/AIS sub-discipline (Phase 11 BarentsWatch)
+        "ais", "barentswatch",
+    }
+    missing = expected_types - SOURCE_TYPE_TO_INT_DISCIPLINE.keys()
+    assert not missing, f"source types without INT mapping: {missing!r}"
+
+    for stype, disc in SOURCE_TYPE_TO_INT_DISCIPLINE.items():
+        # Every mapped value MUST (a) live in `VALID_INT_DISCIPLINES` (forward
+        # vocabulary guard) AND (b) pass the `Item.discipline` Pydantic regex
+        # (Item constructor raises on grammar drift).
+        assert disc in VALID_INT_DISCIPLINES, (
+            f"source_type={stype!r} maps to discipline={disc!r} "
+            f"which is not in VALID_INT_DISCIPLINES={VALID_INT_DISCIPLINES!r}"
+        )
+        Item(
+            source="x",
+            source_type=stype,
+            title="x",
+            ts=TS,
+            lang="en",
+            discipline=disc,
+        )

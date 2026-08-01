@@ -101,7 +101,7 @@ for the single notable-but-not-gating observation.**
 
 ## Audit Block (closing 2026-08-01)
 
-### 1. Schema-discipline backfill debt (PARKED FROM PHASE 8 AUDIT)
+### 1. Schema-discipline backfill debt (RESOLVED 2026-08-01 via libs/store/sql/010-backfill-discipline.sql + tests/test_phase11_gates.py::test_all_source_types_mapped_to_valid_int_discipline — see commit <this-commit>; parking was from Phase 8 audit)
 
 **Symptom (live query, captured during Phase 8 audit 2026-07-31):**
 

@@ -48,3 +48,46 @@ def require_acled_license() -> str:
             "ACLED_LICENSE_KEY is missing or empty. Ingestion blocked."
         )
     return key
+
+
+# --- Source-of-truth mapping: source_type -> INT collection discipline ---
+# Used by Phase 11 adapter-emission tests (tests/test_phase11_gates.py) and
+# consumed by libs/store/sql/010-backfill-discipline.sql for legacy NULL-row
+# backfill. Keep SQL CASE + Python dict in lock-step; tests
+# `test_all_source_types_mapped_to_valid_discipline` enforces conformance.
+#
+# Taxonomy = INT (Open Source / HUMan / SIGint / MASint / GEOint / SOCmint
+# intelligence taxonomy per NATO JP 2-00 framing). NOT to be confused with
+# the PMESII analytical enrichment axis (which lives in ccir.md +
+# triage_score.py and drives SCORING, not metadata).
+SOURCE_TYPE_TO_INT_DISCIPLINE: dict[str, str] = {
+    # OSINT family (open-source / public-data)
+    "rss": "OSINT",
+    "obsidian": "OSINT",
+    "yt": "OSINT",
+    "youtube": "OSINT",
+    "acled": "OSINT",  # open-source conflict-data; ACLED = CIFOR-ICIT academic OSINT
+    # HUMINT family (human-mediated; e.g., email sources)
+    "imap": "HUMINT",
+    "gmail": "HUMINT",
+    # SOCMINT (social-media intelligence; Phase 11 Telegram adapter)
+    "telegram": "SOCMINT",
+    # MASINT family (measurement-and-signature; Phase 11 BarentsWatch AIS)
+    "barentswatch": "MASINT/AIS",
+    "ais": "MASINT/AIS",  # alias for legacy ingestion rows
+}
+
+
+# Canonical INT discipline vocabulary. New disciplines land here BEFORE they
+# appear in SOURCE_TYPE_TO_INT_DISCIPLINE — so per-ingest contract tests can
+# detect drift where the mapping introduces a value the Item Pydantic regex
+# does not accept (or vice versa). Mirrors the regex in _item.py exactly.
+VALID_INT_DISCIPLINES: frozenset[str] = frozenset({
+    "OSINT",
+    "HUMINT",
+    "SOCMINT",
+    "MASINT",
+    "GEOINT",
+    "SIGINT",
+    "MASINT/AIS",  # sub-discipline (AIS = Automatic Identification System)
+})

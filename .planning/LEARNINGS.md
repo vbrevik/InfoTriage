@@ -130,6 +130,121 @@ Test 2 of 5 awaiting verdict. Phase 11 sibling debt (`articles.discipline
   latent cosmetic surface). Pre-decide at Test 4 verdict time, not
   under pressure at Test 5.
 
+### 2026-08-01 (phase-11-taxonomy) — INT-taxonomy backfill landed; debt item #1 closed
+
+Scope: Closed parked-debt item #1 from
+`.planning/phases/11-socmint/11-VALIDATION.md` §1 — "Schema-discipline
+backfill debt (PARKED FROM PHASE 8 AUDIT)" — by adding
+`libs/store/sql/010-backfill-discipline.sql` (idempotent + implicitly
+atomic UPDATE), `SOURCE_TYPE_TO_INT_DISCIPLINE` +
+`VALID_INT_DISCIPLINES` constants in
+`libs/contracts/src/contracts/_phase11_gates.py`, and a per-ingest
+contract test `test_all_source_types_mapped_to_valid_int_discipline`
+in `tests/test_phase11_gates.py`. One atomic milestone commit; 3 code
+files + 2 doc files.
+
+#### Patterns
+
+- **Source-of-truth mapping lives in TWO surfaces — Python dict (runtime)
+  + SQL CASE (one-shot backfill) — with comment-based lock-step
+  enforcement.** Per-ingest contract test asserts the Python dict is
+  internally consistent (every value passes Pydantic regex + lives in
+  `VALID_INT_DISCIPLINES`). The SQL file's header comment cites the
+  Python dict as the canonical reference; future drift between them
+  is mitigated by the comment but not enforced automatically until the
+  parity test ships.
+
+- **`ELSE NULL` (no fallback) surfaces drift loudly.** When a future
+  adapter introduces a new `source_type` not in the dict, the migration
+  leaves `discipline` NULL for those rows — the per-ingest contract
+  test fails (subset check + Pydantic regex check + vocabulary
+  membership check) rather than silently labeling everything OSINT.
+  Pattern: prefer explicit failure over silent fallback for taxonomy
+  backfills where the corpus is small enough to audit by hand.
+
+- **Single-statement UPDATE is implicitly atomic — drop BEGIN/COMMIT.**
+  Initial draft had `BEGIN; ... COMMIT;` wrapper for safety (mirroring
+  how the operator might write multi-statement work). code-reviewer
+  flagged this as a NEW pattern in the project (existing migrations
+  001-009 don't wrap transactions). Dropped the wrapper after
+  confirming: a single UPDATE on `infotriage.articles` is one
+  transaction at the SQL level (Postgres wraps it implicitly); the
+  BEGIN/COMMIT was redundant surface.
+
+- **`acled → OSINT`, NOT `OSINT/DOCEX`.** Initial draft used the
+  sub-discipline `OSINT/DOCEX` to capture ACLED's open-source-curated
+  conflict-data nature. Pytest failed: the `Item.discipline` Pydantic
+  regex `^(OSINT|SOCMINT|MASINT|GEOINT|SIGINT|HUMINT|MASINT/AIS)$`
+  rejects `OSINT/DOCEX` (only `MASINT/AIS` is allowed as a
+  sub-discipline form). The fix: drop the sub-discipline refinement;
+  `OSINT` is the correct umbrella. Lesson: regex constraints enforce
+  taxonomy at test time; if you can't name a discipline that fits the
+  regex, the question "should I have a sub-discipline here?" is the
+  wrong question — the right question is "is this really a sub-discipline
+  of OSINT, or is the macro-discipline precise enough?"
+
+#### Pitfalls
+
+- **Pydantic regex enforcement IS the safety net for taxonomy
+  drift.** Caught the `OSINT/DOCEX` mistake at test time before any
+  production data was committed to `discipline` column. Discipline:
+  trust the regex; let it surface ambitious sub-discipline designs
+  that don't fit the canonical vocabulary.
+
+- **Initial bulky multi-file str_replace failed because str_replace
+  operates ONE file at a time (the tool's contract).** First attempt
+  packed 4 replacements targeting 3 different files into one call;
+  only the file whose path was specified had its sub-edits attempted,
+  and the rest were silently skipped because the OLD string wasn't
+  found in that specific file. Lesson: when you need to fix N files,
+  you need N separate str_replace calls (or use write_file + careful
+  re-read for tiny files). Don't trust the human-readable description
+  in the str_replace prompt — the tool's path argument defines the
+  single target.
+
+- **Defer automated Python↔SQL parity test to a follow-up.** Both
+  surfaces have the mapping; only the Python side has automated
+  enforcement. A future addition to the SQL without a corresponding
+  dict update will go undetected. Acceptable risk for this commit
+  (well-flagged in the SQL header comment + 11-VALIDATION.md); but
+  `tests/test_phase11_parity.py` should land in the next session or
+  the lock-step drift hazard silently returns.
+
+#### Preferences
+
+- **Per-ingest contract test = 3 layered assertions: subset + value
+  vocabulary + Pydantic regex.** Single test function asserts (a)
+  expected source_types in the dict subset, (b) every value in
+  `VALID_INT_DISCIPLINES`, (c) every value passes `Item.discipline`
+  regex via Pydantic Item construction. Three failure-modes
+  distinguished (missing source_type vs off-vocabulary discipline
+  vs regex-rejected) clearly from the assert messages.
+
+- **Drift-detection surfaces loud, not silent.** When taxonomy
+  decisions have a "what if a future case arrives?" dimension,
+  prefer the design that surfaces the unknown loudly (NULL > OSINT;
+  assert > log-and-continue) over the design that silently paper-
+  over the gap.
+
+#### Open questions
+
+- **`tests/test_phase11_parity.py` deferred.** Python↔SQL bytecode-
+  level parity test — read the SQL file, regex-parse
+  `(WHEN 'x' THEN 'y')` tuples, assert byte-equivalence with
+  `SOURCE_TYPE_TO_INT_DISCIPLINE`. ~20 lines. Flag on next session;
+  README mentions this in 11-VALIDATION.md parked debt note. Until
+  landed, lock-step drift hazard is ACCEPTED — the per-ingest
+  Python test catches dict-side mistakes; SQL-side additions don't
+  trip any test today.
+
+- **`barentswatch` vs `ais` source_type alias.** The dict carries
+  both as → `MASINT/AIS`. If production code (per the
+  `apps/ingest-barentswatch/` adapter) only ever emits one, the
+  other is either a legacy alias (correct for backfill) or dead code.
+  Need a `git grep 'source_type.*=\s*["\']?ais["\']?'` for
+  ground truth. Cheap investigation; resolution: keep both if
+  legacy rows exist.
+
 ### 2026-08-01 (flip) — 3 test-side bug fixes landed; baseline flipped 674/3/0 → 677/0/0
 
 Scope: Closed the open debt documented in
