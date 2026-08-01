@@ -2,29 +2,23 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 8/9/10/11 audit chain end-to-end closed (Phase 8 fully verified 5/5 UAT + 29/29 db_live variants; 0 unpushed; local == origin at da2ca0d); make test-safe clean (674 passed / 3 pre-existing test-side failures / 0 regressions on shipped code)
+status: Phase 8/9/10/11 audit chain end-to-end closed (Phase 8 fully verified 5/5 UAT + 29/29 db_live variants); make test-safe CLEAN at 677/0/0 (3 pre-existing test-side bugs resolved via this-commit fixture fixes); local == origin at the imminent commit SHA
 stopped_at: "Audit chain fully closed in this session: Phase 8 went VALIDATION+UAT-complete via 979467d (Path B dedup fix in apps/brief/vault_writer.py) + 48fa6ee (Tests 3+4+5 PASS document); Phase 11 verify-work bug-fix sub-task opened at da2ca0d (3 pre-existing test-side failures surfaced by make test-safe: 2 TIME-BOMB telegram fake_message fixtures + 1 youtube INFOTRIAGE_YOUTUBE_TRANSCRIBE env-var leak -- no production-code regressions). Operator-authorized push landed 3 commits (979467d + 48fa6ee + da2ca0d) to origin/main. make -f ops/Makefile test-safe against throwaway Postgres (port 22062, distinct from prod 22000) ran 66s clean: 674 passed / 3 failed / 0 regressions. Phase 11 backfill taxonomy decision still pending operator (INT vs PMESII-PT; default = INT)."
-last_updated: "2026-08-01T14:30:00.000Z"
+last_updated: "2026-08-01T15:30:00.000Z"
 last_baseline:
   command: "make -f ops/Makefile test-safe"
   date: "2026-08-01"
-  duration_seconds: 66
-  passed: 674
-  failed: 3
+  duration_seconds: 43.97
+  passed: 677
+  failed: 0
   production_code_regressions: 0
   throwaway_pg_port: 22062
   prod_pg_port: 22000
   db_live_variants_unblocked: 15
   db_live_variants_source: "tests/test_store_entities.py parametric Postgres variants"
-  failed_tests:
-    - "tests/test_ingest_telegram.py::test_ingest_emits_item_with_discipline_and_reliability"
-    - "tests/test_ingest_telegram.py::test_ingest_dry_run_does_not_persist"
-    - "tests/test_ingest_youtube.py::test_ingest_r2_dual_output"
-  failed_root_causes:
-    - "fake_message fixture hardcoded date=2026-07-21; stale vs 2026-08-01 (>7d window) -- TIME-BOMB"
-    - "fake_message fixture hardcoded date=2026-07-21; same TIME-BOMB, same fix"
-    - "INFOTRIAGE_YOUTUBE_TRANSCRIBE env-var leaked from shell/.env into dry-run path -- needs monkeypatch.delenv"
-make_test_safe_status: "CLEAN (3 pre-existing test-side bugs surfaced, classified in .planning/phases/11-socmint/11-INGEST-TEST-FIXES-PLAN.md)"
+  prior_baseline_sha: "6dbac4b (674 passed / 3 failed / 66s)"
+  resolved_in_commit: "this commit (test fixtures: TIME-BOMB telegram + autouse youtube delenv)"
+make_test_safe_status: "CLEAN (677/0/0 baseline; 3 pre-existing test-side bugs resolved via .planning/phases/11-socmint/11-INGEST-TEST-FIXES-PLAN.md -- this commit ships the fixture fixes)"
 progress:
   total_phases: 13
   # completed = both VALIDATION.md nyquist_compliant AND UAT closed 5/5.
@@ -42,6 +36,45 @@ progress:
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-08-01 (flip) — 3 pre-existing test-side bug fixes landed; baseline flipped 674/3/0 → 677/0/0
+
+### Just-completed (this commit)
+
+- **3 surfaced test-side bugs FIXED + the 674/3/0 baseline at `6dbac4b` flipped to 677/0/0 in 43.97s.**
+  The closure for the per-`make test-safe` open debt documented in
+  `.planning/phases/11-socmint/11-INGEST-TEST-FIXES-PLAN.md`. Two test files modified:
+
+  | File | Fix landed |
+  |------|-----------|
+  | `tests/test_ingest_telegram.py::fake_message` | REPLACE hardcoded `date=datetime(2026,7,21)` with relative offset `datetime.now(tz=utc) - timedelta(minutes=5)`. 5-min margin clears any reasonable `since` window (`7d`/`24h`/`1h`); thinker-recommended over `hours=1` for forward-safety. Affects 3 tests: `test_ingest_emits_item_with_discipline_and_reliability` + `test_ingest_dry_run_does_not_persist` + the still-passing `test_ingest_title_falls_back_to_channel_and_id` (which ignores `fake_message.date`, so unaffected). |
+  | `tests/test_ingest_youtube.py` | ADD `@pytest.fixture(autouse=True) def isolate_transcription_env(monkeypatch)`: `monkeypatch.delenv("INFOTRIAGE_YOUTUBE_TRANSCRIBE", raising=False)` immediately after imports. Hermetic isolation: protects all 9 tests in this file from `INFOTRIAGE_YOUTUBE_TRANSCRIBE` env-var leak from ambient shell/project-`.env` (would otherwise route `test_ingest_r2_idempotent_rerun`/`test_ingest_r2_empty_channel`/`test_ingest_max_n_config_reaches_yt_dlp_list` into the audio/STT download path). Tests that explicitly want transcription on (`test_transcribe_default_env_var`, `test_ingest_transcribe_env_var_enables_transcription`) use `monkeypatch.setenv` which layers correctly over autouse delenv. |
+
+- **Verification gates (pre-RED, post-GREEN):**
+  * Targeted pytest `tests/test_ingest_telegram.py` (9 tests) + `tests/test_ingest_youtube.py` (12 tests) = **21 passed in 0.7s**, 0 failed (3 previously-failing now green + 18 surrounding preserved).
+  * Full `make -f ops/Makefile test-safe` against throwaway Postgres port 22062 = **677 passed in 43.97s**, 0 failed. Trap teardown clean.
+  * code-reviewer-minimax-m3 SHIP verdict (Wave 4 dispatch, in parallel with targeted pytest).
+  * thinker-with-files-gemini SHIP verdict (validated the 5-min margin over the originally-proposed 1-hour + the autouse-fixture scope over inline).
+
+- **Open Question #1 (from prior LEARNINGS.md session) RESOLVED as fix-then-push (option (a)).** Bug-fix landed + baseline flipped in a single atomic milestone commit; pushes queued behind the canonical pre-push gate (`make test-safe` -> `git status` -> `git log origin/main..HEAD` -> operator push).
+
+- **Push authorization.** This commit + the prior (208a598 STATE.md + 6dbac4b LEARNINGS.md) form the chain the operator previously authorized via `Route B, then D` mapping (LEARNINGS.md `Preferences -> Push is operator-authored only` consent discriminator). Post-push: `local == origin` at this commit's SHA.
+
+### Watch out for
+
+- **TIME-BOMB tests are a recurring bug class.** Likely candidates in the
+  repo: any test that hardcodes a `datetime`/`date` field to a calendar
+  date. Future fix discipline = use relative offsets (`now - X`) or
+  parameterize. When threshold-crossing (e.g., rigid months) the
+  hardcoded date goes stale silently; only `make test-safe` (full
+  live-Postgres) catches it because narrower `pytest -k foo` collections
+  may pass with the same stale data.
+- **Autouse vs inline isolation choice = file-wide vs test-specific.**
+  The autouse fixture here covers all 9 tests in the file at once (1
+  edit), vs 9 inline `monkeypatch.delenv` calls (9 edits, none benefit
+  future-added tests). Pick autouse unless a single test in the file
+  needs the env var *between* tests (false in this file; the autouse
+  scope is fine).
 
 ## Session: 2026-08-01 (current) — make test-safe ground truth + Phase 8 end-to-end verification + push landed clean
 

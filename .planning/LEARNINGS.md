@@ -130,6 +130,114 @@ Test 2 of 5 awaiting verdict. Phase 11 sibling debt (`articles.discipline
   latent cosmetic surface). Pre-decide at Test 4 verdict time, not
   under pressure at Test 5.
 
+### 2026-08-01 (flip) — 3 test-side bug fixes landed; baseline flipped 674/3/0 → 677/0/0
+
+Scope: Closed the open debt documented in
+`.planning/phases/11-socmint/11-INGEST-TEST-FIXES-PLAN.md` from the
+2026-08-01 earlier-cycle session. Operator chose **fix-then-push
+(option (a))** as the resolution to Open Question #1 previously
+recorded in this file. Result: 674/3/0 baseline at `6dbac4b`
+flipped cleanly to 677/0/0 in 43.97s; 0 production-code regressions.
+
+#### Patterns
+
+- **TIME-BOMB test fixture = relative-to-now with defensive margin,
+  never absolute calendar date.** The hardcoded `datetime(2026,7,21)`
+  in `tests/test_ingest_telegram.py::fake_message` went stale on
+  2026-07-25 against the `parse_since("7d")` filter window. Fix shape
+  is ALWAYS relative (`datetime.now(tz=utc) - timedelta(minutes=N)`).
+  Margin choice: 5 minutes — clears any typical `since` window
+  (`7d`, `24h`, `1h`) AND is forward-safe against hypothetical tighter
+  windows. Width (1m vs 5m vs 1h) trades off between maximally-fresh
+  fixture state vs boundary-edge risk for future tight `since`
+  values; 5 minutes is the sweetspot per `thinker-with-files-gemini`
+  recommendation. The bytes-only invariant: a fixture that doesn't
+  advance with the calendar will eventually go stale silently;
+  only `make test-safe` (full live-Postgres run) catches it because
+  narrower `pytest -k foo` invocations don't exercise the path that
+  fails first.
+
+- **env-var leak in pytest = autouse fixture at module level, not
+  inline `monkeypatch.delenv` per test.** The `INFOTRIAGE_YOUTUBE_TRANSCRIBE`
+  env-var leaked from ambient shell/project-`.env` into the dry-run
+  test path at `tests/test_ingest_youtube.py::test_ingest_r2_dual_output`,
+  routing the production code at
+  `apps/ingest-youtube/youtube_ingest.py` into audio/STT. Inline fix
+  = 1 line of `monkeypatch.delenv`, but only covers the failing test.
+  Side-channel risk: 3 OTHER tests in the same file (`r2_idempotent_rerun`,
+  `r2_empty_channel`, `max_n_config_reaches_yt_dlp_list`) would also
+  attempt the audio/download path if the env var leaks — they pass
+  today because the env var isn't set in our local shell. Autouse
+  fixture covers all 9 tests at once (1 edit, future-proof) AND
+  carries a docstring pointing future maintainers to
+  `monkeypatch.setenv` for tests that DO want the var. Choice =
+  autouse scope (file-wide) unless a single test in the file needs
+  env-var *between* tests (false here).
+
+- **Test-side bug class taxonomy.** When `make test-safe` surfaces
+  failures, classify each as one of: TIME-BOMB (hardcoded date goes
+  stale with calendar), env-var-leak (ambient shell/repo state
+  unread by `monkeypatch`), parametric-skip (`@pytest.mark.skipif`
+  becomes permanent suppression instead of live exercise). Different
+  classes have different fix shapes. The 3 surfaced failures here
+  split as 1 TIME-BOMB (affecting 2 tests via shared fixture) + 2
+  env-var-leak (1 test directly, 3 tests indirectly). Pattern:
+  classify the bug, then the fix design follows from the class.
+
+- **`monkeypatch.setenv` layers correctly over `@pytest.fixture(autouse=True)`
+  that does `delenv`.** The autouse fixture runs first with its own
+  monkeypatch instance; the test function's `monkeypatch.setenv`
+  runs later and overrides for the test scope. Both undo at
+  teardown. So tests that explicitly want the env var set (e.g.,
+  `test_transcribe_default_env_var`, `test_ingest_transcribe_env_var_enables_transcription`)
+  don't break when the autouse fixture is added. Confirmed via 21/21
+  green on the file post-fix.
+
+#### Pitfalls
+
+- **Don't bundle test fix + unrelated work in one commit.** Per
+  project milestone-commit policy, scope each fix to the bug class.
+  This commit bundles code (2 test files) + docs (STATE.md +
+  LEARNINGS.md) ONLY because the docs ground the baseline flip
+  in-file; an unrelated fix would force a second commit.
+
+- **Re-derive the Open Question resolution path.** Open Question #1
+  (this file) was "fix-bugs before or after the next push?" The
+  answer chosen (fix-then-push) was driven by prior LEARNINGS.md
+  `Preferences -> Pre-push canonical order`: `make test-safe`
+  must precede push. Doing push-then-fix would create a drift window
+  where the unpushed chain has a 674/3 baseline that no longer
+  reflects ground truth. Pick fix-then-push unless explicitly
+  countermanded.
+
+- **Avoid code-only `git commit` bodies that don't capture the
+  pre-fix baseline.** Future maintainers reading the diff need the
+  prior baseline (`6dbac4b` = 674/3/0/66s) shown explicitly in the
+  commit message body, not just "fix is good." Discipline: cite
+  the prior SHA + prior numbers in the body, so the commit is
+  self-documenting.
+
+#### Preferences
+
+- **Bug-fix commit message body = pre-fix baseline + post-fix
+  baseline + verification gates + thinker/reviewer verdicts.** Tested
+  pattern in this commit: the body quotes 674 / 3 / 0 / 66s as
+  pre-state, 677 / 0 / 0 / 43.97s as post-state, names the thinker
+  and reviewer SHIP verdicts, and references
+  `.planning/phases/11-socmint/11-INGEST-TEST-FIXES-PLAN.md` for
+  full root-cause analysis. Future commits in this class should
+  match this template unless the bug class changes (e.g.,
+  parametric-skip fix doesn't need a "tests currently suppressed"
+  reference).
+
+#### Resolved (formerly Open Questions)
+
+- **Fix the 3 surfaced test-side bugs before or after the next push?**
+  — RESOLVED **fix-then-push (option (a))**, this commit. Cleanup
+  rationale + verification steps preserved above (Patterns + Pitfalls
+  bullets). See `.planning/phases/11-socmint/11-INGEST-TEST-FIXES-PLAN.md`
+  for the original analysis.
+
 ### 2026-08-01 (push gate) — `make test-safe` as canonical pre-push verification
 
 Scope: Ran `make -f ops/Makefile test-safe` end-to-end against a

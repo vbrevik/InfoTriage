@@ -20,6 +20,23 @@ from store import InMemoryStore
 
 
 # ---------------------------------------------------------------------------
+# Test environment isolation
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def isolate_transcription_env(monkeypatch) -> None:
+    """Ensure no test inherits an ambient transcription-enable flag.
+
+    Prevents shell/project-.env leaking of `INFOTRIAGE_YOUTUBE_TRANSCRIBE`
+    into test paths that expect transcription to be DISABLED (stub mode).
+    Tests that explicitly need transcription still use `monkeypatch.setenv`
+    which layers correctly over this autouse deletion.
+    """
+    monkeypatch.delenv("INFOTRIAGE_YOUTUBE_TRANSCRIBE", raising=False)
+
+
+# ---------------------------------------------------------------------------
 # Test doubles
 # ---------------------------------------------------------------------------
 

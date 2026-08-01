@@ -19,7 +19,11 @@ def fake_message():
     """Return a fake Telethon message object."""
     return SimpleNamespace(
         id=42,
-        date=datetime.datetime(2026, 7, 21, 10, 0, 0, tzinfo=datetime.timezone.utc),
+        # Defensive margin: 5 minutes ago to safely clear any typical `since` window
+        # (e.g. `7d`, `24h`, `1h`). Replaces the hardcoded 2026-07-21 timestamp that
+        # went stale on 2026-07-25, causing the `since` filter to drop the message.
+        date=datetime.datetime.now(tz=datetime.timezone.utc)
+        - datetime.timedelta(minutes=5),
         text="Breaking news from the front line.\nMore details follow.",
     )
 
