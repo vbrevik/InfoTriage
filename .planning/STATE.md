@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 12-03 (ntfy bearer-token ACL) Tasks 1-2 COMPLETE, Task 3 checkpoint:human-verify PENDING — ntfy topic ACL tightened from wildcard to SPEC R6 explicit per-topic grants (apps/ntfy/Dockerfile), idempotent `make ntfy-token`/`make ntfy-acl-check` targets, ADR-018 amendment, tests/test_alerting_auth.py (4 tests), COVERAGE.md ntfy capability matrix; live-verified end-to-end against a rebuilt infotriage-ntfy container this session. Blocked on operator placing their own NTFY_TOKEN into their real .env (Task 3, gate=blocking, human-only per plan) — see 12-03-SUMMARY.md
-stopped_at: "Checkpoint: 12-03 Task 3 (human-verify) — operator must run make -f ops/Makefile ntfy-token and place NTFY_TOKEN into .env, then confirm ntfy-acl-check PASSes"
-last_updated: "2026-08-01T16:58:00.000Z"
+status: Phase 12-03 (ntfy bearer-token ACL) COMPLETE — ntfy topic ACL tightened from wildcard to SPEC R6 explicit per-topic grants (apps/ntfy/Dockerfile), idempotent `make ntfy-token`/`make ntfy-acl-check` targets, ADR-018 amendment, tests/test_alerting_auth.py (4 tests), COVERAGE.md ntfy capability matrix; Task 3 (operator confirmation) closed this session — operator pasted their own NTFY_TOKEN into .env and confirmed; continuation agent re-verified ntfy-acl-check 3/3 PASS + full test-safe 723/0/1 (0 regressions) without ever reading .env. See 12-03-SUMMARY.md
+stopped_at: "Phase 12 Plan 03 complete (all 3 tasks). Next: Plan 12-04 (dedupe/throttle wiring)."
+last_updated: "2026-08-01T17:20:00.000Z"
 progress:
   total_phases: 13
   completed_phases: 8
   total_plans: 48
-  completed_plans: 36
+  completed_plans: 37
 last_baseline:
   command: make -f ops/Makefile test-safe
   date: 2026-08-01
@@ -32,6 +32,45 @@ make_test_safe_status: CLEAN (723/0/1 baseline; Phase 12 Plan 03 Tasks 1-2 shipp
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-08-01 (continuation 4) — Phase 12 Plan 03 (ntfy bearer-token ACL) COMPLETE — Task 3 closed
+
+### Just-completed (this session)
+
+- **Phase 12-03 Task 3 closed.** Operator confirmed via chat ("token pasted, now you continue")
+  that they ran `make -f ops/Makefile ntfy-token`, copied the printed `tk_...` value, and pasted
+  it into their real gitignored `.env` as `NTFY_TOKEN=`. This continuation agent verified the
+  checkpoint's resolution **without ever reading, editing, or echoing `.env`** (respecting the
+  global permission deny-rule on `.env*` paths):
+  - `make -f ops/Makefile ntfy-acl-check` → 3/3 PASS (unauth publish 403, authed publish 200,
+    unauth read 403) against the operator's real running container/token.
+  - `python -m pytest tests/test_alerting_auth.py -q` → 3 passed, 1 skipped (the skip is expected
+    — `NTFY_TOKEN` isn't exported into the ambient shell/test-safe env, matching prior-session
+    design behavior, not an auth failure).
+  - `make -f ops/Makefile test-safe` → **723 passed, 1 skipped, 0 failed** — identical to the
+    Task 2 baseline, 0 regressions.
+  - `git grep -nE 'tk_[A-Za-z0-9]{8,}' -- ops/ docs/ apps/ .env.example .planning/` → no output
+    (token value never landed in any tracked file); `git status --short` clean; `git check-ignore
+    -v .env` confirmed `.env` is matched by `.gitignore:2:'.env*'`.
+- **Final `12-03-SUMMARY.md` written** (supersedes the interim checkpoint SUMMARY from the prior
+  session), `status: complete`, all 3 D1/D2/D3 coverage rows marked `pass`.
+- **`ROADMAP.md` updated** via `gsd-tools query roadmap.update-plan-progress 12` (plan_count 9,
+  summary_count 3, status "In Progress" — Phase 12 has 6 more plans (12-04..12-09) still open).
+- **`REQUIREMENTS.md` NOT updated for `ADR-003`** — `requirements.mark-complete ADR-003` returned
+  `not_found`. Confirmed by grep: `ADR-003` is cited across ~10 different requirement rows
+  (D-4, C-6, C-7, A-3, A-4, PR-7, DI-6, N-1, N-4, ...) as the design-doc ADR reference, not itself
+  a requirement ID with its own checkbox row in REQUIREMENTS.md. The plan's `requirements:
+  [ADR-003]` frontmatter doesn't map 1:1 onto this project's REQUIREMENTS.md ID scheme — same
+  class of pre-existing quirk as the `ui-plan-gate-false-positive` /
+  `state-md-custom-format-not-advanced` memories. No action needed; SPEC R6's acceptance criteria
+  are tracked and verified directly in `COVERAGE.md`'s D1/D2/D3 rows instead.
+
+### Next
+
+- **Phase 12 Plan 04** (dedupe/throttle wiring against the 12-02 `alert_state` Store methods) is
+  next per the phase's 5-wave plan map. The emitter already sends a correctly-authenticating
+  `Authorization: Bearer` header (proven live this session against the operator's real token), so
+  12-04 has no remaining blocker from 12-03.
 
 ## Session: 2026-08-01 (continuation 3) — Phase 12 Plan 03 (ntfy bearer-token ACL) Tasks 1-2 COMPLETE, checkpointed at Task 3
 
