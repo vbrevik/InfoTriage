@@ -9,9 +9,9 @@ last_baseline:
   command: "make -f ops/Makefile test-safe"
   date: "2026-08-01"
   duration_seconds: 35.31
-  passed: 678
+  passed: 685
   failed: 0
-  note: "677 -> 678: +1 per-ingest contract test (bb5420e); recall DSN hermeticity fixed (510dade, 7082f54)"
+  note: "678 -> 685: +7 tests from 25bdb4e (gate/citation/wikilink/recall-lang); phase 10+11 gap fixes live"
   production_code_regressions: 0
   throwaway_pg_port: 22062
   prod_pg_port: 22000

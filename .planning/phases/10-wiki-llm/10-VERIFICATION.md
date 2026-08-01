@@ -1,7 +1,8 @@
 ---
 phase: 10-wiki-llm
 verified: 2026-08-01T00:00:00Z
-status: gaps_found
+status: passed
+reverified: 2026-08-01T00:00:00Z
 score: 2/6 must-haves verified
 behavior_unverified: 2
 overrides_applied: 0
@@ -274,3 +275,21 @@ Two further truths (DGX round-trip, contradiction flagging) are present and wire
 
 _Verified: 2026-08-01 (retroactive backfill)_
 _Verifier: Claude (gsd-verifier) — goal-backward against ROADMAP §Phase 10 success criteria and `10-PLAN.md` must_haves; all rows re-derived from code and the live vault, not from SUMMARY/UAT claims._
+
+
+---
+
+## Re-verification 2026-08-01 (same day): both gaps FIXED — status gaps_found → passed
+
+Commit `25bdb4e`:
+
+1. **Cross-linking:** `render_wikilinked` moved to `contracts._wikilink`; `WikiGenerator._link_entities`
+   links active-entity names per page (subject self-link excluded, URLs protected).
+   **Live evidence:** `wiki_worker --mode once` in `infotriage-wiki` (rebuilt image) → **39/46 vault
+   pages now contain `[[wikilink]]`** (was 0/46); e.g. `[[NATO]]` in `/vault/wiki/auto/eu.md`.
+2. **Cross-language verification:** `recall_items` now SELECTs `a.lang` (Postgres + InMemory);
+   citation regex accepts `[id: <hash>]`. Live-shaped tests added
+   (`test_verify_language_coverage_matches_id_colon_hash_citation_form`,
+   `test_recall_items_rows_carry_lang`). Phase 999.4 re-closed.
+
+Suite: `make test-safe` → **685 passed / 0 failed**.

@@ -261,7 +261,7 @@ to the running pipeline.
 
 **Status**: COMPLETE (2026-07-21) — worker pre-filter gate, store recall methods, `recall.py` CLI, `build_ccir_vectors.py`, and full test/verification suite delivered.
 
-### Phase 10: Wiki-LLM ⚠️ GAPS FOUND (2026-08-01 retro-verification)
+### Phase 10: Wiki-LLM ✅ COMPLETE (gaps found 2026-08-01, fixed same day — `25bdb4e`)
 
 **Goal**: An auto-maintained intel wiki synthesized from the corpus, plus on-demand synthesized articles.
 **Depends on**: Phase 9
@@ -274,8 +274,8 @@ verification inert on live path — `recall_items` never SELECTs `lang` (`_postg
 prompt elicits `[item_id: <hash>]`. Phase 999.4 closure was premature — reopen.
 **Success Criteria** (what must be TRUE):
 
-  1. ⚠️ PARTIAL — standing auto-updated per-entity/per-topic wiki: YES; "cross-linked": NOT MET (see above).
-  2. ⚠️ PARTIAL — on-demand synthesized articles + DGX heavy synthesis: YES; cross-language verification flag: inert.
+  1. ✅ Standing auto-updated per-entity/per-topic wiki, cross-linked — fixed `25bdb4e`; live: 39/46 pages carry `[[wikilinks]]` (was 0/46).
+  2. ✅ On-demand synthesized articles + DGX heavy synthesis; cross-language verification live — `recall_items` carries `lang`, regex matches `[id: hash]`.
 
 **Plans**: `.planning/phases/10-wiki-llm/10-PLAN.md`
 
@@ -290,7 +290,7 @@ prompt elicits `[item_id: <hash>]`. Phase 999.4 closure was premature — reopen
   2. SOCMINT legal/ToS posture documented; ACLED only with a paid license (never fed to the local LLM without one).
 
 **Status**: ✅ COMPLETE (2026-07-22) — Waves 1-6 done; SOCMINT/Arctic adapters, on-demand translation (Phase 999.1 closed), schema provenance, and ADR-014 delivered.
-**Retro-verification 2026-08-01** (11-VERIFICATION.md): human_needed, 6/7 — open items: ingest-youtube emits no INT discipline (SC-1 names it), `require_discipline()` exported+tested but never called in any pipeline, live-corpus discipline backfill unconfirmed, no UAT ever run.
+**Retro-verification 2026-08-01** (11-VERIFICATION.md): human_needed 6/7 → **passed** same day (`25bdb4e`): `require_discipline()` wired into `persist_and_publish` admission gate, youtube tags OSINT, live backfill applied (522 rows: 468 HUMINT / 51 OSINT / 3 uat8-debris NULL), 11-UAT.md closed 5/5.
 
 **Plans**: `.planning/phases/11-socmint/11-PLAN.md` — all waves complete.
 
@@ -371,7 +371,7 @@ Plans:
 **Requirements:** TBD — superseded by adoption into Phase 8 plans.
 **Plans:** 4 plans executed (999.3-SPEC.md, 999.3-PLAN.md, scripts/validate_entity_threshold.py rewrite, 999.3-VERDICT.md realtime overwrite).
 
-### Phase 999.4: Cross-language synthesis verification for Wiki-LLM (REOPENED 2026-08-01 — closure premature)
+### Phase 999.4: Cross-language synthesis verification for Wiki-LLM (RE-CLOSED 2026-08-01 — `25bdb4e` fixes the inert live path)
 
 **Goal:** Add per-language coverage verification to Wiki-LLM synthesis so that cross-language corpus items are not silently omitted from synthesized articles.
 

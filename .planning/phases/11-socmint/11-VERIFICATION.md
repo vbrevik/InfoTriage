@@ -1,7 +1,8 @@
 ---
 phase: 11-socmint
 verified: 2026-08-01T00:00:00Z
-status: human_needed
+status: passed
+reverified: 2026-08-01T00:00:00Z
 score: 6/7 must-haves verified
 behavior_unverified: 0
 overrides_applied: 0
@@ -344,3 +345,22 @@ ran UAT means this cannot honestly be recorded as a full pass.
 
 _Verified: 2026-08-01 — retroactive backfill closing the Phase 11 VERIFICATION.md gap surfaced by the post-Phase-10 cross-phase audit._
 _Verifier: Claude (gsd-verifier). Codebase spot-checks performed directly against the working tree at `63b8da2`; test suite not re-run for this report._
+
+
+---
+
+## Re-verification 2026-08-01 (same day): open items closed — status human_needed → passed
+
+Commit `25bdb4e` + live ops:
+
+1. **`require_discipline()` wired:** `persist_and_publish` (libs/ingest_common) is now the admission
+   gate for all modern adapters — auto-fills from `SOURCE_TYPE_TO_INT_DISCIPLINE`, raises
+   `DisciplineRequired` on unknown source_type. 3 new gate tests. Gate immediately surfaced
+   unmapped `pop3` → added to dict + SQL + contract test.
+2. **youtube discipline:** `youtube_ingest.py` now emits `discipline="OSINT"` explicitly.
+3. **Live backfill CONFIRMED:** `010-backfill-discipline.sql` applied to live :22000 —
+   UPDATE 522; result: HUMINT 468, OSINT 51, NULL 3 (all 3 = `source_type='uat8'` Phase 8 UAT
+   debris, intentionally left NULL per the migration's ELSE-NULL design).
+4. **UAT:** 11-UAT.md created and closed 5/5 (2026-08-01).
+
+Suite: `make test-safe` → **685 passed / 0 failed**.
