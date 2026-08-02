@@ -74,6 +74,30 @@ docker compose up -d          # FreshRSS http://localhost:8088
    Run `python3 scripts/provision_gmail_oauth.py` once to obtain a refresh token, then
    `docker compose up ingest-gmail gmail-mcp-server`.
 
+## MVP mode (lean stack — 4 containers)
+
+The full stack above is 19 containers. If you want the *useful core* — feeds →
+score → CAT I push + SAB — without the event bus, the MVP mode runs the same
+value chain in **4 containers** with **zero RabbitMQ**:
+
+```bash
+make -f ops/Makefile mvp-up      # postgres + freshrss + ntfy + mvp poller
+make -f ops/Makefile mvp-status  # health check
+make -f ops/Makefile mvp-down    # stop (keeps data)
+```
+
+The `mvp` poller (apps/mvp/poller.py) runs one synchronous loop: poll
+FreshRSS's **Fever API** for new items → score against `ccir.md` with the local
+LLM (same `triage_score.score_item` the triage worker uses) → persist to
+Postgres → push CAT I alerts via **ntfy** (the Phase 12 alerting lane, now a
+library call — no broker) → write Obsidian notes + SAB. FreshRSS stays the
+fetching engine and reading surface; nothing in the full stack is deleted.
+
+**Accepted gaps (documented, not silent):** email (imap/gmail) and
+Telegram/BarentsWatch are not ingested — feeds only; no pgvector semantic dedup
+(id-dedupe via the store); wiki, opml-health, and DLQ replay are out of scope.
+The full 19-service stack remains available via `make up` at any time.
+
 ## The noise-killer (the point)
 
 ```bash

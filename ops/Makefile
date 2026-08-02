@@ -190,6 +190,26 @@ ntfy-acl-check: ## Live-prove the SPEC R6 ACL matrix: unauth publish/read 403, a
 ccir-sync: ## Regenerate CCIR-owned feeds.opml groups from the registry (contracts.ccir)
 	cd $(ROOT_DIR) && python scripts/ccir_sync.py
 
+# ── Phase 13: MVP lean stack (4-container synchronous slice) ────────────────
+# docker-compose.mvp.yml replaces the event-driven middle with one poller:
+# FreshRSS (fetch) -> score (local LLM) -> Postgres -> ntfy push + vault notes.
+# The full 19-service docker-compose.yml stays intact and untouched.
+
+MVP_COMPOSE := $(COMPOSE) -f $(OPS_DIR)/../docker-compose.mvp.yml
+
+mvp-up: ## Start the MVP lean stack (postgres + freshrss + ntfy + mvp poller)
+	cd $(ROOT_DIR) && $(MVP_COMPOSE) up -d --build --wait
+
+mvp-down: ## Stop the MVP lean stack (keeps data volumes)
+	cd $(ROOT_DIR) && $(MVP_COMPOSE) down
+
+mvp-status: ## Show MVP container status + health
+	cd $(ROOT_DIR) && $(MVP_COMPOSE) ps
+	@printf "%-16s %s\n" "mvp health:" "$$(curl -sf http://127.0.0.1:22017/health >/dev/null 2>&1 && echo up || echo down)"
+
+mvp-test: ## Run the MVP poller test suite
+	cd $(OPS_DIR)/.. && python -m pytest tests/test_mvp_poller.py -q
+
 clean: ## Stop and wipe all data (dangerous)
 	$(COMPOSE) down -v
 	@echo "All data volumes wiped."
