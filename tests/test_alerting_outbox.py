@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import http.server
+import json
 import socket
 import threading
 
@@ -27,6 +28,7 @@ from outbox import (
     DLX_ROUTING_KEY,
     RETRY_SCHEDULE,
     NtfyClient,
+    _ascii_safe_header_value,
     dead_letter,
     deliver_with_retry,
 )
@@ -373,6 +375,67 @@ def test_ack_after_record_propagates_on_outcome_recording_failure(
 
     with pytest.raises(RuntimeError, match="simulated durable-record failure"):
         asyncio.run(deliver_with_retry(client, store, bus, payload, item_id=item_id))
+
+
+# ---------------------------------------------------------------------------
+# ASCII-safety: non-ASCII alert titles must never crash header encoding
+# (latent 12-01 gap; fixed so outbox.py centralizes the transliteration)
+# ---------------------------------------------------------------------------
+
+
+def test_non_ascii_item_title_transliterated_ascii_safe(sequenced_ntfy_server):
+    """A title carrying the ⚠ glyph, Norwegian æ/ø/å, and Cyrillic delivers
+    fine and the X-Title header is strictly ASCII (httpx header encoding
+    constraint) — the payload body keeps the UTF-8 text."""
+    base_url, handler_cls = sequenced_ntfy_server([200])
+    client = NtfyClient(base_url, "secret-token", "cnr-cat-i")
+    payload = _payload("item-ascii")
+    exotic_title = "⚠ Trussel æøå — Москва 🚨"
+
+    asyncio.run(client.deliver(payload, item_title=exotic_title))
+
+    assert len(handler_cls.requests) == 1
+    header_title = handler_cls.requests[0]["headers"]["X-Title"]
+    assert header_title.encode("ascii")  # must not raise
+    assert "!" in header_title  # ⚠ -> !
+    assert "ae" in header_title  # æ -> ae
+    assert "o" in header_title  # ø -> o
+    assert "Trussel" in header_title
+    # The payload body is untouched UTF-8 — SPEC R1's 7-key payload is not
+    # subject to header encoding rules.
+    assert json.loads(handler_cls.requests[0]["body"]) == payload
+
+
+def test_ascii_title_passes_through_unchanged(sequenced_ntfy_server):
+    """Pure-ASCII titles are byte-identical after the transliteration — the
+    tracer's `X-Title == item.title` contract keeps holding."""
+    base_url, handler_cls = sequenced_ntfy_server([200])
+    client = NtfyClient(base_url, "secret-token", "cnr-cat-i")
+    payload = _payload("item-ascii2")
+
+    asyncio.run(client.deliver(payload, item_title="A CAT I test item"))
+
+    assert handler_cls.requests[0]["headers"]["X-Title"] == "A CAT I test item"
+
+
+def test_non_ascii_tags_and_click_headers_ascii_safe(sequenced_ntfy_server):
+    """X-Tags (LLM-derived, unvalidated) and X-Click (operator-configured
+    vault name) can also carry non-ASCII — they must be sanitized at the
+    same choke point rather than crashing the send."""
+    base_url, handler_cls = sequenced_ntfy_server([200])
+    client = NtfyClient(base_url, "secret-token", "cnr-cat-i")
+    payload = _payload("item-ascii3")
+    payload["pmseii_tags"] = ["Military", "Infrastruktur æøå"]
+    payload["deep_link"] = "obsidian://open?vault=Hjemmetå&file=notat"
+
+    asyncio.run(client.deliver(payload, item_title="A CAT I test item"))
+
+    headers = handler_cls.requests[0]["headers"]
+    for header in ("X-Tags", "X-Click", "X-Title"):
+        assert headers[header].encode("ascii")  # must not raise
+    assert "Infrastruktur aeoa" in headers["X-Tags"]  # æøå -> ae,o,a
+    assert "Hjemmet" in headers["X-Click"]
+    assert "?" not in headers["X-Title"]
 
 
 def test_ack_after_record_propagates_via_emit_path_not_swallowed(tmp_path):

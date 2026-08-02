@@ -32,6 +32,40 @@ RETRY_SCHEDULE: tuple[int, ...] = (1, 5)
 DLX_ROUTING_KEY = "outbox.dlx"
 
 
+def _ascii_safe_header_value(value: str) -> str:
+    """Transliterate `value` to an ASCII-safe string for HTTP header use.
+
+    httpx encodes header values strictly as ASCII (httpx 0.27 raises
+    UnicodeEncodeError on any non-ASCII character in a header value), so a
+    value carrying e.g. the ⚠ glyph, Norwegian æ/ø/å, or Cyrillic would
+    otherwise crash delivery at send time (latent gap since 12-01). This is
+    the single choke point for every header this client emits: callers
+    (emitter, digest) never have to remember the constraint. Maps the
+    characters a Norwegian-language CAT I alert realistically carries to
+    their ASCII equivalents and falls back to "?" for anything else —
+    headers are display/click-only, the payload body is unaffected (SPEC R1
+    locks the 7-key JSON payload, which rides the body where UTF-8 is fine).
+    """
+    transliterations = {
+        "⚠": "!",
+        "æ": "ae",
+        "Æ": "AE",
+        "ø": "o",
+        "Ø": "O",
+        "å": "a",
+        "Å": "A",
+        "—": "-",
+        "–": "-",
+    }
+    out: list[str] = []
+    for char in value:
+        if ord(char) < 128:
+            out.append(char)
+        else:
+            out.append(transliterations.get(char, "?"))
+    return "".join(out)
+
+
 class NtfyClient:
     """Minimal authenticated ntfy publisher for the CAT I alert payload."""
 
@@ -56,6 +90,9 @@ class NtfyClient:
             if (item_title or "").strip()
             else ""
         )
+        # Transliterate BEFORE truncating so the 80-char contract applies to
+        # the emitted header value (æ→ae would otherwise expand past it).
+        title_line = _ascii_safe_header_value(title_line)
         title = (
             title_line[:80]
             if title_line
@@ -65,13 +102,17 @@ class NtfyClient:
             ["triangular_flag_on_post", *(payload.get("pmseii_tags") or [])]
         )
 
+        # Every header value rides httpx's strict-ASCII encoding — sanitize
+        # all of them at this single choke point (pmseii_tags is LLM-derived
+        # and unvalidated, so X-Tags can carry non-ASCII too; deep_link's
+        # vault name is operator-configured and could be non-ASCII).
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self._token}",
             "X-Title": title,
             "X-Priority": "5",
-            "X-Tags": tags,
-            "X-Click": payload.get("deep_link", ""),
+            "X-Tags": _ascii_safe_header_value(tags),
+            "X-Click": _ascii_safe_header_value(payload.get("deep_link", "")),
         }
 
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as http_client:

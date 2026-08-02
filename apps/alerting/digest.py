@@ -99,12 +99,12 @@ async def publish_digest(store, client, rows: list[dict]) -> None:
         "deep_link": "",
     }
     # NtfyClient's X-Title header goes through httpx's strict ASCII header
-    # encoding (outbox.py is locked, out of this plan's files_modified) —
-    # the literal D-03 warning glyph (⚠) cannot ride an HTTP header value.
-    # The header carries an ASCII-safe transliteration; the JSON payload
-    # body above (no such constraint) carries the exact D-03 title text.
-    header_title = title.replace("⚠", "!")
-    await client.deliver(payload, item_title=header_title)
+    # encoding, so the literal D-03 warning glyph (⚠) cannot ride an HTTP
+    # header value — outbox.py's _ascii_safe_title choke point handles that
+    # transliteration for every caller, including this digest title. The
+    # JSON payload body above (no such constraint) carries the exact D-03
+    # title text; the header carries the ASCII-safe form.
+    await client.deliver(payload, item_title=title)
     await asyncio.to_thread(
         store.mark_alerts_digested, [row["dedupe_id"] for row in rows]
     )
