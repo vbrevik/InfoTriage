@@ -91,6 +91,11 @@ image, exposed on `localhost:2586`). Multi-channel re-delegation deferred.
 
 ---
 
+> **⚠ Superseded by the locked SPEC.** This Decision's payload table records pre-SPEC
+> values. The shipped shape is the 7-field payload SPEC R1 locks — see the
+> `## Amendment — superseded by 12-SPEC.md (Phase 12 planning)` section at the bottom of
+> this ADR before reading Decision 3 as authority.
+
 ## Decision 3 — Payload shape
 
 JSON-encoded body posted to the ntfy topic `cnr-cat-i`. Shape:
@@ -118,6 +123,12 @@ JSON-encoded body posted to the ntfy topic `cnr-cat-i`. Shape:
   per `ccir.md` §PMESII.
 
 ---
+
+> **⚠ Superseded by the locked SPEC.** This Decision's tier list records pre-SPEC
+> values. The shipped throttle is SPEC R3's two sliding tiers (≤5 per 60s, ≤10 per 10min)
+> with an hourly PMESII-grouped digest collapse — see the
+> `## Amendment — superseded by 12-SPEC.md (Phase 12 planning)` section at the bottom of
+> this ADR before reading Decision 4 as authority.
 
 ## Decision 4 — Throttling
 
@@ -255,3 +266,102 @@ pattern (ADR-007) plus a PostgreSQL `cnr_outbox` table.
 * **Push authentication topic ACL.** ntfy topics are ACL-able per topic; default
   `cnr-cat-i` is operator-only. Worth specifying in the Phase 12 PLAN rather
   than this ADR (configuration-level, not architectural).
+
+---
+
+## Amendment — superseded by 12-SPEC.md (Phase 12 planning)
+
+**Status: superseded (Phase 12 planning).** `12-SPEC.md` locked the Phase 12
+requirements on 2026-08-01 and several values this ADR originally recorded were
+superseded there. This amendment reconciles the ADR with the locked SPEC so that
+the ADR is never read as authority against the shipped implementation. Where the
+ADR's original text and this amendment disagree, **the SPEC and this amendment win**.
+
+### Payload field set
+
+**Superseded.** Decision 3's original seven fields (`title`, `sab_excerpt`,
+`dedupe_id`, `deep_link`, `verified_pmseii`, `timestamp`, `source_count`) are
+replaced by the **seven fields SPEC R1 locks**, shipped verbatim by the Phase 12
+emitter (`apps/alerting/emitter.py`):
+
+| Field | Notes |
+|---|---|
+| `alert_id` | Replaces Decision 3's `title` (the alert's own identity) |
+| `sab_excerpt` | Kept — but capped at 500 chars (see below), not 280 |
+| `dedupe_id` | Kept — formula per SPEC R2 (see below) |
+| `cnr_tier` | New — the CNR tier driving the push |
+| `item_link` | New — the SAB note link (SPEC R8's "links back to vault/SAB") |
+| `pmseii_tags` | Replaces `verified_pmseii` — **the SPEC's tag-field spelling is intentional and is not to be normalized** |
+| `deep_link` | Kept — but scheme per SPEC R5 (see below) |
+
+The SPEC's tag-field spelling (`pmseii_tags`, not `verified_pmseii`) is an
+intentional lock from 12-SPEC.md §R1; do not "fix" it back to the ADR's original
+naming.
+
+### Dedupe identity separator
+
+**Superseded.** Decision 3's at-sign separator (`f"{item_id}@{cnr_tier}"`) is
+replaced by the **pipe separator from SPEC R2**:
+
+```
+dedupe_id = sha256(f"{item_id}|{cnr_tier}").hexdigest()[:16]
+```
+
+Shipped in `apps/alerting/dedupe.py::compute_dedupe_id` (Phase 12 plan 12-04).
+
+### Excerpt cap
+
+**Superseded.** Decision 3's 280-character excerpt is replaced by the **500-character
+cap from SPEC R8 and prohibition P2** — `len(payload['sab_excerpt']) <= 500`, enforced
+by `tests/test_alerting_prohibitions.py::test_p2_excerpt_bounded_and_body_free`.
+
+### Deep-link scheme
+
+**Superseded.** Decision 3's `obsidian://show-note?path=/Vault/items/<slugified-title>`
+form is replaced by the **Obsidian open-URI form resolved in Open Items 2 and locked by
+SPEC R5**:
+
+```
+obsidian://open?vault=<vault-name>&file=<vault-relative-note-path>
+```
+
+The note path is vault-relative and includes the brief output subdirectory
+(`INFOTRIAGE_ALERT_NOTE_SUBDIR`, default `brief-outbox`) — it is the path
+`apps/brief/vault_writer.py` actually writes, cross-verified by
+`tests/test_alerting_deeplink.py`. No custom protocol handler is installed (SPEC R5).
+
+### Throttling tiers
+
+**Superseded.** Decision 4's single 5-per-10-minute tier and its 30-minute collapse are
+replaced by **SPEC R3's two sliding-window tiers**:
+
+- ≤ 5 CAT I alerts per sliding 60-second window
+- ≤ 10 CAT I alerts per sliding 10-minute window
+- overflow collapses into one **hourly PMESII-grouped digest** (SPEC R3, D-03) — never
+  silently dropped; the digest enumerates every suppressed `alert_id`
+
+Shipped in `apps/alerting/throttle.py` (plan 12-05) and `apps/alerting/digest.py`.
+
+### Open Items 2 and 3 — resolved
+
+**Resolved.** Open Item 2 (SAB deep-link URI scheme) resolved to the Obsidian open-URI
+form above (`obsidian://` — `sab://` dropped); Open Item 3 (push authentication topic
+ACL) resolved to the **three-topic ACL matrix shipped in plan 12-03** (producer
+read-write on the primary topic, write-only on `-debug`/`-test`, reader read-only on the
+primary topic only — no grant on debug/test, per SPEC R6).
+
+### Assumption A-01 (plan 12-01) — link-field split
+
+**Recorded as shipped, pending operator confirmation.** Assumption A-01 from plan
+12-01 — `deep_link` targets the item's vault note while `item_link` targets the SAB note
+— is the interpretation implemented and shipped. It awaits the operator's confirmation
+at plan 12-09's Task 3 checkpoint; if the operator assigns different targets, this
+paragraph is updated accordingly.
+
+### The body-excerpt field is now forbidden, not deferred
+
+Decision 3's earlier note that an optional `body_excerpt` field "may be added
+additively" after Phase 13 is **superseded**: the field remains unbuilt, and prohibition
+P2 now *forbids* the payload from ever being sourced from `articles.body` (enforced
+structurally by `tests/test_alerting_prohibitions.py`). It is no longer merely deferred —
+it is out of contract.
