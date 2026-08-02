@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 12-05 (3-tier sliding-window throttle + hourly PMESII digest) COMPLETE — apps/alerting/throttle.py (check_throttle, 60s cap 5 / 600s cap 10) wired into emitter.py's _emit_if_claimed between claim and egress; throttled alerts marked suppressed (never dropped) via Store.mark_alert_suppressed; apps/alerting/digest.py (group_by_pmesii/build_digest_message/publish_digest/run_digest_tick) adds the D-03 hourly in-process digest, gathered as alerting_worker.py's third coroutine. 19 new tests (tests/test_alerting_throttle.py), full test-safe 774/0/1 (0 regressions). See 12-05-SUMMARY.md
-stopped_at: "Phase 12 Plan 05 complete (both tasks). Next: Plan 12-06, then 12-08 (seven ingest adapters set Item.body) — 12-08 depends only on 12-07, not 12-05/12-06."
-last_updated: "2026-08-02T10:20:00.000Z"
+status: Phase 12-08 (7 ingest adapters set Item.body — SPEC R7) CLOSED at 6/7 — gmail, imap, youtube, telegram, obsidian, barentswatch populate Item.body at their Item(...) construction site; ACLED intentionally deferred (26-line Phase-11 stub, no Item construction site, license-gated per REQUIREMENTS.md C-11/Q3) — operator decision 2026-08-02 to track as debt (ROADMAP.md backlog Phase 999.7) rather than build a speculative pipeline or narrow SPEC R7's scope. 18 new tests (tests/test_ingest_body_email.py, tests/test_ingest_body_media.py, tests/test_ingest_body_events.py), all 18 re-verified green this session. See 12-08-SUMMARY.md (status: complete).
+stopped_at: "Phase 12 Plan 08 complete (6/7 adapters, ACLED deferred to backlog 999.7). Next: Plan 12-06 (outbox retry), then 12-09 (prohibitions P1-P5, operator UAT) — both still open per the phase's 5-wave map."
+last_updated: "2026-08-02T12:00:00.000Z"
 progress:
   total_phases: 13
   completed_phases: 8
   total_plans: 48
-  completed_plans: 40
+  completed_plans: 41
 last_baseline:
   command: make -f ops/Makefile test-safe
   date: 2026-08-02
@@ -32,6 +32,74 @@ make_test_safe_status: CLEAN (774/0/1 baseline; Phase 12 Plan 05 both tasks ship
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-08-02 (continuation) — Phase 12 Plan 08 (7 ingest adapters set Item.body) CLOSED at 6/7 — ACLED checkpoint resolved
+
+### Just-completed (this session)
+
+- **Resolved the Task 3 checkpoint left by the prior 12-08 session.** That session shipped
+  Tasks 1-2 in full (gmail, imap, youtube, telegram, obsidian — 5 adapters) plus the
+  barentswatch half of Task 3 (6th adapter), then hit a Rule 4 (architectural) blocker on
+  the 7th: `apps/ingest-acled/acled_ingest.py` is a 26-line Phase-11 stub
+  (`require_acled_license()` + a log line) with no HTTP client, no field-mapping, and no
+  `Item(...)` construction site anywhere in the file — there was nothing to add `body=` to
+  without building an entirely new adapter. It returned a `checkpoint:human-verify
+  gate="blocking-human"` with 3 options (defer / build now / permanently narrow SPEC scope).
+
+- **Operator decision: defer, track as debt.** Specifically: close plan 12-08 now at 6/7
+  adapters; do NOT build a real ACLED fetch/parse/`Item` pipeline (ACLED license is
+  `[GATED]` per `REQUIREMENTS.md` C-11 — EULA §7 bars training/developing AI on content,
+  conflicts with ADR-004 — and open question Q3; this project holds no license, so a
+  pipeline would have nothing to fetch and no test could exercise a real feed); do NOT
+  amend `12-SPEC.md` R7 or `12-08-PLAN.md`'s acceptance criteria to permanently narrow the
+  requirement to 6-of-7 — it still describes all 7 adapters as the eventual target.
+
+- **Debt recorded per this project's existing backlog convention** (`ROADMAP.md`'s
+  `## Backlog` section of `### Phase 999.N` entries, e.g. 999.2/999.5/999.6): added
+  `### Phase 999.7: ACLED ingest adapter — body-population + real fetch pipeline (BACKLOG,
+  opened 2026-08-02)`, cross-referencing `REQUIREMENTS.md` C-11/Q3 and the Rule 4 finding in
+  `12-08-SUMMARY.md`. Gated on Q3 (ACLED license) resolving before promotion via
+  `/gsd-review-backlog`. The Phase 12 plan bullet for 12-08 in `ROADMAP.md` is updated to
+  `[x]` with the 6/7-plus-deferred-999.7 wording; `12-SPEC.md`/`12-08-PLAN.md` left
+  untouched per the operator's explicit instruction.
+
+- **Final `12-08-SUMMARY.md` written** (supersedes the interim checkpoint SUMMARY from the
+  prior session), `status: complete`, `requirements-completed: [ADR-003]`, D7 (ACLED)
+  coverage row marked `human_judgment: true` with the deferral rationale instead of a
+  fabricated pass.
+
+- **Re-verified before closing:** `python -m pytest tests/test_ingest_body_email.py
+  tests/test_ingest_body_media.py tests/test_ingest_body_events.py -q` → **18 passed**
+  (unchanged from the prior session — no code touched this session, docs-only close-out).
+  Full `make -f ops/Makefile test-safe` was NOT re-run this session (no production code
+  changed since the prior session's `719 passed, 74 skipped, 0 failed` `pytest tests/ -q`
+  run); the last full test-safe baseline on record remains 774/0/1 from the 12-05 session,
+  predating 12-07/12-08's test additions — a future session touching production code should
+  refresh it.
+
+- **`ROADMAP.md` updated**: 12-08 bullet flipped to `[x]` (6/7, ACLED deferred to 999.7);
+  new backlog Phase 999.7 section added. `requirements.mark-complete ADR-003` was not
+  re-attempted — matches every prior 12-0x session's identical finding (`ADR-003` is a
+  design-doc reference across ~10 requirement rows, not its own REQUIREMENTS.md checkbox
+  ID); no action needed.
+
+### Watch out for
+
+- **ACLED body-population is now explicitly tracked debt, not silent scope creep.** Any
+  future phase/plan that touches `apps/ingest-acled/` should check `ROADMAP.md` backlog
+  Phase 999.7 first — the deferral rationale, scope-when-promoted checklist, and the C-11/Q3
+  gating are all recorded there rather than re-discovered from scratch.
+- **`12-SPEC.md` R7 and `12-08-PLAN.md`'s acceptance criteria still say "all 7 adapters."**
+  This is intentional (operator explicitly ruled out narrowing them) — do not read the
+  unmodified text as an open bug in this plan; the gap is tracked in the backlog instead.
+
+### Next
+
+- **Phase 12 Plan 06** (outbox retry: 1s/5s → dedicated DLX queue + audit row, ack-after-
+  record, W4) or **Plan 12-09** (prohibitions P1-P5 structural guards, AC8 isolation,
+  ADR-015 reconciliation, operator UAT, W5 — the last plan in the phase) are the two
+  remaining open plans per the phase's 5-wave map. 12-09 depends on 12-06 per the wave
+  ordering (W5 blocked on W4).
 
 ## Session: 2026-08-02 — Phase 12 Plan 05 (3-tier throttle + hourly PMESII digest) COMPLETE
 

@@ -304,7 +304,7 @@ prompt elicits `[item_id: <hash>]`. Phase 999.4 closure was premature — reopen
   1. A CNR CAT I 🚩 post-write publishes a push (ntfy local-server preferred; ADR-004-friendly) with SAB excerpt + dedupe ID.
   2. The SAB remains the canonical artifact.
 
-**Plans**: 6/9 plans executed
+**Plans**: 7/9 plans executed
 
 Plans:
 **Wave 1**
@@ -321,7 +321,7 @@ Plans:
 **Wave 3** *(blocked on Wave 2 completion)*
 
 - [x] 12-05-PLAN.md — 3-tier sliding-window throttle + hourly PMESII-grouped digest tick (W3)
-- [ ] 12-08-PLAN.md — Sub-wave (f) part 2: all 7 ingest adapters populate `articles.body` (W3)
+- [x] 12-08-PLAN.md — Sub-wave (f) part 2: 6 of 7 ingest adapters populate `articles.body` (gmail, imap, youtube, telegram, obsidian, barentswatch); ACLED deferred as tracked debt — backlog Phase 999.7, gated on C-11/Q3 (ACLED license) (W3)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -439,6 +439,30 @@ Plans:
 Plans:
 
 - [ ] TBD (promote with /gsd-review-backlog when ready)
+
+### Phase 999.7: ACLED ingest adapter — body-population + real fetch pipeline (BACKLOG, opened 2026-08-02)
+
+**Goal:** Give `apps/ingest-acled/acled_ingest.py` a real fetch/parse/`Item` construction pipeline (HTTP client, event field-mapping, retry/backoff, tests) so it can join the other 6 adapters in populating `Item.body` (SPEC R7) once a licensed ACLED feed is actually available to ingest.
+
+**Context:** Surfaced 2026-08-02 during Phase 12 Plan 08 (`.planning/phases/12-cnr-alerting-dissemination/12-08-SUMMARY.md`) as a Rule 4 (architectural) finding: `acled_ingest.py` is a 26-line Phase-11 stub (`require_acled_license()` + a log line, no HTTP client, no field-mapping, no `Item(...)` call anywhere in the file). Adding `body=` to it would require building an entire new adapter, not a one-field change — out of scope for a plan whose stated purpose was wiring the field into *existing* adapter construction sites.
+
+**Why this is deferred, not built now:** ACLED access is gated by `REQUIREMENTS.md` C-11 (`[GATED]` — EULA §7 bars training/developing AI on content, conflicts with ADR-004) and `REQUIREMENTS.md`'s open question Q3 (ACLED license). This project holds no ACLED license today, so a real fetch pipeline would have nothing to fetch and no adapter-level test could exercise a real feed. Building the pipeline now would be speculative work against an unresolved licensing gate.
+
+**Scope when promoted:**
+1. Resolve Q3 (ACLED license) — operator decision, likely requires acquiring a paid ACLED license compatible with ADR-004's local-LLM-only posture, or an explicit decision to permanently drop ACLED as a source.
+2. If licensed: build `acled_ingest.py`'s HTTP client, event→`Item` field mapping (notes/description → `body`), retry/backoff, and adapter tests — comparable scope to the existing BarentsWatch or Telegram adapters (Phase 11).
+3. Add `body=` at the new `Item(...)` construction site per SPEC R7 (notes/description text where non-empty, unset otherwise — matching the pattern already proven by the other 6 adapters in `tests/test_ingest_body_events.py`).
+4. Extend `tests/test_ingest_body_events.py`'s 7-adapter coverage assertion (currently proves 6-of-7 explicitly, naming the ACLED gap) to the full 7-of-7 SPEC R7 acceptance criterion.
+
+**Status quo until then:** `articles.body` is populated for 6 of 7 adapters in production (gmail, imap, youtube, telegram, obsidian, barentswatch — Phase 12 Plan 08). ACLED rows do not exist in the corpus today (the license gate blocks all ACLED ingestion), so no data is silently missing a body — there is no ACLED data at all yet. `12-SPEC.md` R7 and `12-08-PLAN.md`'s acceptance criteria are intentionally left unchanged (still describe all 7 adapters); this backlog entry is the tracked gap between that criterion and today's 6-of-7 shipped state, not a scope narrowing.
+
+**Source:** `.planning/phases/12-cnr-alerting-dissemination/12-08-SUMMARY.md` (Deviations §3, Rule 4 finding), `REQUIREMENTS.md` C-11 + Q3, ADR-014 (Phase 11 SOCMINT license posture).
+**Requirements:** TBD — depends on Q3 resolution.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (promote with /gsd-review-backlog once Q3 — ACLED license — is resolved)
 
 ### Phase 999.6: Trace Labs OSINT contributions evaluation (BACKLOG)
 
