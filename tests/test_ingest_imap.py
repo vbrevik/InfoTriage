@@ -31,8 +31,20 @@ FIXTURE_MAILBOX = {
 }
 
 FIXTURE_ENTRIES = [
-    ("Subject One", "sender@example.com", "Body of message one", "<msg1@example.com>"),
-    ("Subject Two", "sender@example.com", "Body of message two", "<msg2@example.com>"),
+    (
+        "Subject One",
+        "sender@example.com",
+        "Body of message one",
+        "Body of message one",
+        "<msg1@example.com>",
+    ),
+    (
+        "Subject Two",
+        "sender@example.com",
+        "Body of message two",
+        "Body of message two",
+        "<msg2@example.com>",
+    ),
 ]
 
 

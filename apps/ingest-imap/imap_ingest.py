@@ -147,9 +147,13 @@ def body_text(msg) -> str:
 
 
 def fetch_entries(imap, ids: list, max_recent: int = 60) -> list[tuple]:
-    """Fetch (subject, from_, snippet, message_id) tuples for the most-recent message IDs.
+    """Fetch (subject, from_, snippet, full_text, message_id) tuples for the most-recent
+    message IDs.
 
     T-04-05: max_recent=60 cap retained from imap_to_atom.py to bound fetch volume.
+    full_text is the raw decoded message text (no whitespace-collapsing, no truncation) —
+    the source for Item.body (SPEC R7). snippet is the existing 500-char, whitespace-
+    joined preview kept for Item.summary, unchanged from its pre-existing derivation.
     """
 
     def _parse(mid):
@@ -157,10 +161,12 @@ def fetch_entries(imap, ids: list, max_recent: int = 60) -> list[tuple]:
         if typ != "OK":
             return None
         msg = email.message_from_bytes(data[0][1])
+        full_text = body_text(msg)
         return (
             dec(msg.get("subject")) or "(no subject)",
             dec(msg.get("from")) or "(unknown sender)",
-            " ".join(body_text(msg).split())[:500],
+            " ".join(full_text.split())[:500],
+            full_text,
             msg.get("Message-ID", str(mid)),
         )
 
@@ -195,8 +201,9 @@ def _fetch_imap(mailbox: dict) -> list[Item]:
             ts=datetime.now(tz=timezone.utc),
             lang="und",
             summary=snippet[:500],
+            body=full_text,
         )
-        for subject, from_, snippet, message_id in entries
+        for subject, from_, snippet, full_text, message_id in entries
     ]
 
 
@@ -262,10 +269,11 @@ def _fetch_pop3(mailbox: dict, max_recent: int = 60) -> list[Item]:
             msg = email.message_from_bytes(raw)
             subject = dec(msg.get("subject")) or "(no subject)"
             from_ = dec(msg.get("from")) or "(unknown sender)"
-            snippet = " ".join(body_text(msg).split())[:500]
+            full_text = body_text(msg)
+            snippet = " ".join(full_text.split())[:500]
             # Prefer Message-ID; fall back to UIDL+idx for messages without it.
             message_id = msg.get("Message-ID") or f"<pop3-{uidl}-{idx}@local>"
-            entries.append((subject, from_, snippet, uidl, message_id))
+            entries.append((subject, from_, snippet, full_text, uidl, message_id))
     finally:
         try:
             pop.quit()
@@ -282,8 +290,9 @@ def _fetch_pop3(mailbox: dict, max_recent: int = 60) -> list[Item]:
             ts=datetime.now(tz=timezone.utc),
             lang="und",
             summary=snippet[:500],
+            body=full_text,
         )
-        for subject, from_, snippet, uidl, message_id in entries
+        for subject, from_, snippet, full_text, uidl, message_id in entries
     ]
 
 

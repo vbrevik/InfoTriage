@@ -148,7 +148,11 @@ async def get_message(
 ) -> dict:
     """Call the get_message MCP tool; return the full message dict.
 
-    Returns a dict with id, snippet, payload.headers (at minimum).
+    Returns a dict with id, snippet, payload.headers, and payload.body/parts
+    (at minimum). format="full" is required (not "metadata") so the full
+    decoded message body is present on payload.body/payload.parts for
+    ingest-gmail's body extraction (SPEC R7, plan 12-08) — metadata-only
+    responses omit body content entirely.
     """
     result = await mcp_call(
         client,
@@ -158,7 +162,7 @@ async def get_message(
             "name": "get_message",
             "arguments": {
                 "messageId": message_id,
-                "format": "metadata",
+                "format": "full",
                 "metadataHeaders": ["Subject", "Date", "From"],
             },
         },

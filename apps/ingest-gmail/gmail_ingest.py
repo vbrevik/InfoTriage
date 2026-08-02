@@ -15,6 +15,7 @@ Environment variables:
 Security: no write/mutate tools are called; source_type is always "gmail";
 no credentials flow through this module (T-04-11, T-04-12, T-04-13, ADR-008).
 """
+import base64
 import datetime
 import logging
 import os
@@ -56,6 +57,41 @@ def _parse_subject(headers: list[dict]) -> str:
     for h in headers:
         if h.get("name", "").lower() == "subject":
             return h.get("value", "")
+    return ""
+
+
+def _decode_gmail_base64(data: str) -> str:
+    """Decode Gmail API's URL-safe base64 (no padding) message body data.
+
+    Returns "" on missing/malformed input rather than raising — a decode
+    failure must not block ingestion of the rest of the message.
+    """
+    if not data:
+        return ""
+    padded = data + "=" * (-len(data) % 4)
+    try:
+        return base64.urlsafe_b64decode(padded).decode("utf-8", "replace")
+    except Exception:
+        return ""
+
+
+def _extract_text_body(payload: dict) -> str:
+    """Recursively extract the text/plain body from a Gmail message payload.
+
+    Gmail API (format="full") nests multipart messages under payload.parts;
+    a simple message carries payload.body.data directly. Returns "" when no
+    readable text/plain part exists (e.g. an image-only message) so the
+    field flows through as empty and the store's put_item coerces it to SQL
+    NULL — no per-adapter None-coercion needed (SPEC R7).
+    """
+    mime_type = payload.get("mimeType", "")
+    data = payload.get("body", {}).get("data", "")
+    if mime_type == "text/plain" and data:
+        return _decode_gmail_base64(data)
+    for part in payload.get("parts") or []:
+        text = _extract_text_body(part)
+        if text:
+            return text
     return ""
 
 
@@ -109,6 +145,7 @@ def fetch_items(messages: list[dict]) -> list:
             ts=ts,
             lang="und",  # language unknown without content analysis
             summary=snippet[:500],
+            body=msg.get("body", ""),
         )
         items.append(item)
     return items
@@ -158,6 +195,7 @@ async def ingest() -> None:
                         "snippet": msg.get("snippet", ""),
                         "subject": _parse_subject(headers),
                         "date": _parse_date(headers).isoformat(),
+                        "body": _extract_text_body(msg.get("payload", {})),
                     }
                 )
 
