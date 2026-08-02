@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""alerting_worker.py — CAT I verdict.ready -> authenticated ntfy push (Phase 12 tracer).
+"""alerting_worker.py — CAT I verdict.ready/sab.published -> authenticated
+ntfy push, gated by dedupe (12-04) and the sliding-window throttle (12-05),
+with an hourly PMESII-grouped digest of anything the throttle suppressed.
 
-One path only: bus -> q.alerting -> emitter -> Store -> 7-field payload ->
-authenticated POST to the ntfy cnr-cat-i topic. No dedupe, no throttle, no
-digest, no retry/DLX — those are expansion plans built out from this proven
-slice (12-04..12-06).
+bus -> q.alerting -> emitter (claim, throttle) -> Store -> 7-field payload ->
+authenticated POST to the ntfy cnr-cat-i topic, plus a third coroutine
+(`run_digest_tick`) that ticks hourly in-process and publishes a grouped
+digest when suppressed rows exist. No retry/DLX yet — that is a later
+expansion plan.
 
 Usage:
     python apps/alerting/alerting_worker.py --dsn ... --amqp-dsn ...
@@ -21,6 +24,7 @@ from pathlib import Path
 from contracts import RabbitMQBus, setup_logging
 from store import PostgresStore
 
+from digest import DEFAULT_DIGEST_INTERVAL, run_digest_tick
 from emitter import run_consumer
 from outbox import NtfyClient
 
@@ -84,6 +88,16 @@ def _build_parser() -> argparse.ArgumentParser:
         help="ntfy base URL (default NTFY_URL)",
     )
     parser.add_argument(
+        "--digest-interval",
+        type=int,
+        default=int(
+            os.environ.get(
+                "INFOTRIAGE_ALERTING_DIGEST_INTERVAL", DEFAULT_DIGEST_INTERVAL
+            )
+        ),
+        help="Hourly digest tick interval in seconds (default 3600, D-03)",
+    )
+    parser.add_argument(
         "--health-host",
         default=os.environ.get("INFOTRIAGE_ALERTING_HEALTH_HOST", HEALTH_HOST),
         help="Health server host",
@@ -108,6 +122,7 @@ async def _run_async_mode(args: argparse.Namespace, ntfy_token: str) -> None:
         tasks = [
             run_health_server(host=args.health_host, port=args.health_port),
             run_consumer(bus, store, client),
+            run_digest_tick(store, client, interval=args.digest_interval),
         ]
         try:
             await asyncio.gather(*tasks)

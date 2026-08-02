@@ -10,7 +10,10 @@ cases and runs unfiltered.
 from __future__ import annotations
 
 import asyncio
+import importlib.util
+import sys
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 from contracts import Item
@@ -19,6 +22,31 @@ from store import InMemoryStore
 from emitter import handle_verdict_ready
 from outbox import NtfyClient
 from throttle import WINDOW_10MIN_CAP, WINDOW_60S_CAP, check_throttle
+
+# `apps/triage/digest.py` (SAB/tiered digest generator) also lives on
+# pytest's shared `pythonpath` list and is collected FIRST (pyproject.toml
+# lists apps/triage before apps/alerting), so a bare `from digest import
+# ...` here would silently resolve to the wrong module — the two apps are
+# never both on sys.path at once in production (each runs in its own
+# single-app Docker container per apps/alerting/Dockerfile), so this
+# collision is a pytest-session-only artifact of the shared flat
+# pythonpath, not a real ambiguity. Load apps/alerting/digest.py explicitly
+# by file path under a private module name so this file's imports are
+# unambiguous without touching the shared pyproject.toml pythonpath order
+# (which tests/test_ccir_sync.py and tests/test_write_bluf.py depend on
+# resolving to apps/triage/digest.py).
+_ALERTING_DIGEST_PATH = (
+    Path(__file__).resolve().parents[1] / "apps" / "alerting" / "digest.py"
+)
+_spec = importlib.util.spec_from_file_location("alerting_digest", _ALERTING_DIGEST_PATH)
+_alerting_digest = importlib.util.module_from_spec(_spec)
+sys.modules["alerting_digest"] = _alerting_digest
+_spec.loader.exec_module(_alerting_digest)
+
+build_digest_message = _alerting_digest.build_digest_message
+group_by_pmesii = _alerting_digest.group_by_pmesii
+publish_digest = _alerting_digest.publish_digest
+run_digest_tick = _alerting_digest.run_digest_tick
 
 
 # ---------------------------------------------------------------------------
@@ -237,3 +265,236 @@ def test_emitter_suppressed_alert_stops_counting_toward_throttle_window(
     same_now = base + timedelta(seconds=5)
     verdict = check_throttle(store, now=same_now)
     assert verdict.passed  # only 5 non-suppressed rows remain in the 60s window
+
+
+# ===========================================================================
+# Task 2 — digest.group_by_pmesii / build_digest_message
+# ===========================================================================
+
+
+def _row(item_id, alert_id, dedupe_id, pmesii, title, fired_at):
+    return {
+        "dedupe_id": dedupe_id,
+        "item_id": item_id,
+        "alert_id": alert_id,
+        "pmesii": pmesii,
+        "title": title,
+        "fired_at": fired_at,
+    }
+
+
+def test_group_by_pmesii_groups_shared_tags_together():
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    rows = [
+        _row("i1", "a1", "d1", "Military", "Item 1", base),
+        _row("i2", "a2", "d2", "Economic", "Item 2", base),
+        _row("i3", "a3", "d3", "Military, Political", "Item 3", base),
+    ]
+
+    grouped = group_by_pmesii(rows)
+
+    assert set(grouped.keys()) == {"Military", "Economic"}
+    assert [r["item_id"] for r in grouped["Military"]] == ["i1", "i3"]
+    assert [r["item_id"] for r in grouped["Economic"]] == ["i2"]
+
+
+def test_group_by_pmesii_null_pmesii_grouped_under_unclassified_not_dropped():
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    rows = [
+        _row("i1", "a1", "d1", None, "Item 1", base),
+        _row("i2", "a2", "d2", "", "Item 2", base),
+    ]
+
+    grouped = group_by_pmesii(rows)
+
+    assert len(grouped) == 1
+    heading = next(iter(grouped))
+    assert "unclassified" in heading.lower()
+    assert len(grouped[heading]) == 2
+
+
+def test_build_digest_message_title_states_suppressed_count():
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    rows = [
+        _row("i1", "alert-1", "d1", "Military", "Item 1", base),
+        _row("i2", "alert-2", "d2", "Military", "Item 2", base),
+        _row("i3", "alert-3", "d3", "Economic", "Item 3", base),
+    ]
+
+    title, body = build_digest_message(rows)
+
+    assert "3" in title
+    assert "suppressed" in title.lower()
+    assert "CAT I" in title
+
+
+def test_build_digest_message_body_contains_all_alert_ids_and_deep_links():
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    rows = [
+        _row("i1", "alert-1", "d1", "Military", "Item 1", base),
+        _row("i2", "alert-2", "d2", "Military", "Item 2", base),
+        _row("i3", "alert-3", "d3", "Economic", "Item 3", base),
+    ]
+
+    _, body = build_digest_message(rows)
+
+    from deep_link import item_note_link
+
+    for row in rows:
+        assert row["alert_id"] in body
+        assert item_note_link(row["item_id"]) in body
+
+
+# ===========================================================================
+# Task 2 — publish_digest / run_digest_tick (async, through InMemoryStore)
+# ===========================================================================
+
+
+def test_publish_digest_zero_undigested_rows_produces_zero_requests(
+    stub_ntfy_server, tmp_path
+):
+    base_url, handler_cls = stub_ntfy_server
+    store = InMemoryStore(blob_root=tmp_path)
+    client = NtfyClient(base_url, "secret-token", "cnr-cat-i")
+
+    asyncio.run(publish_digest(store, client, store.list_undigested_suppressed()))
+
+    assert len(handler_cls.requests) == 0
+
+
+def test_publish_digest_three_suppressed_rows_produces_exactly_one_request(
+    stub_ntfy_server, tmp_path
+):
+    base_url, handler_cls = stub_ntfy_server
+    store = InMemoryStore(blob_root=tmp_path)
+    client = NtfyClient(base_url, "secret-token", "cnr-cat-i")
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+    for i in range(3):
+        dedupe_id = f"dedupe-{i}"
+        store.claim_alert(
+            dedupe_id, f"item-{i}", "I", f"alert-{i}", now=base + timedelta(seconds=i)
+        )
+        store.mark_alert_suppressed(dedupe_id, pmesii="Military", title=f"Item {i}")
+
+    rows = store.list_undigested_suppressed()
+    asyncio.run(publish_digest(store, client, rows))
+
+    assert len(handler_cls.requests) == 1
+    body = handler_cls.requests[0]["body"].decode()
+    for i in range(3):
+        assert f"alert-{i}" in body
+    headers = handler_cls.requests[0]["headers"]
+    assert "3" in headers["X-Title"]
+
+
+def test_publish_digest_marks_rows_digested_second_tick_emits_nothing(
+    stub_ntfy_server, tmp_path
+):
+    base_url, handler_cls = stub_ntfy_server
+    store = InMemoryStore(blob_root=tmp_path)
+    client = NtfyClient(base_url, "secret-token", "cnr-cat-i")
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+    store.claim_alert("dedupe-only", "item-only", "I", "alert-only", now=base)
+    store.mark_alert_suppressed("dedupe-only", pmesii="Military", title="Item only")
+
+    rows = store.list_undigested_suppressed()
+    asyncio.run(publish_digest(store, client, rows))
+    assert len(handler_cls.requests) == 1
+
+    assert store.list_undigested_suppressed() == []
+
+    second_rows = store.list_undigested_suppressed()
+    asyncio.run(publish_digest(store, client, second_rows))
+    assert len(handler_cls.requests) == 1  # unchanged — nothing new to publish
+
+
+def test_publish_digest_row_suppressed_after_digest_picked_up_by_next_tick(
+    stub_ntfy_server, tmp_path
+):
+    base_url, handler_cls = stub_ntfy_server
+    store = InMemoryStore(blob_root=tmp_path)
+    client = NtfyClient(base_url, "secret-token", "cnr-cat-i")
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+    store.claim_alert("dedupe-1", "item-1", "I", "alert-1", now=base)
+    store.mark_alert_suppressed("dedupe-1", pmesii="Military", title="Item 1")
+    asyncio.run(publish_digest(store, client, store.list_undigested_suppressed()))
+    assert len(handler_cls.requests) == 1
+
+    later = base + timedelta(hours=1)
+    store.claim_alert("dedupe-2", "item-2", "I", "alert-2", now=later)
+    store.mark_alert_suppressed("dedupe-2", pmesii="Military", title="Item 2")
+
+    rows = store.list_undigested_suppressed()
+    assert [r["dedupe_id"] for r in rows] == ["dedupe-2"]
+    asyncio.run(publish_digest(store, client, rows))
+    assert len(handler_cls.requests) == 2
+
+
+def test_publish_digest_failed_delivery_does_not_mark_rows_digested(tmp_path):
+    """When delivery raises, mark_alerts_digested must NOT run — the next
+    tick retries the same rows whole rather than silently losing them."""
+    store = InMemoryStore(blob_root=tmp_path)
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+    store.claim_alert("dedupe-fail", "item-fail", "I", "alert-fail", now=base)
+    store.mark_alert_suppressed("dedupe-fail", pmesii="Military", title="Item fail")
+
+    class _FailingClient:
+        async def deliver(self, payload, item_title=""):
+            raise RuntimeError("simulated ntfy delivery failure")
+
+    rows = store.list_undigested_suppressed()
+    with pytest.raises(RuntimeError):
+        asyncio.run(publish_digest(store, _FailingClient(), rows))
+
+    assert store.list_undigested_suppressed() == rows  # untouched, will retry
+
+
+def test_run_digest_tick_empty_hour_emits_nothing_one_iteration(
+    stub_ntfy_server, tmp_path
+):
+    base_url, handler_cls = stub_ntfy_server
+    store = InMemoryStore(blob_root=tmp_path)
+    client = NtfyClient(base_url, "secret-token", "cnr-cat-i")
+
+    async def _one_iteration():
+        task = asyncio.create_task(run_digest_tick(store, client, interval=0.01))
+        await asyncio.sleep(0.05)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    asyncio.run(_one_iteration())
+
+    assert len(handler_cls.requests) == 0
+
+
+def test_run_digest_tick_non_empty_hour_emits_exactly_one_message(
+    stub_ntfy_server, tmp_path
+):
+    base_url, handler_cls = stub_ntfy_server
+    store = InMemoryStore(blob_root=tmp_path)
+    client = NtfyClient(base_url, "secret-token", "cnr-cat-i")
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+    store.claim_alert("dedupe-tick", "item-tick", "I", "alert-tick", now=base)
+    store.mark_alert_suppressed("dedupe-tick", pmesii="Military", title="Item tick")
+
+    async def _one_iteration():
+        task = asyncio.create_task(run_digest_tick(store, client, interval=0.05))
+        await asyncio.sleep(0.1)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    asyncio.run(_one_iteration())
+
+    assert len(handler_cls.requests) == 1
+    assert store.list_undigested_suppressed() == []
