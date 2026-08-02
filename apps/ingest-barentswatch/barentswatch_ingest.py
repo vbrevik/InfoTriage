@@ -268,6 +268,17 @@ def _position_to_item(data: dict) -> Item:
         summary_parts.append(f"SOG: {sog} kn")
     if cog is not None:
         summary_parts.append(f"COG: {cog}°")
+    # AIS position pings carry no full text — SPEC R7's canonical bodyless case.
+    # Some BarentsWatch record variants (not the routine position ping) may
+    # carry a longer narrative/notes field beyond the summary; use it when
+    # present. Falsy values (missing key, "", None) leave body unset, which
+    # put_item (plan 12-07) coerces to SQL NULL — never the empty string.
+    narrative = (
+        data.get("note")
+        or data.get("notes")
+        or data.get("remark")
+        or data.get("remarks")
+    )
     item = Item(
         source="barentswatch",
         source_type="ais",
@@ -276,6 +287,7 @@ def _position_to_item(data: dict) -> Item:
         ts=ts,
         lang="und",
         summary="; ".join(summary_parts),
+        body=narrative,
         discipline="MASINT/AIS",
         admiralty_reliability=DEFAULT_ADMIRALTY_RELIABILITY,
     )
