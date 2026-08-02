@@ -1,0 +1,150 @@
+# docker-compose.mvp.yml — InfoTriage MVP: the lean stack.
+#
+# 4 containers replace the full 19-service event-driven stack. The MVP value
+# chain is synchronous: FreshRSS fetches feeds (it already handles TTL and
+# rate limits), the `mvp` poller scores new items against ccir.md with the
+# local LLM, persists to Postgres, fires CAT I pushes through ntfy, and writes
+# Obsidian notes + SAB. No RabbitMQ, no per-adapter containers, no scheduler,
+# no DLQ consumer — nothing in the main docker-compose.yml is deleted.
+#
+# Usage:
+#   docker compose -f docker-compose.mvp.yml up -d
+#   make -f ops/Makefile mvp-status
+#
+# Env comes from the same .env as the full stack (NF-6: credentials at runtime
+# via env_file, never in image layers).
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: infotriage-mvp-postgres
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:22000:5432"   # localhost-only; host :22000 -> container 5432
+    environment:
+      POSTGRES_DB: infotriage
+      POSTGRES_USER: infotriage
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-infotriage_dev}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U infotriage"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [mvp]
+
+  freshrss:
+    image: freshrss/freshrss:latest
+    container_name: infotriage-mvp-freshrss
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8088:80"      # web UI + Fever API: localhost:8088
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      TZ: Europe/Oslo
+      CRON_MIN: "23,53"          # twice an hour (not on the :00 stampede)
+    volumes:
+      - ./data/freshrss:/var/www/FreshRSS/data
+    healthcheck:
+      test: ["CMD-SHELL", "php -r 'exit(strpos(@file_get_contents(\"http://localhost:80/\"), \"<title>\") !== false ? 0 : 1);'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks: [mvp]
+
+  ntfy:
+    # Phase 12 ADR-018 pre-bake: auth.db is baked into the image at build time
+    # via BuildKit secrets; the container just runs `ntfy serve`.
+    build:
+      context: apps/ntfy
+      dockerfile: Dockerfile
+      secrets:
+        - ntfy_producer_password
+        - ntfy_reader_password
+        - ntfy_topic_prefix
+    image: infotriage-ntfy:prebaked
+    container_name: infotriage-mvp-ntfy
+    restart: unless-stopped
+    command: ["serve"]
+    ports:
+      - "127.0.0.1:22070:80"     # local-only per ADR-016
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      NTFY_BASE_URL: http://127.0.0.1:22070
+      NTFY_AUTH_FILE: /etc/ntfy/auth.db
+      NTFY_AUTH_DEFAULT_ACCESS: deny-all
+      NTFY_CACHE_FILE: /var/cache/ntfy/cache.db
+    volumes:
+      - ./data/ntfy-cache:/var/cache/ntfy:rw
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -S http://localhost:80/ 2>&1 | grep -qE 'HTTP/[0-9.]+ (200|401|403)'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks: [mvp]
+
+  mvp:
+    build:
+      context: .
+      dockerfile: apps/mvp/Dockerfile
+    container_name: infotriage-mvp
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:22017:22017"  # health: localhost:22017 (loopback-only, ADR-016)
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      INFOTRIAGE_PG_DSN: ${INFOTRIAGE_PG_DSN:-postgresql://infotriage:infotriage_dev@postgres:5432/infotriage}
+      INFOTRIAGE_BLOB_ROOT: /data/blobs
+      FRESHRSS_URL: http://freshrss:80
+      FRESHRSS_FEVER_USER: ${FRESHRSS_FEVER_USER:-admin}
+      FRESHRSS_FEVER_API_PASSWORD: ${FRESHRSS_FEVER_API_PASSWORD}
+      NTFY_URL: http://ntfy:80
+      NTFY_TOPIC_PREFIX: ${NTFY_TOPIC_PREFIX:-cnr-cat-i}
+      NTFY_TOKEN: ${NTFY_TOKEN}   # fail-closed, same as alerting (SPEC R6)
+      INFOTRIAGE_VAULT_PATH: /vault/brief-outbox
+      INFOTRIAGE_ALERT_NOTE_SUBDIR: brief-outbox
+      INFOTRIAGE_OBSIDIAN_VAULT_NAME: ${INFOTRIAGE_OBSIDIAN_VAULT_NAME:-obsidian}
+      MVP_STATE_PATH: /data/mvp/state.json
+      MVP_POLL_INTERVAL: ${MVP_POLL_INTERVAL:-300}
+      # Host LLM router (Spark primary / oMLX fallback) — same as triage/brief.
+      LLM_BASE_URL: http://host.docker.internal:8600/v1
+      LLM_API_KEY: ${LLM_API_KEY:-omlx}
+      LLM_MODEL: ${LLM_MODEL:-qwen36-ud-4bit}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./data:/data
+      - ${OBSIDIAN_VAULT_PATH:-./data/obsidian}/brief-outbox:/vault/brief-outbox:rw
+      - ./ccir.md:/app/ccir.md:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      freshrss:
+        condition: service_started
+      ntfy:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:22017/health', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks: [mvp]
+
+secrets:
+  ntfy_producer_password:
+    environment: NTFY_PRODUCER_PASSWORD
+  ntfy_reader_password:
+    environment: NTFY_READER_PASSWORD
+  ntfy_topic_prefix:
+    environment: NTFY_TOPIC_PREFIX
+
+networks:
+  mvp:
+    name: infotriage-mvp

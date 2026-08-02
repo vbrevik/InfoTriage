@@ -1,0 +1,14 @@
+# mvp poller third-party runtime dependencies
+# Mirrors apps/alerting/requirements.txt: contracts and store are installed
+# with --no-deps in the Dockerfile, so ALL transitive deps the libs import at
+# module level must be listed here (contracts/__init__ imports RabbitMQBus ->
+# aio-pika; store/__init__ imports render_atom -> feedgen; emitter/outbox ->
+# httpx; setup_logging -> json-log-formatter).
+aio-pika>=9.6
+psycopg[binary]>=3.3
+pgvector>=0.4.2
+feedgen>=0.3.1
+pydantic>=2.0
+json-log-formatter>=1.1
+PyYAML>=6.0
+httpx>=0.25
