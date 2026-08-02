@@ -2,36 +2,103 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 12-04 (dedupe/dual-trigger wiring) COMPLETE — apps/alerting/dedupe.py (compute_dedupe_id + claim, SPEC R2), sab.published now bound to q.alerting alongside verdict.ready (D-01), emitter.py split into handle_verdict_ready/handle_sab_published/_emit_if_claimed sharing one atomic claim-before-read path (SPEC R1 exactly-once), 17 new tests (6 dedupe + 11 dual-trigger), full test-safe 740/0/1 (0 regressions). See 12-04-SUMMARY.md
-stopped_at: "Phase 12 Plan 04 complete (both tasks). Next: Plan 12-05 (throttle wiring)."
-last_updated: "2026-08-01T17:58:00.000Z"
+status: Phase 12-07 (Item.body contract + store write path) COMPLETE — libs/contracts/_item.py gained optional body field (never-empty-string, no-size-cap, excluded from identity per D-04); PostgresStore/InMemoryStore put_item/get_item body-aware with a single empty/whitespace-to-NULL choke point per store; 15 new parametrized tests (tests/test_item_body_persistence.py, incl. >=1MB backstop), full test-safe 755/0/1 (0 regressions). Plan run out of wave order (depends only on 12-02; 12-05/12-06 still open). See 12-07-SUMMARY.md
+stopped_at: "Phase 12 Plan 07 complete (both tasks). Next: Plan 12-05 (throttle wiring) or 12-06, then 12-08 (seven ingest adapters set Item.body)."
+last_updated: "2026-08-02T00:00:00.000Z"
 progress:
   total_phases: 13
   completed_phases: 8
   total_plans: 48
-  completed_plans: 38
+  completed_plans: 39
 last_baseline:
   command: make -f ops/Makefile test-safe
   date: 2026-08-01
-  duration_seconds: 43.58
-  passed: 740
+  duration_seconds: 48.85
+  passed: 755
   failed: 0
   skipped: 1
-  note: "723 -> 740 (740 passed + 1 skipped): +17 tests from 12-04 (6 tests/test_alerting_dedupe.py + 11 tests/test_alerting_emitter.py). The 1 skip is unchanged from the 12-03 baseline (test_real_bearer_token_accepted, NTFY_TOKEN not exported in ambient test-safe env). 0 regressions."
+  note: "740 -> 755 (755 passed + 1 skipped): +15 tests from 12-07 (tests/test_item_body_persistence.py, parametrized over InMemoryStore/PostgresStore incl. the >=1MB no-truncation backstop). The 1 skip is unchanged from the 12-03 baseline (test_real_bearer_token_accepted, NTFY_TOKEN not exported in ambient test-safe env). 0 regressions."
   production_code_regressions: 0
   throwaway_pg_port: 22062
   prod_pg_port: 22000
   db_live_variants_unblocked: 15
   db_live_variants_source: tests/test_store_entities.py parametric Postgres variants
-  prior_baseline_sha: d83d15e (723 passed / 0 failed / 1 skipped)
-  resolved_in_commit: "bc2e568 (12-04 Task 2: dual-trigger consumption with exactly-once egress)"
-make_test_safe_status: CLEAN (740/0/1 baseline; Phase 12 Plan 04 both tasks shipped this session)
+  prior_baseline_sha: bc2e568 (740 passed / 0 failed / 1 skipped)
+  resolved_in_commit: "a529b8b (12-07 Task 2: body-aware put_item/get_item with parity + oversized-body backstop)"
+make_test_safe_status: CLEAN (755/0/1 baseline; Phase 12 Plan 07 both tasks shipped this session)
 ---
 
 # STATE — InfoTriage
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-08-01/02 — Phase 12 Plan 07 (Item.body contract + store write path) COMPLETE
+
+### Just-completed (this session)
+
+- **Phase 12-07 shipped: producer-side write path for `articles.body` (SPEC R7, ADR-003).**
+  This is the contract+store half of the bundled Phase 13 sub-wave (f) that T1-01's
+  INTEGRATED-SUB-WAVE workflow shape brings into Phase 12; it depends only on 12-02, so
+  it was executed out of wave order while 12-05/12-06 (throttle wiring) remain open.
+  2-task plan, 2 atomic commits:
+
+  1. `d95485c` — Task 1: `libs/contracts/src/contracts/_item.py` gained `body:
+     Optional[str] = None`, positioned between `summary` and `body_ref`. Comment
+     documents the three locked properties (full source text; None/never-empty-string
+     for bodyless items; no size cap — TEXT column). The computed `id` field is
+     unaffected — body deliberately does not participate in dedup identity, confirmed
+     by a same-id assertion in the new test suite.
+
+  2. `a529b8b` — Task 2: `PostgresStore.put_item` writes `body` into the INSERT column
+     list, VALUES tuple, and `ON CONFLICT DO UPDATE` clause (bound via `%s`, no
+     f-string SQL); `get_item` selects it and passes it to the `Item` constructor. The
+     empty-string/whitespace-only-to-`None` coercion is enforced once, immediately
+     before binding — the single choke point per SPEC R7/Edge R7-empty, so none of the
+     seven adapters landing in 12-08 has to remember the rule. `InMemoryStore.put_item`
+     applies the identical coercion to a `model_copy`'d `Item` (never mutates the
+     caller's object) for observable parity. New `tests/test_item_body_persistence.py`:
+     15 cases parametrized over both stores (db_live-guarded for postgres) — byte-
+     identical round-trip, all three NULL-producing input variants (with a raw-SQL
+     `NULL`-not-`''` assertion for postgres), `ON CONFLICT DO UPDATE` refresh/clear, and
+     a `>=1_100_000`-character oversized-body backstop generated at test time.
+
+- **`list_items()` in both stores intentionally NOT touched** — the plan's stated SQL
+  surface scopes only `put_item`'s INSERT/ON CONFLICT and `get_item`'s SELECT/
+  constructor; `list_items` isn't named and isn't exercised by any `<behavior>`
+  assertion. Flagged in `12-07-SUMMARY.md` for 12-08/12-09 authors' visibility, not
+  fixed (scope boundary rule — no unrequested changes).
+
+- **No deviations.** Both tasks' `<verify>` commands and every `<acceptance_criteria>`
+  passed on the first implementation; no Rule 1-3 auto-fix was needed.
+
+- **Verification:** `python -m pytest tests/test_item_body_persistence.py -x -q` → 8
+  passed / 7 skipped locally (no `INFOTRIAGE_TEST_DSN` in ambient shell); full
+  `make -f ops/Makefile test-safe` (throwaway Postgres, port 22062) → **755 passed, 1
+  skipped, 0 failed** (740 → 755, +15 new tests, 0 regressions; all 15 db_live-
+  parametrized variants of the new suite ran and passed against a real throwaway
+  Postgres, not just skipped). `black --check` clean, `mypy` clean on all 3 production
+  files + the new test file. Source-level checks confirmed: `EXCLUDED.body` present in
+  the `ON CONFLICT DO UPDATE` clause; no `.body[` slicing or HTML-sanitization calls in
+  either store file.
+
+- **`ROADMAP.md` updated** via `gsd-tools query roadmap.update-plan-progress 12`
+  (plan_count 9, summary_count 5, status "In Progress" — Phase 12 has 4 more plans
+  (12-05, 12-06, 12-08, 12-09) still open).
+
+- **`REQUIREMENTS.md` NOT updated for `ADR-003`** — `requirements.mark-complete ADR-003`
+  again returned `not_found`, matching every prior 12-0x session's identical finding:
+  `ADR-003` is a design-doc reference cited across ~10 requirement rows, not itself a
+  REQUIREMENTS.md ID with its own checkbox. No action needed.
+
+### Next
+
+- **Phase 12 Plan 05 or 12-06** (throttle wiring, still open per the phase's 5-wave map)
+  can run next — or **Plan 12-08** (the seven ingest adapters that set `Item.body`) can
+  start immediately since it depends only on this plan (12-07), not on 12-05/12-06.
+  12-08 should be a one-line change per adapter: set `Item.body` from the adapter's own
+  full-text source; the store layer already enforces NULL-not-empty-string and no-cap
+  with no adapter-side logic needed.
 
 ## Session: 2026-08-01 (continuation 5) — Phase 12 Plan 04 (dedupe/dual-trigger wiring) COMPLETE
 

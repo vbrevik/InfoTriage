@@ -316,7 +316,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 12-04-PLAN.md — Dual-trigger consumption with atomic dedupe, exactly-once across both orders (W2)
-- [ ] 12-07-PLAN.md — Sub-wave (f) part 1: `Item.body` contract + body-aware store write path (W2)
+- [x] 12-07-PLAN.md — Sub-wave (f) part 1: `Item.body` contract + body-aware store write path (W2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
