@@ -304,7 +304,7 @@ prompt elicits `[item_id: <hash>]`. Phase 999.4 closure was premature — reopen
   1. A CNR CAT I 🚩 post-write publishes a push (ntfy local-server preferred; ADR-004-friendly) with SAB excerpt + dedupe ID.
   2. The SAB remains the canonical artifact.
 
-**Plans**: 8/9 plans executed
+**Plans**: 9/9 plans executed (12-09 Tasks 1-2 complete, checkpointed at Task 3 operator UAT)
 
 Plans:
 **Wave 1**
@@ -329,7 +329,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 12-09-PLAN.md — Prohibitions P1–P5 structural guards, AC8 isolation, ADR-015 reconciliation, operator UAT (W5)
+- [ ] 12-09-PLAN.md — Prohibitions P1–P5 structural guards, AC8 isolation, ADR-015 reconciliation, operator UAT (W5) — **Tasks 1-2 COMPLETE 2026-08-02** (9-test structural prohibition suite + ADR-015 amendment); **Task 3 operator UAT OPEN (blocking)** — see 12-09-SUMMARY.md
 
 ## Backlog
 
@@ -463,6 +463,27 @@ Plans:
 Plans:
 
 - [ ] TBD (promote with /gsd-review-backlog once Q3 — ACLED license — is resolved)
+
+### Phase 999.8: Retighten freshrss/rssbridge to loopback-only bindings (BACKLOG, opened 2026-08-02)
+
+**Goal:** Change `freshrss` (`8088:80`) and `rssbridge` (`3000:80`) in `docker-compose.yml` to publish on the loopback address only (`127.0.0.1:8088:80` / `127.0.0.1:3000:80`), closing the last two ADR-016 non-loopback port exposures.
+
+**Context:** Surfaced 2026-08-02 during Phase 12 Plan 09 Task 1 (`.planning/phases/12-cnr-alerting-dissemination/12-09-SUMMARY.md`, Deviations 3): the P1 airgap guard (`tests/test_alerting_prohibitions.py::test_p1_no_off_host_egress`) parses every published port in docker-compose.yml and found `freshrss` and `rssbridge` are the only two services genuinely bound on all interfaces (`8088:80`, `3000:80`), not just localhost. They predate the ADR-016 (2026-07-23) loopback convention every later service follows. The guard names them in an explicit, documented exception list and asserts loopback-only on every OTHER service, so the doctrine regresses loudly if a new service is added without a loopback binding — but the two legacy services themselves remain exposed.
+
+**Why deferred, not fixed now:** Retightening touches `docker-compose.yml` (outside plan 12-09's `files_modified`) and is a real network-exposure behavior change (the web UIs would no longer be reachable from other LAN devices) an operator should decide — not a silent auto-fix during a prohibitions-plan execution. Both are web UIs (FreshRSS reader, rss-bridge proxy) with no auth by default, so the exposure is real but non-alerting-related.
+
+**Scope when promoted:**
+1. Flip the two port lines to `127.0.0.1:`-prefixed forms, matching the ADR-016 comment convention.
+2. Remove the `_LEGACY_NON_LOOPBACK_SERVICES` exception set from `tests/test_alerting_prohibitions.py` (the P1 guard then asserts loopback-only across 100% of services).
+3. Update this backlog entry's status and the 12-09-SUMMARY.md deviation note.
+
+**Source:** `.planning/phases/12-cnr-alerting-dissemination/12-09-SUMMARY.md` (Deviations §3), ADR-016 (airgap doctrine), `tests/test_alerting_prohibitions.py` (P1 guard + exception list).
+**Requirements:** TBD (ADR-016 alignment).
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (promote with /gsd-review-backlog when ready)
 
 ### Phase 999.6: Trace Labs OSINT contributions evaluation (BACKLOG)
 

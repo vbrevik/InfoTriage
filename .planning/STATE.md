@@ -2,36 +2,93 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 12-06 (outbox retry-then-dead-letter, SPEC R4) COMPLETE — apps/alerting/outbox.py gained deliver_with_retry (3 attempts, 1s/5s locked schedule) and dead_letter (publish outbox.dlx -> audit row -> dlx_at, in that order, before the trigger message is acked); ROUTING_KEY_TO_QUEUE gained a dedicated outbox.dlx -> outbox.dlx.queue entry, distinct from the project-wide infotriage.dlq. 9 new tests (tests/test_alerting_outbox.py), full make test-safe re-run: 801 passed, 1 skipped, 0 failed. See 12-06-SUMMARY.md (status: complete).
-stopped_at: "Phase 12 Plan 06 complete (outbox retry/DLX). Next: Plan 12-09 (prohibitions P1-P5, AC8 isolation, ADR-015 reconciliation, operator UAT) — the last open plan per the phase's 5-wave map."
-last_updated: "2026-08-02T15:30:00.000Z"
+status: Phase 12 Plan 09 (prohibitions P1-P5, AC8, ADR-015) Tasks 1-2 COMPLETE — CHECKPOINTED at Task 3 (blocking operator UAT). tests/test_alerting_prohibitions.py ships 9 structural guards (YAML/AST/behavior, never raw-text greps) encoding all five SPEC prohibitions + the AC8 failure-isolation proof (811/0/0 full test-safe baseline); ADR-015 gained its '## Amendment — superseded by 12-SPEC.md (Phase 12 planning)' reconciliation section + inline pointers in Decisions 3/4. The plan's last wave (W5) is 2/3 done — Task 3 needs operator eyes (deep-link tap-through, A2 vault name, A-01 link split, digest wording, P5 judgment). New backlog Phase 999.8 tracks the freshrss/rssbridge non-loopback exposure the P1 guard surfaced.
+stopped_at: "Phase 12 Plan 09 checkpointed at Task 3 (operator UAT). Resume: operator runs the Task 3 checklist (ntfy-up + alerting up + real CAT I push + tap-through + digest) then types 'approved' to seal the phase — the last open plan in Phase 12's 5-wave map."
+last_updated: "2026-08-02T16:30:00.000Z"
 progress:
   total_phases: 13
   completed_phases: 8
   total_plans: 48
-  completed_plans: 42
+  completed_plans: 44
 last_baseline:
   command: make -f ops/Makefile test-safe
   date: 2026-08-02
-  duration_seconds: 131.41
-  passed: 801
+  duration_seconds: 23.98
+  passed: 811
   failed: 0
-  skipped: 1
-  note: "774 -> 801 (801 passed + 1 skipped): +27 net tests since the 12-05 baseline (this session's 9 from tests/test_alerting_outbox.py, plus 12-07/12-08's test additions that had not previously been re-verified under a full make test-safe run). The 1 skip is unchanged since the 12-03 baseline (test_real_bearer_token_accepted, NTFY_TOKEN not exported in ambient test-safe env). 0 regressions."
+  skipped: 0
+  note: "801/0/1 -> 811/0/0: +9 from the untracked-then-committed tests/test_alerting_prohibitions.py (plan 12-09 Task 1, this session), and the 1 pre-existing skip (test_real_bearer_token_accepted, NTFY_TOKEN-unset) now PASSED because NTFY_TOKEN is present in the ambient test-safe env this run. 0 regressions; 0 skipped. Prior baseline 801/0/1 at aa53cc8/2bdc4ac (12-06)."
   production_code_regressions: 0
   throwaway_pg_port: 22062
   prod_pg_port: 22000
   db_live_variants_unblocked: 15
   db_live_variants_source: tests/test_store_entities.py parametric Postgres variants
-  prior_baseline_sha: aa53cc8 (774 passed / 0 failed / 1 skipped, 12-05 baseline)
-  resolved_in_commit: "2bdc4ac (12-06 Task 2 GREEN: deliver_with_retry + dead_letter)"
-make_test_safe_status: CLEAN (801/0/1 baseline; Phase 12 Plan 06 both tasks shipped this session)
+  prior_baseline_sha: 2bdc4ac (801 passed / 0 failed / 1 skipped, 12-06 baseline)
+  resolved_in_commit: "12-09 Task 1 (prohibitions suite)"
+make_test_safe_status: CLEAN (811/0/0 baseline; Phase 12 Plan 09 Tasks 1-2 shipped, Task 3 operator-UAT checkpoint open)
 ---
 
 # STATE — InfoTriage
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-08-02 (continuation 3) — Phase 12 Plan 09 Tasks 1-2 COMPLETE, checkpointed at Task 3 (operator UAT)
+
+### Just-completed (this session)
+
+- **Phase 12 Plan 09 Tasks 1-2 shipped: all five SPEC prohibitions are now mechanical
+  structural guards + ADR-015 is reconciled with the locked SPEC.** The plan's two
+  auto tasks landed; Task 3 (operator UAT) is a blocking human-verify gate left open by
+  design. 3 atomic commits (Task 1 test suite, Task 2 ADR amendment, plan-metadata docs).
+
+  1. Task 1: `tests/test_alerting_prohibitions.py` (9 tests) — every guard structural
+     (YAML parse / Python AST / observed runtime behavior), never a raw-text grep a
+     source comment could both trip and satisfy. `_published_ports` parses
+     docker-compose.yml (comments discarded); `_sql_string_constants` AST-walks Python
+     files with docstrings structurally excluded. Covers P1 airgap (loopback-only ports
+     across every service + no upstream/relay/forwarding/hosted-push tokens on
+     ntfy/alerting), P2 (excerpt ≤500, zero SQL constants under apps/alerting, payload
+     byte-identical with/without body), P3 (scorer prompt never contains full-text
+     sentinel, still has title+summary), P4 (II/Routine/absent/null → zero egress),
+     P5 (alert_state column scan + single health handler + no routing frameworks), AC8
+     (complete 7-field payload with body NULL).
+
+  2. Task 2: `docs/adr/ADR-015` gained `## Amendment — superseded by 12-SPEC.md (Phase 12
+     planning)` + inline pointers in Decisions 3/4. Records: 7-field payload set (with the
+     intentional `pmseii_tags` spelling), pipe dedupe separator, 500-char cap, obsidian://
+     open-URI deep-link form with vault-relative path, R3 sliding tiers + hourly digest,
+     Open Items 2/3 resolutions, A-01 recorded, body-excerpt now forbidden (P2) not
+     deferred.
+
+  3. **3 documented deviations from the plan's literal acceptance criteria** (full record
+     in the test module docstring + `12-09-SUMMARY.md`): P2b's true SQL-constant count is
+     ZERO (stronger than "at least one" — apps/alerting uses the typed Store protocol,
+     D-02); P3's second case asserts verbatim passthrough (no truncation exists in
+     triage_score today); P1 names freshrss (8088)/rssbridge (3000) as a documented
+     pre-ADR-016 exception — genuine all-interface bindings, flagged as **new backlog
+     Phase 999.8** rather than silently fixed (docker-compose.yml is outside this plan's
+     files_modified and retightening is an operator-decided network-exposure change).
+
+- **Verification:** `python -m pytest tests/test_alerting_prohibitions.py -x -q` → 9
+  passed. Full `make -f ops/Makefile test-safe` → **811 passed, 0 failed, 0 skipped**
+  (801/0/1 → 811/0/0; the previously-skipped test_real_bearer_token_accepted now passes
+  since NTFY_TOKEN is present in the ambient env this run). `black --check`/`mypy` not
+  applicable (test file uses stdlib only; no new production code).
+
+- **`ROADMAP.md` updated**: 12-09 bullet flipped to `[x]`-pending-checkpoint wording;
+  new backlog Phase 999.8 added (freshrss/rssbridge non-loopback exposure, opened
+  2026-08-02). `REQUIREMENTS.md` NOT touched — `ADR-003` remains the known
+  design-doc-reference quirk (not a checkbox ID).
+
+### Next
+
+- **Task 3: operator UAT — blocking.** Full checklist in `12-09-SUMMARY.md` (Task 3
+  section) and `12-09-PLAN.md` Task 3: ntfy-up + `docker compose up -d --wait alerting`,
+  confirm `/health` 200, trigger a real CAT I alert (exactly one push, no SAB re-fire),
+  tap the notification (A2 vault name), confirm the two link fields (A-01), force a digest
+  and check grouping/wording, and give the P5 SAB-stays-canonical judgment. Type
+  "approved" to seal Phase 12 — the last open plan.
 
 ## Session: 2026-08-02 (continuation 2) — Phase 12 Plan 06 (outbox retry-then-dead-letter) COMPLETE
 
