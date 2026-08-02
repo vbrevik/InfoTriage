@@ -2,36 +2,109 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 12-07 (Item.body contract + store write path) COMPLETE — libs/contracts/_item.py gained optional body field (never-empty-string, no-size-cap, excluded from identity per D-04); PostgresStore/InMemoryStore put_item/get_item body-aware with a single empty/whitespace-to-NULL choke point per store; 15 new parametrized tests (tests/test_item_body_persistence.py, incl. >=1MB backstop), full test-safe 755/0/1 (0 regressions). Plan run out of wave order (depends only on 12-02; 12-05/12-06 still open). See 12-07-SUMMARY.md
-stopped_at: "Phase 12 Plan 07 complete (both tasks). Next: Plan 12-05 (throttle wiring) or 12-06, then 12-08 (seven ingest adapters set Item.body)."
-last_updated: "2026-08-02T00:00:00.000Z"
+status: Phase 12-05 (3-tier sliding-window throttle + hourly PMESII digest) COMPLETE — apps/alerting/throttle.py (check_throttle, 60s cap 5 / 600s cap 10) wired into emitter.py's _emit_if_claimed between claim and egress; throttled alerts marked suppressed (never dropped) via Store.mark_alert_suppressed; apps/alerting/digest.py (group_by_pmesii/build_digest_message/publish_digest/run_digest_tick) adds the D-03 hourly in-process digest, gathered as alerting_worker.py's third coroutine. 19 new tests (tests/test_alerting_throttle.py), full test-safe 774/0/1 (0 regressions). See 12-05-SUMMARY.md
+stopped_at: "Phase 12 Plan 05 complete (both tasks). Next: Plan 12-06, then 12-08 (seven ingest adapters set Item.body) — 12-08 depends only on 12-07, not 12-05/12-06."
+last_updated: "2026-08-02T10:20:00.000Z"
 progress:
   total_phases: 13
   completed_phases: 8
   total_plans: 48
-  completed_plans: 39
+  completed_plans: 40
 last_baseline:
   command: make -f ops/Makefile test-safe
-  date: 2026-08-01
-  duration_seconds: 48.85
-  passed: 755
+  date: 2026-08-02
+  duration_seconds: 49.43
+  passed: 774
   failed: 0
   skipped: 1
-  note: "740 -> 755 (755 passed + 1 skipped): +15 tests from 12-07 (tests/test_item_body_persistence.py, parametrized over InMemoryStore/PostgresStore incl. the >=1MB no-truncation backstop). The 1 skip is unchanged from the 12-03 baseline (test_real_bearer_token_accepted, NTFY_TOKEN not exported in ambient test-safe env). 0 regressions."
+  note: "755 -> 774 (774 passed + 1 skipped): +19 tests from 12-05 (tests/test_alerting_throttle.py — throttle boundary/precision unit tests, emitter integration tests, digest group/build/publish/tick tests). The 1 skip is unchanged from the 12-03 baseline (test_real_bearer_token_accepted, NTFY_TOKEN not exported in ambient test-safe env). 0 regressions."
   production_code_regressions: 0
   throwaway_pg_port: 22062
   prod_pg_port: 22000
   db_live_variants_unblocked: 15
   db_live_variants_source: tests/test_store_entities.py parametric Postgres variants
   prior_baseline_sha: bc2e568 (740 passed / 0 failed / 1 skipped)
-  resolved_in_commit: "a529b8b (12-07 Task 2: body-aware put_item/get_item with parity + oversized-body backstop)"
-make_test_safe_status: CLEAN (755/0/1 baseline; Phase 12 Plan 07 both tasks shipped this session)
+  resolved_in_commit: "aa53cc8 (12-05 Task 2: hourly PMESII-grouped digest tick)"
+make_test_safe_status: CLEAN (774/0/1 baseline; Phase 12 Plan 05 both tasks shipped this session)
 ---
 
 # STATE — InfoTriage
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-08-02 — Phase 12 Plan 05 (3-tier throttle + hourly PMESII digest) COMPLETE
+
+### Just-completed (this session)
+
+- **Phase 12-05 shipped: SPEC R3's sliding-window throttle + D-03's hourly digest.** 2-task
+  plan, 2 atomic commits:
+
+  1. `5ea4911` — Task 1: `apps/alerting/throttle.py` — `check_throttle(store, *, now=None)`
+     evaluates the 60-second tier (cap 5) then the 600-second tier (cap 10) against
+     `Store.count_alerts_in_window`, returning a `ThrottleVerdict` naming whichever tier
+     tripped. `emitter.py`'s `_emit_if_claimed` reordered so item/enrichment are read
+     BEFORE the throttle gate (needed for the suppression record's pmesii/title, not just
+     the payload), then runs the gate between the winning claim and egress — matching
+     RESEARCH's dedupe-then-throttle-then-digest priority ordering. A throttled alert calls
+     `store.mark_alert_suppressed` and produces zero egress; the message is still acked.
+     `tests/test_alerting_throttle.py` (new file) proves the 5-pass/6-throttle boundary, the
+     sliding-vs-calendar-bucket precision property, the 600s tier, and suppression
+     bookkeeping — all via an injected clock, no sleeping.
+
+  2. `aa53cc8` — Task 2: `apps/alerting/digest.py` — `group_by_pmesii` (comma-split PMESII
+     text, first non-empty tag as primary domain, null/empty grouped under an explicit
+     "Unclassified" heading, never dropped), `build_digest_message` (D-03's exact title
+     `"⚠ N suppressed CAT I alerts"` + one entry per row with title/deep-link/alert_id),
+     `publish_digest` (delivers through the existing `NtfyClient`, marks digested only
+     after success — a failed digest retries whole next tick), and `run_digest_tick` (the
+     D-03 in-process hourly loop, cloned from `apps/wiki/wiki_worker.py`'s `run_periodic`
+     shape). `alerting_worker.py` gains `--digest-interval`
+     (`INFOTRIAGE_ALERTING_DIGEST_INTERVAL`, default 3600) and gathers `run_digest_tick` as
+     a third coroutine alongside the health server and consumer.
+
+- **2 deviations, both auto-fixed (Rule 3 blocking + Rule 1 bug), full detail in
+  `12-05-SUMMARY.md`:**
+  1. `apps/alerting/digest.py` collides by module name with the pre-existing
+     `apps/triage/digest.py` (SAB/tiered digest generator) under pytest's shared flat
+     `pythonpath` (apps/triage listed first in `pyproject.toml`) — a pytest-session-only
+     artifact (each app runs in its own single-app Docker container in production, per
+     `apps/alerting/Dockerfile`). Fixed by loading `apps/alerting/digest.py` explicitly via
+     `importlib.util.spec_from_file_location` in the test file only; no change to the
+     shared pythonpath order (which `tests/test_ccir_sync.py`/`tests/test_write_bluf.py`
+     depend on resolving to `apps/triage/digest.py`).
+  2. D-03's literal `"⚠"` title glyph raised `UnicodeEncodeError` through httpx's
+     strict-ASCII header encoding (`outbox.py`, not in this plan's `files_modified`).
+     `publish_digest` now passes an ASCII-safe `"!"` substitute as the `X-Title` header
+     value only; `build_digest_message`'s returned title (asserted on by tests, embedded in
+     the JSON payload body) keeps the exact D-03 glyph text.
+
+- **Verification:** `python -m pytest tests/test_alerting_throttle.py tests/test_alerting_emitter.py
+  tests/test_alerting_dedupe.py tests/test_alerting_tracer.py -q` → **42 passed**. Full
+  `make -f ops/Makefile test-safe` → **774 passed, 1 skipped, 0 failed** (755 → 774, +19 new
+  tests, 0 regressions; the 1 skip is the pre-existing `test_real_bearer_token_accepted`
+  NTFY_TOKEN-not-in-ambient-env skip, unchanged since 12-03). `black --check`/`mypy` clean on
+  all new/modified production files.
+
+- **`ROADMAP.md` updated** via `gsd-tools query roadmap.update-plan-progress 12` (plan_count 9,
+  summary_count 6, status "In Progress" — Phase 12 has 3 more plans (12-06, 12-08, 12-09) still
+  open).
+
+- **`REQUIREMENTS.md` NOT updated for `ADR-003`** — `requirements.mark-complete ADR-003`
+  returned `not_found` again, matching every prior 12-0x session's identical finding: `ADR-003`
+  is a design-doc reference, not itself a REQUIREMENTS.md ID with its own checkbox. No action
+  needed.
+
+- **Flagged for a future plan (not fixed, out of this plan's scope):** `outbox.py`'s
+  strict-ASCII `X-Title` header handling is a latent pre-existing gap since 12-01 — it also
+  affects real CAT I alert titles containing non-ASCII characters, not just this plan's digest
+  title. Whichever future plan owns `outbox.py` should address it.
+
+### Next
+
+- **Phase 12 Plan 06** is next per the phase's 5-wave plan map, or **Plan 12-08** (the seven
+  ingest adapters that set `Item.body`) can start immediately since it depends only on 12-07,
+  not 12-05/12-06.
 
 ## Session: 2026-08-01/02 — Phase 12 Plan 07 (Item.body contract + store write path) COMPLETE
 
