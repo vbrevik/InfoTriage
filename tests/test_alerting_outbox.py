@@ -23,7 +23,13 @@ import pytest
 from store import InMemoryStore
 
 import outbox
-from outbox import DLX_ROUTING_KEY, RETRY_SCHEDULE, NtfyClient, dead_letter, deliver_with_retry
+from outbox import (
+    DLX_ROUTING_KEY,
+    RETRY_SCHEDULE,
+    NtfyClient,
+    dead_letter,
+    deliver_with_retry,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -304,9 +310,7 @@ def test_dead_letter_body_carries_full_payload_plus_reason_and_attempts(tmp_path
     _seed_claim(store, payload, item_id)
 
     asyncio.run(
-        dead_letter(
-            store, bus, payload, item_id=item_id, reason="boom", attempts=3
-        )
+        dead_letter(store, bus, payload, item_id=item_id, reason="boom", attempts=3)
     )
 
     _, dlx_item_id, dlx_payload = bus.published[0]
@@ -330,9 +334,7 @@ def test_dead_letter_audit_row_op_and_details(tmp_path):
     _seed_claim(store, payload, item_id)
 
     asyncio.run(
-        dead_letter(
-            store, bus, payload, item_id=item_id, reason="boom", attempts=3
-        )
+        dead_letter(store, bus, payload, item_id=item_id, reason="boom", attempts=3)
     )
 
     assert len(store._audit) == 1

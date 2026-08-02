@@ -4,10 +4,16 @@ ntfy push, gated by dedupe (12-04) and the sliding-window throttle (12-05),
 with an hourly PMESII-grouped digest of anything the throttle suppressed.
 
 bus -> q.alerting -> emitter (claim, throttle) -> Store -> 7-field payload ->
-authenticated POST to the ntfy cnr-cat-i topic, plus a third coroutine
-(`run_digest_tick`) that ticks hourly in-process and publishes a grouped
-digest when suppressed rows exist. No retry/DLX yet — that is a later
-expansion plan.
+authenticated POST to the ntfy cnr-cat-i topic, retried on the SPEC R4 1s/5s
+schedule and dead-lettered to `outbox.dlx.queue` on exhaustion (plan 12-06),
+plus a third coroutine (`run_digest_tick`) that ticks hourly in-process and
+publishes a grouped digest when suppressed rows exist.
+
+`store` and `bus` (both opened below) reach the retry/dead-letter path
+(`outbox.deliver_with_retry`/`dead_letter`) via the existing `run_consumer(bus,
+store, client)` call — no new construction wiring needed: `run_consumer`'s
+handler already threads `store` and `bus` through `emitter.py`'s
+claim/throttle/emit chain down to the single `deliver_with_retry` call site.
 
 Usage:
     python apps/alerting/alerting_worker.py --dsn ... --amqp-dsn ...

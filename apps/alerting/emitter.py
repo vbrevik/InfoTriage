@@ -27,6 +27,7 @@ from typing import Iterator
 
 from deep_link import item_note_link, sab_note_link
 from dedupe import claim, compute_dedupe_id
+from outbox import deliver_with_retry
 from throttle import check_throttle
 
 log = logging.getLogger(__name__)
@@ -78,7 +79,7 @@ def build_alert_payload(
 
 
 async def _emit_if_claimed(
-    item_id: str, cnr_tier: str, store, client, *, now=None
+    item_id: str, cnr_tier: str, store, client, *, bus=None, now=None
 ) -> None:
     """Shared emit path: claim first, egress only on a winning claim.
 
@@ -94,6 +95,11 @@ async def _emit_if_claimed(
     digest). A throttled alert is marked suppressed rather than dropped
     (SPEC R3) — it is not lost, it is pending the next hourly digest — and
     the message is still acked by the caller; only the egress is skipped.
+
+    `bus` defaults to None so pre-12-06 direct callers (the tracer test,
+    the throttle/emitter test suites) keep working unchanged — none of them
+    exercise the delivery-exhaustion path, so deliver_with_retry never
+    reaches for it. run_consumer always passes the real bus (SPEC R4).
     """
     alert_id = uuid.uuid4().hex
     dedupe_id, claimed = claim(
@@ -129,10 +135,14 @@ async def _emit_if_claimed(
     alert_payload = build_alert_payload(
         item, enrichment, item_id, cnr_tier, alert_id=alert_id, dedupe_id=dedupe_id
     )
-    await client.deliver(alert_payload, item_title=item_title)
+    await deliver_with_retry(
+        client, store, bus, alert_payload, item_id=item_id, item_title=item_title
+    )
 
 
-async def handle_verdict_ready(payload: dict, store, client, *, now=None) -> None:
+async def handle_verdict_ready(
+    payload: dict, store, client, *, bus=None, now=None
+) -> None:
     """Handle one verdict.ready trigger — CAT I only, else no egress at all.
 
     Reads the item id and the cnr value off the decoded event body itself
@@ -145,7 +155,7 @@ async def handle_verdict_ready(payload: dict, store, client, *, now=None) -> Non
     item_id = payload.get("item_id")
     if not item_id:
         return
-    await _emit_if_claimed(item_id, cnr_tier, store, client, now=now)
+    await _emit_if_claimed(item_id, cnr_tier, store, client, bus=bus, now=now)
 
 
 def _extract_cat_i_item_ids(payload: dict) -> Iterator[str]:
@@ -164,18 +174,20 @@ def _extract_cat_i_item_ids(payload: dict) -> Iterator[str]:
                 yield item_id
 
 
-async def handle_sab_published(payload: dict, store, client, *, now=None) -> None:
+async def handle_sab_published(
+    payload: dict, store, client, *, bus=None, now=None
+) -> None:
     """Handle one sab.published trigger — the fallback second look at CAT I refs.
 
     Does NOT read the message header for an item id: for this event the
     header identifies the SAB snapshot, not an article.
     """
     for item_id in _extract_cat_i_item_ids(payload):
-        await _emit_if_claimed(item_id, CAT_I, store, client, now=now)
+        await _emit_if_claimed(item_id, CAT_I, store, client, bus=bus, now=now)
 
 
 async def handle_trigger(
-    item_id: str, payload: dict, store, client, *, now=None
+    item_id: str, payload: dict, store, client, *, bus=None, now=None
 ) -> None:
     """Back-compat shim for the pre-12-04 tracer call shape (item_id passed
     explicitly, sourced from the message header).
@@ -188,7 +200,7 @@ async def handle_trigger(
     cnr_tier = payload.get("cnr")
     if cnr_tier != CAT_I:
         return
-    await _emit_if_claimed(item_id, cnr_tier, store, client, now=now)
+    await _emit_if_claimed(item_id, cnr_tier, store, client, bus=bus, now=now)
 
 
 async def run_consumer(bus, store, client) -> None:
@@ -205,13 +217,20 @@ async def run_consumer(bus, store, client) -> None:
     await bus._ensure_connection()
 
     async def _handler(message) -> None:
+        # message.process() acks on clean exit, nacks on exception. The
+        # delivery outcome (delivered or dead-lettered) is recorded durably
+        # inside deliver_with_retry/dead_letter BEFORE this block returns —
+        # see outbox.py's deliver_with_retry docstring. Do not swallow any
+        # exception raised below; a crash here must propagate so this
+        # context nacks/leaves the message unacked rather than falsely
+        # acking a trigger whose outcome was never durably recorded.
         async with message.process():
             body = json.loads(message.body.decode())
             event = body.get("event")
             if event == "verdict.ready":
-                await handle_verdict_ready(body, store, client)
+                await handle_verdict_ready(body, store, client, bus=bus)
             elif event == "sab.published":
-                await handle_sab_published(body, store, client)
+                await handle_sab_published(body, store, client, bus=bus)
             else:
                 log.warning(
                     "alerting: unrecognized event=%s on q.alerting — ignoring", event
