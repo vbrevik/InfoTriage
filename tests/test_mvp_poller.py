@@ -255,6 +255,86 @@ def test_poll_once_dedupes_repeat_items_and_advances_since_id(
     assert len(handler_cls.requests) == 1  # unchanged
 
 
+def test_poll_once_bad_item_does_not_kill_cycle(
+    monkeypatch, tmp_path, fever_server, ntfy_server
+):
+    """One throwing item must not abort the cycle (per-item isolation).
+
+    The bad item is LAST so the since_id cursor stays below it: it is NOT
+    advanced on failure and must be re-fetched (and fail again) next cycle
+    — while the good item before it is still scored, persisted, and pushed.
+    (Known cursor limitation: an item that fails BEFORE a later good item
+    advances past it is not retried — logged and accepted for the MVP.)
+    """
+    calls: list[str] = []
+
+    def flaky_scorer(item_dict):
+        title = item_dict.get("title", "")
+        calls.append(title)
+        if title == "Eksploderende lager":
+            raise RuntimeError("LLM timeout")
+        return {
+            **item_dict,
+            "ccir": "CIR-1",
+            "cnr": "I",
+            "score": 9,
+            "bucket": "read",
+            "why": "test rationale",
+            "pmesii": "Military",
+            "tessoc": "none",
+        }
+
+    monkeypatch.setattr("poller.score_item", flaky_scorer)
+    base_url, handler_cls = ntfy_server
+    _FeverHandler.items = [
+        _fever_item(1, title="Rutinesak", html="Innhold 1"),
+        _fever_item(2, title="Eksploderende lager", html="Innhold 2"),
+    ]
+    store = InMemoryStore(blob_root=tmp_path)
+    state = _PollState(tmp_path / "state.json")
+
+    from outbox import NtfyClient
+
+    client = NtfyClient(base_url, "secret-token", "cnr-cat-i")
+    result = asyncio.run(
+        poll_once(
+            store,
+            client,
+            base_url=fever_server,
+            user="admin",
+            password="pw",
+            vault_path=tmp_path / "vault",
+            state=state,
+        )
+    )
+
+    # The bad item did not kill the cycle; the good item survived.
+    assert result["scored"] == 1
+    assert result["pushed"] == 1
+    assert len(handler_cls.requests) == 1
+    # Cursor stopped at the good item (1); the bad item (2) not advanced.
+    assert state.since_id == 1
+
+    # Second poll: cursor below the bad item -> it re-fetches and fails again,
+    # the good item is deduped away (store hit) -> no new push.
+    second = asyncio.run(
+        poll_once(
+            store,
+            client,
+            base_url=fever_server,
+            user="admin",
+            password="pw",
+            vault_path=tmp_path / "vault",
+            state=state,
+        )
+    )
+    assert second["scored"] == 0
+    assert second["pushed"] == 0
+    assert len(handler_cls.requests) == 1  # unchanged
+    assert calls.count("Eksploderende lager") == 2  # retried next cycle
+    assert state.since_id == 1  # still stuck on the bad item — by design
+
+
 def test_poll_once_kept_items_write_vault_notes(
     monkeypatch, tmp_path, fever_server, ntfy_server
 ):

@@ -173,48 +173,62 @@ async def poll_once(
     new_items: list[Item] = []
     for raw in sorted(fetched, key=lambda r: int(r.get("id") or 0)):
         fever_id = int(raw.get("id") or 0)
-        item = _build_item(raw)
-        if _kept(item.id, store):
-            skipped += 1
-            state.advance(fever_id)
-            continue
+        try:
+            item = _build_item(raw)
+            if _kept(item.id, store):
+                skipped += 1
+                state.advance(fever_id)
+                continue
 
-        # Score (local LLM via the exact triage scorer).
-        result = await asyncio.to_thread(
-            score_item,
-            {"title": item.title, "source": item.source, "summary": item.summary},
-        )
-        fields = {
-            "ccir": result.get("ccir"),
-            "cnr": result.get("cnr"),
-            "score": result.get("score"),
-            "bucket": result.get("bucket"),
-            "why": result.get("why"),
-            "pmesii": result.get("pmesii"),
-            "tessoc": result.get("tessoc"),
-        }
-
-        # Persist BEFORE alerting (same ordering guarantee as the old lane).
-        await asyncio.to_thread(store.put_item, item)
-        await asyncio.to_thread(store.put_enrichment, item.id, fields)
-        scored += 1
-        new_items.append(item)
-
-        # CAT I -> the shipped alerting emit path, synchronously, bus=None.
-        if fields.get("cnr") == "I":
-            await handle_verdict_ready(
-                {"event": "verdict.ready", "item_id": item.id, "cnr": "I"},
-                store,
-                client,
-                bus=None,
+            # Score (local LLM via the exact triage scorer).
+            result = await asyncio.to_thread(
+                score_item,
+                {"title": item.title, "source": item.source, "summary": item.summary},
             )
-            pushed += 1
+            fields = {
+                "ccir": result.get("ccir"),
+                "cnr": result.get("cnr"),
+                "score": result.get("score"),
+                "bucket": result.get("bucket"),
+                "why": result.get("why"),
+                "pmesii": result.get("pmesii"),
+                "tessoc": result.get("tessoc"),
+            }
 
-        state.advance(fever_id)
+            # Persist BEFORE alerting (same ordering guarantee as the old lane).
+            await asyncio.to_thread(store.put_item, item)
+            await asyncio.to_thread(store.put_enrichment, item.id, fields)
+            scored += 1
+            new_items.append(item)
 
-    # Obsidian notes + SAB for kept items (same filter brief used).
+            # CAT I -> the shipped alerting emit path, synchronously, bus=None.
+            if fields.get("cnr") == "I":
+                await handle_verdict_ready(
+                    {"event": "verdict.ready", "item_id": item.id, "cnr": "I"},
+                    store,
+                    client,
+                    bus=None,
+                )
+                pushed += 1
+
+            state.advance(fever_id)
+        except Exception as exc:
+            # One bad item must not kill the cycle — log and retry next poll.
+            # since_id is NOT advanced on failure, so the item re-fetches.
+            log.error(
+                "mvp: item %s failed, will retry next cycle: %s",
+                fever_id,
+                exc,
+                exc_info=True,
+            )
+
+    # Obsidian notes + SAB for kept items (same filter brief used). A vault
+    # write error must not take the whole cycle down; notes are best-effort.
     if new_items:
-        await asyncio.to_thread(_write_notes, store, new_items, vault_path)
+        try:
+            await asyncio.to_thread(_write_notes, store, new_items, vault_path)
+        except Exception as exc:
+            log.error("mvp: vault note write failed: %s", exc, exc_info=True)
 
     log.info(
         "mvp: cycle done — scored=%d pushed=%d skipped=%d",
@@ -309,6 +323,9 @@ async def main() -> None:
 
     vault_path = Path(os.environ.get("INFOTRIAGE_VAULT_PATH", "/vault/brief-outbox"))
     state = _PollState(Path(os.environ.get("MVP_STATE_PATH", "/data/mvp/state.json")))
+
+    # Liveness endpoint for the compose healthcheck — runs alongside the loop.
+    health_task = asyncio.create_task(run_health_server())
 
     with PostgresStore(dsn=pg_dsn, blob_root=blob_root) as store:
         client = NtfyClient(ntfy_url, ntfy_token, ntfy_topic)
