@@ -27,6 +27,7 @@ from typing import Iterator
 
 from deep_link import item_note_link, sab_note_link
 from dedupe import claim, compute_dedupe_id
+from throttle import check_throttle
 
 log = logging.getLogger(__name__)
 
@@ -85,6 +86,14 @@ async def _emit_if_claimed(
     itself is the single atomic check-and-set (SPEC R1). A losing claim
     (the second of two racing triggers, or a re-fire within the TTL) returns
     immediately with zero egress.
+
+    After a winning claim, the item/enrichment rows are read (needed both
+    for the payload AND for the suppression record, since a throttled alert
+    still needs its pmesii/title recorded), then the sliding-window throttle
+    gate runs (RESEARCH.md priority ordering: dedupe, then throttle, then
+    digest). A throttled alert is marked suppressed rather than dropped
+    (SPEC R3) — it is not lost, it is pending the next hourly digest — and
+    the message is still acked by the caller; only the egress is skipped.
     """
     alert_id = uuid.uuid4().hex
     dedupe_id, claimed = claim(
@@ -102,10 +111,24 @@ async def _emit_if_claimed(
         )
         return
 
+    item_title = getattr(item, "title", None) or ""
+
+    verdict = check_throttle(store, now=now)
+    if not verdict.passed:
+        pmesii_text = (enrichment.get("pmesii") or "").strip() or None
+        store.mark_alert_suppressed(dedupe_id, pmesii=pmesii_text, title=item_title)
+        log.info(
+            "alerting: throttled item_id=%s dedupe_id=%s tier=%s — suppressed, "
+            "pending next digest",
+            item_id,
+            dedupe_id,
+            verdict.tier,
+        )
+        return
+
     alert_payload = build_alert_payload(
         item, enrichment, item_id, cnr_tier, alert_id=alert_id, dedupe_id=dedupe_id
     )
-    item_title = getattr(item, "title", None) or ""
     await client.deliver(alert_payload, item_title=item_title)
 
 
