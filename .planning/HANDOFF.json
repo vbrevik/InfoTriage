@@ -1,16 +1,16 @@
 {
   "version": "1.0",
-  "timestamp": "2026-07-23T19:00:00Z",
+  "timestamp": "2026-08-02T16:30:00Z",
   "phase": "12-cnr-alerting-dissemination",
   "phase_name": "CNR alerting / dissemination",
   "phase_dir": ".planning/phases/12-cnr-alerting-dissemination",
   "previous_phase": "11-socmint",
   "previous_phase_dir": ".planning/phases/11-socmint",
-  "plan": 0,
-  "task": 1,
-  "total_tasks": 1,
-  "status": "in_progress",
-  "context_summary": "M1 ship-gate closed (Phase 7, 2026-07-12). M2 in flight: Phase 8-11 closed; forensics housekeeping (STATE/HANDOFF/PROJECT/ROADMAP/999.archive) committed 2026-07-22. Phase 12 (CNR alerting / dissemination) entered execution. Sub-wave (a) ntfy container ITERATED 9 ROUNDS across 2026-07-23 in-container-bashscript bootstrap attempts before the operator terminated with 'kill the per-cmd-pattern-matching approach; use sealed bind-mount'. Sub-wave (a) is now LOCKED on the sealed-bind-mount architecture (ADR-017 sealed-bind-mount addendum). Phase 12 continues with sub-waves (b)+(c)+(d) on the rebuilt foundation; (f) Phase 13 body-wiring is a bundled sub-wave. Phase 12 sub-wave (a) subsequently PIVOTED 2026-07-23 to Dockerfile pre-bake + BuildKit secrets (ADR-018); sealed-bind-mount substrate (commit 5c52056 + audit findings) archived to docs/planning/_archived/phase-12-sealed-bind-mount-attempt/. Phase 12 continues on the new ADR-018 foundation.",
+  "plan": 9,
+  "task": 3,
+  "total_tasks": 3,
+  "status": "in_progress_checkpoint",
+  "context_summary": "Phase 12 (CNR alerting / dissemination) is at its FINAL plan (12-09), W5, checkpointed at Task 3 (blocking operator UAT). Plans 12-01..12-08 are complete: tracer, alert_state substrate, ntfy bearer-token ACL (ADR-018 pre-bake), dual-trigger dedupe, throttle + hourly digest, outbox retry/DLX, Item.body contract + store write path, and 6/7 adapter body-population (ACLED deferred to backlog 999.7). Plan 12-09 Tasks 1-2 shipped 2026-08-02: 9-test structural prohibition suite (P1-P5 + AC8) + ADR-015 reconciliation amendment; make test-safe 811/0/0. Task 3 (operator UAT: deep-link tap-through, A2 vault name, A-01 link split, digest wording, P5 judgment) is the phase's last gate — typing 'approved' seals Phase 12. Backlog Phase 999.8 opened 2026-08-02 for the freshrss/rssbridge non-loopback exposure surfaced by the P1 guard.",
   "phase_11_closeout": {
     "status": "completed",
     "verdict": "PASS",
@@ -333,9 +333,9 @@
   "blockers": [],
   "async_jobs": [],
   "human_actions_pending": [
-    "Phase 12 sub-wave (a) PIVOT decision recorded (ADR-018 accepted; sealed-bind-mount audit remains as historical record). Forward path: ship sub-waves (b)+(c)+(d)+(e)+(f) on the Dockerfile pre-bake foundation per phase_12_subwave_a_final_architecture.ship_next.",
-    "Operator commit (chore(phase-12-pivot)): stage + commit the pivot substrate as one milestone commit per project rule (explicit file paths; no `git add .`). Pivot files in scope: apps/ntfy/Dockerfile (NEW), docs/adr/ADR-018-phase-12-dockerfile-buildkit-secrets.md (NEW), docker-compose.yml (MODIFIED ntfy block + secrets block), .env.example (MODIFIED NTFY section), ops/Makefile (MODIFIED targets), docs/adr/ADR-017-phase-12-subwave-a-acl-amendments.md (MODIFIED substrate cross-ref), tests/test_ntfy_health.py (MODIFIED dropped sealed-bundle + added docker-exec test), .planning/HANDOFF.json (MODIFIED), .planning/STATE.md (MODIFIED), docs/planning/phase-12-subwave-a-audit.md (MODIFIED SUPERSEDED banner), docs/planning/_archived/phase-12-sealed-bind-mount-attempt/{README.md, seed_ntfy_sealed.py, server.yml, .gitkeep, ADR-017-sealed-bind-mount-addendum.md} (NEW, archive-move). DELETED originals: scripts/seed_ntfy_sealed.py, configs/ntfy-sealed/{server.yml, .gitkeep}, docs/adr/ADR-017-sealed-bind-mount-addendum.md.",
-    "Live operator flow validation (non-blocking but recommended): `make ntfy-build && make ntfy-up && make ntfy-publish-test` confirms BuildKit secrets did pre-bake producer + reader into the auth.db of the runtime image. The 5 expected-failures in tests/test_ntfy_health.py should flip to passing."
+    "Phase 12 Plan 09 Task 3 — OPERATOR UAT (blocking, checkpoint:human-verify). See .planning/phases/12-cnr-alerting-dissemination/12-09-SUMMARY.md Task 3 section for the full checklist. Type 'approved' to seal Phase 12.",
+    "Optional debt: decide whether to retighten freshrss (8088)/rssbridge (3000) to loopback-only bindings (backlog Phase 999.8, opened 2026-08-02) — a network-exposure change only the operator should authorize.",
+    "Recommended live validation: `make ntfy-build && make ntfy-up && make ntfy-publish-test` confirms the ADR-018 pre-baked auth.db contains producer + reader (the docker-exec test in tests/test_ntfy_health.py checks this inside the running container)."
   ],
   "decisions": [
     {
@@ -393,7 +393,7 @@
       "purpose": "feat(ingest-youtube): Phase 11 Wave 5 — local faster-whisper transcription"
     }
   ],
-  "next_action": "Phase 12 sub-wave (a) PIVOT locked on Dockerfile pre-bake (ADR-018). HANDOFF.json phase_12_subwave_a_final_architecture.architecture + .ship_next are the dispatch target. Phase 12 continues with sub-waves (b) outbox+DLX, (c) payload emitter, (d) throttling, (e) failure-mode tests, (f) Phase 13 body wiring — all per phase_12_subwave_a_final_architecture.ship_next. Begin via /gsd-execute-phase 12 (or whichever GSD dispatch surfaces next). Sub-wave (a) is closed for further development (sealed-bind-mount is archived; ADR-018 is the substrate).",
+  "next_action": "Phase 12 Plan 09 Task 3 — blocking OPERATOR UAT (checkpoint:human-verify). Run the checklist in .planning/phases/12-cnr-alerting-dissemination/12-09-SUMMARY.md (Task 3 section): make -f ops/Makefile ntfy-up; docker compose up -d --wait alerting; confirm http://127.0.0.1:22050/health = 200; trigger a real CAT I alert (exactly one push, no SAB re-fire); tap the notification (A2 vault-name check); confirm deep_link=item note / item_link=SAB note (A-01); force a digest and check grouping/wording; give the P5 SAB-stays-canonical judgment. Type 'approved' to seal Phase 12 — the last open plan in the phase's 5-wave map. Everything else in the phase (12-01..12-08 + 12-09 Tasks 1-2) is shipped; the historical sub-wave (a) audit/architecture sections below are preserved as record.",
   "context_notes": "Phase 12 sub-wave (a) overran 9 rounds of in-container bootstrap debugging, was pivoted to sealed-bind-mount (commit 5c52056), and was finally pivoted to Dockerfile pre-bake + BuildKit secrets (ADR-018, 2026-07-23). The sealed-bind-mount audit remains as historical record at phase_12_subwave_a_audit_findings (scope_lock=deprecated/SUPERSEDED_BY_PIVOT). The 4 LOCKED ADR-017 ACL decisions are preserved across both pivots. The audit-and-pivot cycle generalizes: brittle-system thrashing has no terminus without a widely different substrate.",
   "adr_004_resolved": {
     "resolution": "superseded_by_adr_016",
