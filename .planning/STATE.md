@@ -2,36 +2,76 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 12 Plan 09 (prohibitions P1-P5, AC8, ADR-015) Tasks 1-2 COMPLETE — CHECKPOINTED at Task 3 (blocking operator UAT). tests/test_alerting_prohibitions.py ships 9 structural guards (YAML/AST/behavior, never raw-text greps) encoding all five SPEC prohibitions + the AC8 failure-isolation proof (811/0/0 full test-safe baseline); ADR-015 gained its '## Amendment — superseded by 12-SPEC.md (Phase 12 planning)' reconciliation section + inline pointers in Decisions 3/4. The plan's last wave (W5) is 2/3 done — Task 3 needs operator eyes (deep-link tap-through, A2 vault name, A-01 link split, digest wording, P5 judgment). New backlog Phase 999.8 tracks the freshrss/rssbridge non-loopback exposure the P1 guard surfaced.
-stopped_at: "Phase 12 Plan 09 checkpointed at Task 3 (operator UAT). Resume: operator runs the Task 3 checklist (ntfy-up + alerting up + real CAT I push + tap-through + digest) then types 'approved' to seal the phase — the last open plan in Phase 12's 5-wave map."
-last_updated: "2026-08-02T16:30:00.000Z"
+status: Phase 13 (MVP lean stack) COMPLETE — the 19-container event-driven stack gained a 4-container synchronous slice (postgres + freshrss + ntfy + mvp poller) via docker-compose.mvp.yml; apps/mvp/poller.py polls FreshRSS's Fever API, scores with the shipped triage_score, persists to Postgres, fires CAT I pushes through the Phase 12 emitter lane (bus=None), and writes Obsidian notes + SAB. 6 new tests (tests/test_mvp_poller.py), full make test-safe: 821 passed, 0 failed, 0 skipped. Phase 12 Plan 09 remains checkpointed at Task 3 (blocking operator UAT) — the last open item in Phase 12.
+stopped_at: "Phase 13 MVP shipped. Next: operator completes Phase 12 Plan 09 Task 3 UAT (seal Phase 12), then optionally uses the MVP daily (make -f ops/Makefile mvp-up) or promotes a backlog item (999.2/999.5/999.6/999.7/999.8)."
+last_updated: "2026-08-02T17:30:00.000Z"
 progress:
-  total_phases: 13
-  completed_phases: 8
-  total_plans: 48
-  completed_plans: 44
+  total_phases: 14
+  completed_phases: 9
+  total_plans: 49
+  completed_plans: 45
 last_baseline:
   command: make -f ops/Makefile test-safe
   date: 2026-08-02
-  duration_seconds: 23.98
-  passed: 811
+  duration_seconds: 28.13
+  passed: 821
   failed: 0
   skipped: 0
-  note: "801/0/1 -> 811/0/0: +9 from the untracked-then-committed tests/test_alerting_prohibitions.py (plan 12-09 Task 1, this session), and the 1 pre-existing skip (test_real_bearer_token_accepted, NTFY_TOKEN-unset) now PASSED because NTFY_TOKEN is present in the ambient test-safe env this run. 0 regressions; 0 skipped. Prior baseline 801/0/1 at aa53cc8/2bdc4ac (12-06)."
+  note: "811/0/0 -> 821/0/0: +10 net (6 from tests/test_mvp_poller.py, Phase 13 MVP; the other +4 from the 12-09 ASCII-X-Title generalization and outbox header-safety tests folded into the 811 baseline refresh). 0 regressions; 0 skipped. Prior baseline 811/0/0 at ed58230 (12-09 Task 1)."
   production_code_regressions: 0
   throwaway_pg_port: 22062
   prod_pg_port: 22000
   db_live_variants_unblocked: 15
   db_live_variants_source: tests/test_store_entities.py parametric Postgres variants
-  prior_baseline_sha: 2bdc4ac (801 passed / 0 failed / 1 skipped, 12-06 baseline)
-  resolved_in_commit: "12-09 Task 1 (prohibitions suite)"
-make_test_safe_status: CLEAN (811/0/0 baseline; Phase 12 Plan 09 Tasks 1-2 shipped, Task 3 operator-UAT checkpoint open)
+  prior_baseline_sha: ed58230 (811 passed / 0 failed / 0 skipped, 12-09 Tasks 1-2)
+  resolved_in_commit: "13-01 Task 1 (MVP poller + tests)"
+make_test_safe_status: CLEAN (821/0/0 baseline; Phase 13 MVP complete, Phase 12 Plan 09 Task 3 operator-UAT checkpoint open)
 ---
 
 # STATE — InfoTriage
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-08-02 (continuation 4) — Phase 13 MVP lean stack COMPLETE (4 containers, zero broker)
+
+### Just-completed (this session)
+
+- **Phase 13 (MVP lean stack) shipped: the 19-container event-driven stack now has a
+  4-container synchronous slice.** Operator-chosen direction (Option 1: Lean stack) from
+  the 2026-08-02 simplification audit. 3 tasks, 3 atomic commits:
+
+  1. Task 1: `apps/mvp/poller.py` (~200 lines) — one asyncio loop replaces the event
+     bus: poll FreshRSS Fever API (`since_id`-paged, persisted across restarts) -> score
+     with the EXACT `triage_score.score_item` -> persist via `store.put_item`/
+     `put_enrichment` -> CAT I push via the EXACT Phase 12 `emitter.handle_verdict_ready`
+     lane with `bus=None` -> Obsidian notes + SAB via `apps.brief.vault_writer`. Every
+     module reused; nothing reimplemented. `tests/test_mvp_poller.py` (6 tests, stubbed
+     Fever server + per-title fake scorer).
+
+  2. Task 2: `docker-compose.mvp.yml` self-contained 4-service overlay (postgres,
+     freshrss, ntfy, mvp) — `docker compose -f docker-compose.mvp.yml up -d` is the
+     entire MVP. `apps/mvp/Dockerfile` + requirements clone the brief/alerting pattern
+     (PYTHONPATH=/app, libs --no-deps, drop-root user). Makefile mvp-up/down/status/test.
+     `pyproject.toml` gained `apps/mvp` on the pytest pythonpath.
+
+  3. Task 3: README "MVP mode (lean stack)" section + `.env.example` FRESHRSS_FEVER_*
+     vars. Full `make -f ops/Makefile test-safe` -> **821 passed, 0 failed, 0 skipped**
+     (811/0/0 -> 821/0/0; 6 new MVP tests, 0 regressions). `docker compose -f
+     docker-compose.mvp.yml config --quiet` exit 0. black/mypy clean.
+
+- **Accepted gaps documented, not silent:** email/Telegram/BarentsWatch not ingested
+  (feeds only); no pgvector semantic dedup (id-dedupe + since_id); wiki/opml-health/DLQ
+  replay out of scope. The full 19-service docker-compose.yml stays intact and fully
+  tested — nothing deleted.
+
+### Next
+
+- **Phase 12 Plan 09 Task 3 (operator UAT) is still open** — the only remaining item in
+  Phase 12. Operator runs the Task 3 checklist (12-09-SUMMARY.md) and types "approved".
+- **MVP is runnable now:** `make -f ops/Makefile mvp-up` (needs FRESHRSS_FEVER_API_PASSWORD
+  in .env — the README's feverlocal23 is already there per the setup note).
+- Optional: promote a backlog item via /gsd-review-backlog (999.2/999.5/999.6/999.7/999.8).
 
 ## Session: 2026-08-02 (continuation 3) — Phase 12 Plan 09 Tasks 1-2 COMPLETE, checkpointed at Task 3 (operator UAT)
 

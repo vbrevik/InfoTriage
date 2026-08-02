@@ -33,7 +33,8 @@ urgent insertions. The all-local-LLM rule (ADR-004) is never revisited by a phas
 - [x] **Phase 9: RAG recall** (M2) - CCIR pre-filter + thematic recall over corpus ✅
 - [x] **Phase 10: Wiki-LLM** (M2) - COMPLETE: Waves 1-4 done
 - [x] **Phase 11: SOCMINT + Arctic collection** (M2) - COMPLETE (Waves 1-6, 2026-07-22)
-- [ ] **Phase 12: CNR alerting / dissemination** (M2) - real-time notification lane
+- [ ] **Phase 12: CNR alerting / dissemination** (M2) - real-time notification lane (9/9 plans executed — 12-09 Tasks 1-2 done, Task 3 operator UAT OPEN)
+- [x] **Phase 13: MVP lean stack** (2026-08-02) - the 19-container stack gained a 4-container synchronous slice (postgres + freshrss + ntfy + mvp poller) via `docker-compose.mvp.yml`; `apps/mvp/poller.py` runs the whole value chain without RabbitMQ (Fever poll -> score -> Postgres -> CAT I push + SAB). See `.planning/phases/13-mvp-lean-stack/`
 - [x] **Phase 99.1: M1 closure** (urgent decimal insertion, before M2) — retroactive closure of 4 procedural gaps surfaced by `.planning/v1.0-MILESTONE-AUDIT.md` §8: (RT-1) Phase 7 missing `07-VERIFICATION.md`; (RT-2) Phase 6 + Phase 7 missing `*-VALIDATION.md`; (RT-3) Phases 00/02/04 `*-VALIDATION.md` `nyquist_compliant: false` → `true`; (RT-4) `apps/opml_health/service.py:52` inline `FeedUnhealthy` class shadow. Drives M1 audit `gaps_found → passed` before M2 begins.
 
 Parallel, non-blocking: **SP-COP** — COP/map UI gated spike (World Monitor adopt-vs-build; ADR-005).
@@ -330,6 +331,21 @@ Plans:
 **Wave 5** *(blocked on Wave 4 completion)*
 
 - [ ] 12-09-PLAN.md — Prohibitions P1–P5 structural guards, AC8 isolation, ADR-015 reconciliation, operator UAT (W5) — **Tasks 1-2 COMPLETE 2026-08-02** (9-test structural prohibition suite + ADR-015 amendment); **Task 3 operator UAT OPEN (blocking)** — see 12-09-SUMMARY.md
+
+### Phase 13: MVP lean stack
+
+**Goal**: A runnable, useful MVP slice of the full architecture — feeds → score → CAT I
+push + SAB — in 4 containers with zero broker, so the operator gets daily value without
+babysitting the event-driven middle.
+**Depends on**: Phase 12 (the alerting lane is reused as a library, bus=None)
+**Requirements**: N/A (operator-chosen simplification)
+**Success Criteria** (what must be TRUE):
+
+  1. `docker compose -f docker-compose.mvp.yml up -d` starts postgres + freshrss + ntfy + mvp
+  2. A fresh CAT I feed item produces exactly one ntfy push within one poll interval
+  3. The full 19-service docker-compose.yml remains intact and the full suite stays green
+
+**Plans**: `.planning/phases/13-mvp-lean-stack/13-PLAN.md` — 3/3 complete (2026-08-02)
 
 ## Backlog
 
