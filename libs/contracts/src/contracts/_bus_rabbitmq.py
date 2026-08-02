@@ -53,6 +53,21 @@ ROUTING_KEY_TO_QUEUE: dict[str, list[str]] = {
     "verdict.ready": ["q.brief", "q.wiki", "q.alerting"],
     "sab.published": ["q.notify", "q.alerting"],
     "feed.unhealthy": ["q.ops"],
+    # Terminal alerting dead-letter destination (SPEC R4, Phase 12 plan 12-06).
+    # Deliberately a queue distinct from infotriage.dlq (the project-wide DLQ
+    # above): SPEC R4 names outbox.dlx.queue specifically, and burying
+    # alerting failures among unrelated poison messages from other services
+    # is a failure nobody finds (RESEARCH anti-pattern). Reuses the existing
+    # declare-and-bind loop in _declare_topology wholesale — no new exchange,
+    # no TTL/wait-queue chain; the in-process retry in apps/alerting/outbox.py
+    # is the chosen design (RESEARCH Pattern 5). Nothing nacks messages on
+    # this queue, so wiring it to infotriage.dlx as ITS dead-letter target
+    # (via the shared per-queue arguments below) is harmless — it is a
+    # terminal inspection destination, not a retry hop. publish()'s
+    # in-process seen-set (keyed on routing_key + item_id) makes a repeated
+    # dead-letter publish for the same alert within one process lifetime a
+    # no-op, which is the desired behavior, not a bug to work around.
+    "outbox.dlx": ["outbox.dlx.queue"],
 }
 
 # Dead-letter configuration
