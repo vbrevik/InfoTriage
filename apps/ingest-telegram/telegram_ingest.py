@@ -105,6 +105,7 @@ def _message_to_item(channel: str, message) -> Item:
         ts=message.date,
         lang="und",
         summary=text[:500],
+        body=text,
         discipline="SOCMINT",
         admiralty_reliability=DEFAULT_ADMIRALTY_RELIABILITY,
     )

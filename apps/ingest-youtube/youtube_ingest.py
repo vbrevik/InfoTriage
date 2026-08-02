@@ -233,33 +233,37 @@ def _transcribe_audio(audio_path: str, model_name: str = "tiny") -> str | None:
         return None
 
 
-def transcribe(video_id: str, transcribe_wanted: bool = False) -> str:
-    """Return a transcript for ``video_id``.
+def transcribe(video_id: str, transcribe_wanted: bool = False) -> tuple[str, bool]:
+    """Return (display_text, is_real_transcript) for ``video_id``.
 
     When ``transcribe_wanted`` is true, the audio track is downloaded with
     yt-dlp and transcribed locally with faster-whisper. On any failure the
     function returns a stub/fallback string so that ingestion is not blocked.
+    ``is_real_transcript`` distinguishes an actual transcript from a stub
+    message — the caller uses it to decide Item.body (None for stubs; SPEC
+    R7 names "transcript-less videos" as a bodyless case, never the stub text).
     """
     if not transcribe_wanted:
         return (
             "(transcription disabled — set transcribe:true to enable; "
-            "install faster-whisper and ffmpeg)"
+            "install faster-whisper and ffmpeg)",
+            False,
         )
 
     tmp_dir = None
     try:
         result = _download_audio(video_id)
         if result is None:
-            return "(transcription failed — could not download audio)"
+            return "(transcription failed — could not download audio)", False
         tmp_dir, audio_path = result
 
         text = _transcribe_audio(audio_path, model_name=_whisper_model())
         if text:
-            return text
-        return "(transcription produced no output)"
+            return text, True
+        return "(transcription produced no output)", False
     except Exception as exc:
         logger.warning("transcription failed for %s: %s", video_id, exc)
-        return "(transcription failed — see logs)"
+        return "(transcription failed — see logs)", False
     finally:
         if tmp_dir:
             shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -331,7 +335,7 @@ async def ingest() -> None:
                     # Local-only transcription is opt-in (ADR-004).
                     # Run the heavy download/STT work off the event loop so the
                     # FastAPI trigger stays responsive for long videos.
-                    text = await asyncio.to_thread(
+                    text, is_real_transcript = await asyncio.to_thread(
                         transcribe, vid, transcribe_wanted=transcribe_wanted
                     )
 
@@ -346,6 +350,7 @@ async def ingest() -> None:
                         ts=datetime.datetime.now(tz=datetime.timezone.utc),
                         lang="und",
                         summary=text[:500],
+                        body=text if is_real_transcript else None,
                         body_ref=body_ref,
                         discipline="OSINT",
                     )

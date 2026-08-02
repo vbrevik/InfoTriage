@@ -36,6 +36,23 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
+def _extract_note_body(text: str) -> str:
+    """Return the note content following the YAML frontmatter block.
+
+    Mirrors from_frontmatter's own line-based delimiter matching (T-04-08)
+    so both functions agree on where the frontmatter ends. Falls back to the
+    whole file when no frontmatter delimiters are present (e.g. a plain-text
+    clip). No stripping/truncation — the store's put_item coerces an empty
+    or whitespace-only result to SQL NULL (SPEC R7).
+    """
+    lines = text.split("\n")
+    if lines and lines[0].strip() == "---":
+        for i in range(1, len(lines)):
+            if lines[i].strip() == "---":
+                return "\n".join(lines[i + 1 :])
+    return text
+
+
 def _infer_lang(text: str) -> str:
     """Infer language from title text per D-09.
 
@@ -122,6 +139,7 @@ def item_from_obsidian_clip(path: str) -> Item:
         )
 
     lang = _infer_lang(title)
+    note_body = _extract_note_body(text)
 
     return Item(
         source=source,
@@ -131,6 +149,7 @@ def item_from_obsidian_clip(path: str) -> Item:
         ts=ts,
         lang=lang,
         summary=summary,
+        body=note_body,
     )
 
 
