@@ -2,36 +2,107 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 12-08 (7 ingest adapters set Item.body — SPEC R7) CLOSED at 6/7 — gmail, imap, youtube, telegram, obsidian, barentswatch populate Item.body at their Item(...) construction site; ACLED intentionally deferred (26-line Phase-11 stub, no Item construction site, license-gated per REQUIREMENTS.md C-11/Q3) — operator decision 2026-08-02 to track as debt (ROADMAP.md backlog Phase 999.7) rather than build a speculative pipeline or narrow SPEC R7's scope. 18 new tests (tests/test_ingest_body_email.py, tests/test_ingest_body_media.py, tests/test_ingest_body_events.py), all 18 re-verified green this session. See 12-08-SUMMARY.md (status: complete).
-stopped_at: "Phase 12 Plan 08 complete (6/7 adapters, ACLED deferred to backlog 999.7). Next: Plan 12-06 (outbox retry), then 12-09 (prohibitions P1-P5, operator UAT) — both still open per the phase's 5-wave map."
-last_updated: "2026-08-02T12:00:00.000Z"
+status: Phase 12-06 (outbox retry-then-dead-letter, SPEC R4) COMPLETE — apps/alerting/outbox.py gained deliver_with_retry (3 attempts, 1s/5s locked schedule) and dead_letter (publish outbox.dlx -> audit row -> dlx_at, in that order, before the trigger message is acked); ROUTING_KEY_TO_QUEUE gained a dedicated outbox.dlx -> outbox.dlx.queue entry, distinct from the project-wide infotriage.dlq. 9 new tests (tests/test_alerting_outbox.py), full make test-safe re-run: 801 passed, 1 skipped, 0 failed. See 12-06-SUMMARY.md (status: complete).
+stopped_at: "Phase 12 Plan 06 complete (outbox retry/DLX). Next: Plan 12-09 (prohibitions P1-P5, AC8 isolation, ADR-015 reconciliation, operator UAT) — the last open plan per the phase's 5-wave map."
+last_updated: "2026-08-02T15:30:00.000Z"
 progress:
   total_phases: 13
   completed_phases: 8
   total_plans: 48
-  completed_plans: 41
+  completed_plans: 42
 last_baseline:
   command: make -f ops/Makefile test-safe
   date: 2026-08-02
-  duration_seconds: 49.43
-  passed: 774
+  duration_seconds: 131.41
+  passed: 801
   failed: 0
   skipped: 1
-  note: "755 -> 774 (774 passed + 1 skipped): +19 tests from 12-05 (tests/test_alerting_throttle.py — throttle boundary/precision unit tests, emitter integration tests, digest group/build/publish/tick tests). The 1 skip is unchanged from the 12-03 baseline (test_real_bearer_token_accepted, NTFY_TOKEN not exported in ambient test-safe env). 0 regressions."
+  note: "774 -> 801 (801 passed + 1 skipped): +27 net tests since the 12-05 baseline (this session's 9 from tests/test_alerting_outbox.py, plus 12-07/12-08's test additions that had not previously been re-verified under a full make test-safe run). The 1 skip is unchanged since the 12-03 baseline (test_real_bearer_token_accepted, NTFY_TOKEN not exported in ambient test-safe env). 0 regressions."
   production_code_regressions: 0
   throwaway_pg_port: 22062
   prod_pg_port: 22000
   db_live_variants_unblocked: 15
   db_live_variants_source: tests/test_store_entities.py parametric Postgres variants
-  prior_baseline_sha: bc2e568 (740 passed / 0 failed / 1 skipped)
-  resolved_in_commit: "aa53cc8 (12-05 Task 2: hourly PMESII-grouped digest tick)"
-make_test_safe_status: CLEAN (774/0/1 baseline; Phase 12 Plan 05 both tasks shipped this session)
+  prior_baseline_sha: aa53cc8 (774 passed / 0 failed / 1 skipped, 12-05 baseline)
+  resolved_in_commit: "2bdc4ac (12-06 Task 2 GREEN: deliver_with_retry + dead_letter)"
+make_test_safe_status: CLEAN (801/0/1 baseline; Phase 12 Plan 06 both tasks shipped this session)
 ---
 
 # STATE — InfoTriage
 
 > **Ephemeral.** Pick-up-next-session memory. Durable context lives in `docs/`, `PROJECT.md`,
 > `REQUIREMENTS.md`, `ROADMAP.md`, `.planning/codebase/`. Trim aggressively.
+
+## Session: 2026-08-02 (continuation 2) — Phase 12 Plan 06 (outbox retry-then-dead-letter) COMPLETE
+
+### Just-completed (this session)
+
+- **Phase 12-06 shipped: the egress path is now lossless (SPEC R4).** 2-task plan, 3 atomic
+  commits (Task 2 ran TDD RED/GREEN):
+
+  1. `768ba68` — Task 1: `libs/contracts/src/contracts/_bus_rabbitmq.py`'s
+     `ROUTING_KEY_TO_QUEUE` gained `"outbox.dlx": ["outbox.dlx.queue"]`, reusing the
+     existing declare-and-bind loop in `_declare_topology` wholesale — no new exchange,
+     no TTL/wait-queue chain. Deliberately a queue distinct from the project-wide
+     `infotriage.dlq` per SPEC R4 and the RESEARCH anti-pattern note (alerting failures
+     buried among unrelated poison messages are failures nobody finds).
+
+  2. `d17019a` — Task 2 RED: `tests/test_alerting_outbox.py` (9 tests) written and
+     confirmed failing (`ImportError`) against the pre-implementation `outbox.py`, via a
+     temporary `git stash`-equivalent (patch-and-restore) so the RED gate was genuine
+     rather than trivially passing against already-written implementation code.
+
+  3. `2bdc4ac` — Task 2 GREEN: `apps/alerting/outbox.py` gained `RETRY_SCHEDULE = (1, 5)`,
+     `DLX_ROUTING_KEY = "outbox.dlx"`, `deliver_with_retry(client, store, bus, payload, *,
+     item_id, item_title="")` (3 total attempts, catching both `httpx.HTTPStatusError`
+     non-2xx and `httpx.RequestError` connection failures identically, sleeping the
+     locked 1s/5s schedule between attempts), and `dead_letter(store, bus, payload, *,
+     item_id, reason, attempts)` (publish full payload+reason+attempts to `outbox.dlx` ->
+     write an `alert_dead_lettered` audit row -> stamp `dlx_at` on the alert-state row, in
+     that order, before the coroutine returns). `emitter.py`'s single delivery call site
+     in `_emit_if_claimed` now goes through `deliver_with_retry`; `bus` threaded as an
+     optional (default `None`) keyword arg through `handle_verdict_ready`/
+     `handle_sab_published`/`handle_trigger`/`_emit_if_claimed` so every pre-12-06 direct
+     caller (tracer/throttle/emitter test suites) kept working unchanged — none of them
+     exercise the delivery-exhaustion path, so a `None` bus is never dereferenced.
+     `alerting_worker.py`'s docstring updated (the stale "No retry/DLX yet — later
+     expansion plan" line is now inaccurate and was removed); no runtime wiring change was
+     needed there since `run_consumer(bus, store, client)` already threads `store` and
+     `bus` all the way down to the new call site.
+
+- **No deviations requiring Rule 1-4 action.** One process note: Task 2's implementation
+  was drafted before its RED test file (violates the plan's TDD execution order) —
+  self-caught before committing anything; recovered by `git diff`-capturing the
+  implementation, `git checkout --`-reverting it, confirming the test file genuinely fails
+  (`ImportError`) against pre-implementation code, committing that as the RED commit, then
+  reapplying the captured implementation via `git apply` for the GREEN commit. End state
+  matches the mandated RED-then-GREEN sequence; no plan or test content was affected.
+
+- **Verification:** `python -m pytest tests/test_alerting_outbox.py -x -q` -> 9 passed.
+  `python -m pytest tests/test_alerting_throttle.py tests/test_alerting_emitter.py
+  tests/test_alerting_tracer.py tests/test_alerting_dedupe.py tests/test_alerting_deeplink.py
+  tests/test_alerting_state_store.py tests/test_bus_rabbitmq.py tests/test_bus_consume.py -q`
+  -> 67 passed, 12 skipped (all pre-existing skips — RabbitMQ-unreachable and
+  NTFY_TOKEN-unset guards, unchanged). Full `make -f ops/Makefile test-safe` (throwaway
+  Postgres, port 22062) -> **801 passed, 1 skipped, 0 failed** (774 -> 801, +27 net tests,
+  0 regressions; this is also the first full test-safe run since 12-07/12-08 landed their
+  own test additions without a full-suite re-run, so this baseline also folds those in).
+  `black --check`/`mypy` clean on all touched production and test files (one `black`
+  auto-format pass applied to `outbox.py`/`test_alerting_outbox.py` before the GREEN
+  commit, re-verified clean after).
+
+- **`ROADMAP.md` updated** via `gsd-tools query roadmap.update-plan-progress 12` (plan_count 9,
+  summary_count 7, status "In Progress" — Phase 12 has 1 more plan (12-09) still open).
+
+- **`REQUIREMENTS.md` NOT updated for `ADR-003`** — matches every prior 12-0x session's
+  identical finding: `ADR-003` is a design-doc reference cited across ~10 requirement rows,
+  not itself a REQUIREMENTS.md ID with its own checkbox.
+
+### Next
+
+- **Phase 12 Plan 09** (prohibitions P1-P5 structural guards, AC8 isolation, ADR-015
+  reconciliation, operator UAT) is the last open plan in the phase's 5-wave map, and depends
+  on 12-06 per the wave ordering (W5 blocked on W4, now unblocked).
 
 ## Session: 2026-08-02 (continuation) — Phase 12 Plan 08 (7 ingest adapters set Item.body) CLOSED at 6/7 — ACLED checkpoint resolved
 

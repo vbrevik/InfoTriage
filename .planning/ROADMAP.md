@@ -304,7 +304,7 @@ prompt elicits `[item_id: <hash>]`. Phase 999.4 closure was premature — reopen
   1. A CNR CAT I 🚩 post-write publishes a push (ntfy local-server preferred; ADR-004-friendly) with SAB excerpt + dedupe ID.
   2. The SAB remains the canonical artifact.
 
-**Plans**: 7/9 plans executed
+**Plans**: 8/9 plans executed
 
 Plans:
 **Wave 1**
@@ -325,7 +325,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 12-06-PLAN.md — Outbox retry (1s/5s) → dedicated DLX queue + audit row, ack-after-record (W4)
+- [x] 12-06-PLAN.md — Outbox retry (1s/5s) → dedicated DLX queue + audit row, ack-after-record (W4)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
