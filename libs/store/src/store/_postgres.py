@@ -106,6 +106,20 @@ class PostgresStore:
     # Raw read cursor (Phase 6: brief consumer/server ad-hoc SELECTs)
     # -------------------------------------------------------------------------
 
+    def rollback(self) -> None:
+        """Roll back the current transaction on the open connection.
+
+        For long-lived callers (e.g. a poll loop reusing one connection across
+        many independent units of work) that catch a write failure per-item:
+        Postgres leaves the connection in an aborted-transaction state after
+        any error until a ROLLBACK runs, so every subsequent command on that
+        connection fails too unless the caller rolls back first.
+        """
+        assert (
+            self._conn is not None
+        ), "PostgresStore used outside 'with' block — connection not open"
+        self._conn.rollback()
+
     def cursor(self, row_factory=None):
         """Return a cursor on the open connection for ad-hoc SELECTs.
 

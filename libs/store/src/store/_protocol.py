@@ -51,6 +51,19 @@ class Store(Protocol):
         """
         ...
 
+    def rollback(self) -> None:
+        """Abort the current transaction so the connection can accept new work.
+
+        For a long-lived caller reusing one Store across many independent
+        units of work (e.g. a poll loop), a write failure leaves a real DB
+        connection in an aborted-transaction state until this runs — every
+        later command on it would otherwise fail too.
+
+        For PostgresStore: rolls back the open connection.
+        For InMemoryStore: no-op (no transaction to abort).
+        """
+        ...
+
     def put_item(self, item: Item) -> None:
         """Upsert item by item.id (last-write-wins). Raises on persistence failure.
 

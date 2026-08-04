@@ -342,3 +342,42 @@ def test_list_items_returns_discipline_and_reliability(store):
     assert len(result) == 1
     assert result[0].discipline == "OSINT"
     assert result[0].admiralty_reliability == "A1"
+
+
+# ---------------------------------------------------------------------------
+# rollback — recovering a long-lived connection after a failed write
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.db_live
+@pytest.mark.skipif(
+    not _test_db_reachable(),
+    reason="INFOTRIAGE_TEST_DSN unset or test DB unreachable — db_live test skipped",
+)
+def test_rollback_recovers_connection_after_failed_write(tmp_path):
+    """A failed write must not poison every subsequent call on the connection.
+
+    Regression test for the MVP poller bug: a long-lived caller (a poll loop)
+    reuses one PostgresStore connection across many independent items. Without
+    a rollback after a failed write, Postgres leaves the connection in an
+    aborted-transaction state and every later command raises
+    InFailedSqlTransaction — even for items that have nothing to do with the
+    one that actually failed.
+    """
+    from store import PostgresStore
+
+    dsn = os.environ.get(TEST_DSN_ENV)
+    with PostgresStore(dsn=dsn, blob_root=tmp_path / "blobs") as s:
+        # Force a real Postgres error mid-transaction (undefined relation).
+        with pytest.raises(Exception):
+            s.cursor().execute("SELECT * FROM infotriage.no_such_table")
+
+        # Without rollback(), this next call would raise InFailedSqlTransaction
+        # even though it is a perfectly valid, unrelated operation.
+        s.rollback()
+
+        item = _item(title="Post-rollback item")
+        s.put_item(item)
+        got = s.get_item(item.id)
+        assert got is not None
+        assert got.title == "Post-rollback item"

@@ -22,22 +22,26 @@ from poller import _PollState, _handle_health, _summary_from_html, poll_once
 
 
 class _FeverHandler(http.server.BaseHTTPRequestHandler):
-    """Stub Fever server: serves a controllable items list, records requests."""
+    """Stub Fever server: serves a controllable items list, records requests.
+
+    Real Fever auth reads `api_key` from POST body only (do_GET is unused by
+    the poller now — kept only in case a test wants to probe GET-is-rejected
+    behavior); do_POST is the path the poller actually exercises.
+    """
 
     items: list[dict] = []
     requests: list[dict] = []
 
-    def do_GET(self) -> None:  # noqa: N802
-        parsed = urllib.parse.urlparse(self.path)
-        query = urllib.parse.parse_qs(parsed.query)
+    def _respond(self, method: str, params: dict) -> None:
         self.__class__.requests.append(
             {
-                "path": parsed.path,
-                "query": query,
-                "since_id": int(query.get("since_id", ["0"])[0]),
+                "method": method,
+                "path": self.path,  # raw, so tests can assert on the query string
+                "params": params,
+                "since_id": int(params.get("since_id", ["0"])[0]),
             }
         )
-        since = int(query.get("since_id", ["0"])[0])
+        since = int(params.get("since_id", ["0"])[0])
         items = [i for i in self.__class__.items if int(i.get("id", 0)) > since]
         body = json.dumps({"auth": 1, "items": items}).encode()
         self.send_response(200)
@@ -45,6 +49,15 @@ class _FeverHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def do_GET(self) -> None:  # noqa: N802
+        parsed = urllib.parse.urlparse(self.path)
+        self._respond("GET", urllib.parse.parse_qs(parsed.query))
+
+    def do_POST(self) -> None:  # noqa: N802
+        length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(length)
+        self._respond("POST", urllib.parse.parse_qs(body.decode()))
 
     def log_message(self, format, *args) -> None:  # noqa: A002
         pass  # silence stub-server access logs
@@ -128,10 +141,60 @@ def _fake_scorer(cnr_for_title: dict[str, str], score: int = 9):
     return fake_score
 
 
+def test_fetch_new_items_sends_api_key_via_post_body_not_query(fever_server):
+    """Regression: FreshRSS's Fever API reads api_key from $_POST only — a
+    GET-carried api_key is silently ignored and auth always fails with no
+    error. fetch_new_items must POST, with api_key in the body, not the URL.
+    """
+    from poller import fetch_new_items
+
+    _FeverHandler.items = [_fever_item(1, title="T", html="H")]
+
+    items = fetch_new_items(fever_server, "admin", "pw", since_id=0)
+
+    assert len(items) == 1
+    assert len(_FeverHandler.requests) == 1
+    req = _FeverHandler.requests[0]
+    assert req["method"] == "POST"
+    # api_key must travel in the POST body, never the URL query string.
+    assert "api_key" not in urllib.parse.urlparse(req["path"]).query
+    assert "api_key" in req["params"]
+
+
 def test_summary_from_html_strips_tags_and_truncates():
     text = _summary_from_html("<p>Hello <b>world</b></p>", limit=20)
     assert text == "Hello world"[:20] or text.startswith("Hello world")
     assert "<" not in text
+
+
+def test_summary_from_html_unescapes_entities_before_stripping_cdata():
+    """Regression: a real Defense One feed item arrives as
+    '&lt;![CDATA[<p>...</p>]]&gt;' — HTML-entity-escaped around a CDATA
+    marker that itself contains real unescaped tags. Entities must be
+    unescaped BEFORE tag-stripping runs, or the leaked '&lt;![CDATA[' text
+    survives verbatim into the rendered summary.
+    """
+    html = (
+        "&lt;![CDATA[<p>How many missions could a drone fly?</p>"
+        "\n\n<p>That future is near.</p>]]&gt;"
+    )
+    text = _summary_from_html(html)
+    assert "CDATA" not in text
+    assert "&lt;" not in text
+    assert "&gt;" not in text
+    assert text == "How many missions could a drone fly? That future is near."
+
+
+def test_summary_from_html_drops_lovdata_stikkord_null_noise():
+    """Regression: Lovdata's regulation feed sends a literal trailing
+    'Stikkord: null' when its keyword field is empty — not our template,
+    the raw feed content — which carries zero information and must be
+    dropped from the rendered summary.
+    """
+    html = "Forskrift om tilsynsmyndighet etter romloven\n\nStikkord: null"
+    text = _summary_from_html(html)
+    assert text == "Forskrift om tilsynsmyndighet etter romloven"
+    assert "Stikkord" not in text
 
 
 def test_poll_once_cat_i_fires_exactly_one_push(

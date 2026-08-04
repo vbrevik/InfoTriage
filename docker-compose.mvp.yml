@@ -13,6 +13,17 @@
 #
 # Env comes from the same .env as the full stack (NF-6: credentials at runtime
 # via env_file, never in image layers).
+#
+# `name:` is REQUIRED here: Compose defaults an unnamed project to the current
+# directory's basename, which is "infotriage" — identical to the main stack's
+# default project name. Without this, `docker compose -f docker-compose.mvp.yml
+# up` (whether invoked directly or via `make -f ops/Makefile mvp-up`, which
+# also has no -p flag) silently reconciles the main stack's `postgres`/
+# `freshrss`/`ntfy` service slots to this file's config — replacing those
+# containers and knocking them off the main stack's network, breaking every
+# other service's DNS lookup for host "postgres" (found the hard way: this
+# collision destroyed the running full stack's postgres+ntfy containers).
+name: infotriage-mvp
 
 services:
   postgres:
@@ -20,7 +31,9 @@ services:
     container_name: infotriage-mvp-postgres
     restart: unless-stopped
     ports:
-      - "127.0.0.1:22000:5432"   # localhost-only; host :22000 -> container 5432
+      # NOT 22000: that's the main stack's postgres (docker-compose.yml). Same
+      # host port would fail to bind whenever both stacks run together.
+      - "127.0.0.1:22100:5432"
     environment:
       POSTGRES_DB: infotriage
       POSTGRES_USER: infotriage
@@ -39,7 +52,8 @@ services:
     container_name: infotriage-mvp-freshrss
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8088:80"      # web UI + Fever API: localhost:8088
+      # NOT 8088: that's the main stack's freshrss (docker-compose.yml).
+      - "127.0.0.1:8089:80"
     environment:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       TZ: Europe/Oslo
@@ -69,10 +83,11 @@ services:
     restart: unless-stopped
     command: ["serve"]
     ports:
-      - "127.0.0.1:22070:80"     # local-only per ADR-016
+      # NOT 22070: that's the main stack's ntfy (docker-compose.yml).
+      - "127.0.0.1:22170:80"
     environment:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      NTFY_BASE_URL: http://127.0.0.1:22070
+      NTFY_BASE_URL: http://127.0.0.1:22170
       NTFY_AUTH_FILE: /etc/ntfy/auth.db
       NTFY_AUTH_DEFAULT_ACCESS: deny-all
       NTFY_CACHE_FILE: /var/cache/ntfy/cache.db

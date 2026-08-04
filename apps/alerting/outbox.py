@@ -211,7 +211,14 @@ async def dead_letter(
     body or a credential (T-12-30).
     """
     dlx_payload = {**payload, "reason": reason, "attempts": attempts}
-    await bus.publish(DLX_ROUTING_KEY, item_id, dlx_payload)
+    if bus is not None:
+        await bus.publish(DLX_ROUTING_KEY, item_id, dlx_payload)
+    else:
+        log.warning(
+            "alerting: no bus configured — DLX publish skipped for item_id=%s, "
+            "dead-letter recorded via audit/alert_state only",
+            item_id,
+        )
 
     store.audit_write(
         op="alert_dead_lettered",

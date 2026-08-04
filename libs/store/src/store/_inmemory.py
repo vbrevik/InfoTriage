@@ -86,6 +86,9 @@ class InMemoryStore:
     def init_schema(self) -> None:
         pass
 
+    def rollback(self) -> None:
+        """No-op — the dict-backed fake has no transaction to abort."""
+
     # Item CRUD
 
     def put_item(self, item: Item) -> None:

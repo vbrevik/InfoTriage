@@ -66,7 +66,11 @@ def _fever_api_key(user: str, password: str) -> str:
 def fetch_new_items(
     base_url: str, user: str, password: str, since_id: int
 ) -> list[dict]:
-    """GET the Fever API for items newer than `since_id`.
+    """POST the Fever API for items newer than `since_id`.
+
+    Fever's auth check reads `api_key` from `$_POST` only (see FreshRSS's
+    p/api/fever.php) — a GET-carried api_key is silently ignored and auth
+    fails with no error, so this must be a POST with api_key in the body.
 
     Returns the parsed `items` array (empty on any HTTP/parse error — a
     transient FreshRSS hiccup must not kill the poll loop). Non-2xx raises,
@@ -79,19 +83,37 @@ def fetch_new_items(
         "since_id": str(since_id),
         "api_key": _fever_api_key(user, password),
     }
-    url = _fever_url(base_url) + "?" + urllib.parse.urlencode(params)
-    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    data = urllib.parse.urlencode(params).encode("utf-8")
+    req = urllib.request.Request(
+        _fever_url(base_url), data=data, headers={"Accept": "application/json"}
+    )
     with urllib.request.urlopen(req, timeout=30) as resp:
         payload = json.load(resp)
     return payload.get("items") or []
 
 
 def _summary_from_html(html: str, limit: int = 500) -> str:
-    """Crude HTML-to-text for the scorer input (title + summary contract)."""
+    """Crude HTML-to-text for the scorer input (title + summary contract).
+
+    Two upstream feed quirks handled here (found in real Fever output, not
+    hypothetical): some feeds (e.g. Defense One) double-encode their CDATA
+    wrapper — the literal text is `&lt;![CDATA[<p>...]]&gt;`, i.e. HTML
+    entities around a CDATA marker that itself contains real unescaped tags —
+    so entities must be unescaped BEFORE tag-stripping or `&lt;` never
+    resolves to a `<` the tag regex can match. Lovdata's regulation feed
+    appends a literal trailing "Stikkord: null" when its keyword field is
+    empty (not a template bug on our end — that literal string is what the
+    feed sends); it carries zero information, so it is dropped.
+    """
+    import html as html_lib
     import re
 
-    text = re.sub(r"<[^>]+>", " ", html or "")
+    text = html_lib.unescape(html or "")
+    text = re.sub(r"<!\[CDATA\[", " ", text)
+    text = re.sub(r"\]\]>", " ", text)
+    text = re.sub(r"<[^>]+>", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"\s*Stikkord:\s*null\s*$", "", text, flags=re.IGNORECASE).strip()
     return text[:limit]
 
 
@@ -215,6 +237,10 @@ async def poll_once(
         except Exception as exc:
             # One bad item must not kill the cycle — log and retry next poll.
             # since_id is NOT advanced on failure, so the item re-fetches.
+            # A failed write leaves the connection's transaction aborted until
+            # rolled back — without this, every item after the first failure
+            # would also fail (Postgres rejects all commands until ROLLBACK).
+            store.rollback()
             log.error(
                 "mvp: item %s failed, will retry next cycle: %s",
                 fever_id,
@@ -228,6 +254,7 @@ async def poll_once(
         try:
             await asyncio.to_thread(_write_notes, store, new_items, vault_path)
         except Exception as exc:
+            store.rollback()
             log.error("mvp: vault note write failed: %s", exc, exc_info=True)
 
     log.info(
@@ -328,6 +355,7 @@ async def main() -> None:
     health_task = asyncio.create_task(run_health_server())
 
     with PostgresStore(dsn=pg_dsn, blob_root=blob_root) as store:
+        store.init_schema()  # idempotent: applies any not-yet-applied libs/store/sql/*.sql
         client = NtfyClient(ntfy_url, ntfy_token, ntfy_topic)
         while True:
             try:
@@ -341,6 +369,7 @@ async def main() -> None:
                     state=state,
                 )
             except Exception as exc:
+                store.rollback()  # no-op if the connection wasn't left aborted
                 log.error("mvp: poll cycle failed: %s", exc, exc_info=True)
             await asyncio.sleep(interval)
 

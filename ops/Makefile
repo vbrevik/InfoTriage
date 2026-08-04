@@ -198,6 +198,21 @@ ccir-sync: ## Regenerate CCIR-owned feeds.opml groups from the registry (contrac
 MVP_COMPOSE := $(COMPOSE) -f $(OPS_DIR)/../docker-compose.mvp.yml
 
 mvp-up: ## Start the MVP lean stack (postgres + freshrss + ntfy + mvp poller)
+	@# MVP's postgres/freshrss bind-mount the SAME ./data/postgres, ./data/freshrss
+	@# dirs as the main stack (docker-compose.yml) — that is the switchable-mode
+	@# design (same underlying data, pick one pipeline at a time), NOT a
+	@# side-by-side one. Two Postgres server processes against one data
+	@# directory is unsafe, so refuse to start if the main stack's postgres is
+	@# already up (found the hard way: this collision silently destroyed the
+	@# running main-stack postgres/ntfy containers before docker-compose.mvp.yml
+	@# had its own project name).
+	@if [ -n "$$(docker ps -q -f name=^infotriage-postgres$$)" ]; then \
+		echo "mvp-up: REFUSING — main stack's infotriage-postgres is already running." >&2; \
+		echo "  MVP mode and the main stack share ./data/postgres + ./data/freshrss;" >&2; \
+		echo "  running both at once is unsafe. Run 'make down' first, or stay on the" >&2; \
+		echo "  main stack if that is what you actually want." >&2; \
+		exit 1; \
+	fi
 	cd $(ROOT_DIR) && $(MVP_COMPOSE) up -d --build --wait
 
 mvp-down: ## Stop the MVP lean stack (keeps data volumes)

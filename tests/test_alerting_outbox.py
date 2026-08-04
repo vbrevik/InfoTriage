@@ -324,6 +324,37 @@ def test_dead_letter_body_carries_full_payload_plus_reason_and_attempts(tmp_path
 
 
 # ---------------------------------------------------------------------------
+# Test 6b: bus=None (MVP synchronous poller) must not crash on dead-letter
+# ---------------------------------------------------------------------------
+
+
+def test_dead_letter_with_no_bus_records_audit_and_outcome_without_crashing(
+    tmp_path,
+):
+    """Regression: the MVP poller calls handle_verdict_ready with bus=None.
+
+    _emit_if_claimed's docstring long assumed no bus=None caller would ever
+    exhaust retries and reach dead_letter — the MVP poller breaks that
+    assumption (it runs synchronously against a real ntfy, no message bus).
+    dead_letter must degrade gracefully: skip the DLX publish, still write
+    the audit row and mark the alert_state outcome, not raise.
+    """
+    store = InMemoryStore(blob_root=tmp_path)
+    item_id = "item-6b"
+    payload = _payload(item_id)
+    _seed_claim(store, payload, item_id)
+
+    asyncio.run(
+        dead_letter(store, None, payload, item_id=item_id, reason="boom", attempts=3)
+    )
+
+    assert len(store._audit) == 1
+    assert store._audit[0]["op"] == "alert_dead_lettered"
+    row = _raw_row(store, payload["dedupe_id"])
+    assert row["dlx_at"] is not None
+
+
+# ---------------------------------------------------------------------------
 # Test 7: audit row op/details are reconstructable
 # ---------------------------------------------------------------------------
 
